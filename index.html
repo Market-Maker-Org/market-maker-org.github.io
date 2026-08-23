@@ -722,6 +722,11 @@ function toast(msg,type,ms){const box=document.getElementById("toasts");if(!box)
   t.innerHTML='<span class="ic">'+ic+'</span><span>'+msg+'</span>';box.appendChild(t);
   setTimeout(()=>{t.classList.add("out");setTimeout(()=>t.remove(),300);},ms||3200);}
 function cp(text,label){if(!text)return;try{navigator.clipboard.writeText(text);toast((label||"Copied")+" · "+short(text));}catch(e){toast("Copy failed","err");}}
+function showSkeletons(){
+  ["d_supply","d_circ","d_burn","d_tre","d_pot","d_pumpdebt","d_decay","d_idx","d_pool","d_allpool","d_ratio","d_mcap","d_depth","d_fee"].forEach(id=>{const el=$(id);if(el&&el.textContent==="—")el.innerHTML='<span class="sk"></span>';});
+  const pr=$("d_price");if(pr)pr.innerHTML='<span class="sk" style="width:200px;height:32px"></span>';
+  const fe=$("feed");if(fe)fe.innerHTML='<div class="ev" style="pointer-events:none"><span class="sk" style="width:100%;height:15px"></span></div>'.repeat(4);
+  const hl=$("holderList");if(hl)hl.innerHTML='<div class="hrow" style="pointer-events:none"><span class="sk" style="width:100%;height:15px"></span></div>'.repeat(6);}
 function savePrefs(){try{localStorage.setItem("mm_prefs",JSON.stringify({watch,range:chartRange,log:chartLog,slip:swSlip,series:Object.fromEntries(Object.entries(SERIES).map(([k,s])=>[k,s.on]))}));}catch(e){}}
 function loadPrefs(){try{const p=JSON.parse(localStorage.getItem("mm_prefs")||"{}");
   if(p.watch&&/^0x[a-fA-F0-9]{40}$/.test(p.watch))watch=p.watch;
@@ -746,6 +751,7 @@ function priceFromSqrt(sqrtP){if(sqrtP===0n)return null;const mmPerEth=(Number(s
 async function boot(){
   ro=new E.JsonRpcProvider(CFG.rpc);mmRead=new E.Contract(CFG.mm,A.token.abi,ro);poolMgr=new E.Contract(CFG.pm,PM_ABI,ro);poolId=computePoolId();
   try{await ro.getBlockNumber();$("net").classList.add("ok");$("nettxt").textContent="Robinhood · live";}catch(e){$("nettxt").textContent="RPC error";}
+  showSkeletons(); // polished first paint while data loads
   loadPrefs(); // restore saved chart series/range/log, slippage, watched wallet
   if(!watch&&CFG.defaultWatch)watch=CFG.defaultWatch;
   if(watch)$("p_addr").textContent=short(watch);
