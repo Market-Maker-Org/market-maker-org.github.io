@@ -794,7 +794,9 @@ async function boot(){
   setTimeout(buildFlows,900);setTimeout(buildFlows,2500); // draw ecosystem flow lines once laid out
   // pause network polling while the tab is hidden (saves RPC + battery); UI ticks keep running cheaply
   const vis=fn=>()=>{if(!document.hidden)fn();};
-  setInterval(vis(refresh),5000);setInterval(vis(fetchSlow),30000);setInterval(tickLive,120);setInterval(vis(fetchEthUsd),60000);setInterval(vis(getHolders),30000);setInterval(tickHolders,250);setInterval(tickDebt,150);setInterval(vis(fetchPumpStats),60000);
+  setInterval(vis(refresh),5000);setInterval(vis(fetchSlow),30000);setInterval(vis(fetchEthUsd),60000);setInterval(vis(getHolders),30000);setInterval(vis(fetchPumpStats),60000);
+  // one consolidated UI ticker (was 3 timers) — lighter, pauses when hidden
+  setInterval(()=>{if(document.hidden)return;tickLive();tickHolders();tickDebt();},250);
   document.addEventListener("visibilitychange",()=>{if(!document.hidden){refresh();fetchSlow();}});
 }
 let walletEip=null;
@@ -836,8 +838,11 @@ async function connectWallet(){
 }
 async function openSocial(){
   if(window.mmOpenConnect){window.mmOpenConnect();return;}
-  if(window.mmReownLoading){toast("Loading login options…");for(let i=0;i<24&&!window.mmOpenConnect;i++)await new Promise(r=>setTimeout(r,150));if(window.mmOpenConnect){window.mmOpenConnect();return;}}
-  toast("Install MetaMask/Rabby, or try again in a moment for social login","warn");
+  toast("Loading login options…");
+  if(window.mmLoadReown)try{await window.mmLoadReown();}catch(e){}
+  for(let i=0;i<24&&!window.mmOpenConnect;i++)await new Promise(r=>setTimeout(r,150));
+  if(window.mmOpenConnect)window.mmOpenConnect();
+  else toast("Login options unavailable — install MetaMask/Rabby instead","warn");
 }
 let walProfile=null;
 async function finishConnect(sgnr,profile){
@@ -910,7 +915,7 @@ const DECAY_TOPIC=E.id("Decay(uint256,uint256,uint256,uint256,uint256)");
 // liquidity, volume) and the token's Decay events (reflection index, deflation).
 async function buildHistory(attempt=0){
   try{
-    const cur=await ro.getBlockNumber();const c=E.AbiCoder.defaultAbiCoder();const CH=45000,N=9;
+    const cur=await ro.getBlockNumber();const c=E.AbiCoder.defaultAbiCoder();const CH=45000,N=5;
     const sync=[],swaps=[],decays=[];
     // SEQUENTIAL fetches — the /rpc proxy returns empty arrays under concurrent getLogs load.
     for(let i=N-1;i>=0;i--){const to=cur-i*CH,from=Math.max(0,to-CH+1);if(to<=0)continue;
@@ -1374,17 +1379,21 @@ function updateLegend(all,hi,maxLen){
 }
 function drawPrice(){drawChart();}
 window.addEventListener("resize",()=>{clearTimeout(_flowT);_flowT=setTimeout(buildFlows,200);drawChart();});
-(function(){const c=$("c_price");if(!c)return;
+(function(){const c=$("c_price");if(!c)return;let raf=0;
+  const draw=()=>{if(!raf)raf=requestAnimationFrame(()=>{raf=0;drawChart();});};
   c.addEventListener("mousemove",e=>{if(!_chart)return;const r=c.getBoundingClientRect(),x=e.clientX-r.left;
-    _hoverI=Math.round((x-_chart.PADL)/(_chart.W-_chart.PADR-_chart.PADL-2)*(_chart.maxLen-1));drawChart();});
-  c.addEventListener("mouseleave",()=>{_hoverI=null;drawChart();});})();
+    _hoverI=Math.round((x-_chart.PADL)/(_chart.W-_chart.PADR-_chart.PADL-2)*(_chart.maxLen-1));draw();}); // rAF-throttled: 1 redraw/frame
+  c.addEventListener("mouseleave",()=>{_hoverI=null;draw();});})();
 boot();
 </script>
 
 <!-- Reown AppKit: full wallet connect (injected + WalletConnect + email + Google/X socials). -->
 <!-- Loaded as an isolated module; on any failure the app keeps the injected-wallet fallback. -->
 <script type="module">
-window.mmReownLoading=true;
+// Reown is heavy (~MBs). Injected wallets connect directly without it, so we LAZY-LOAD
+// it only when the user asks for email/social/WalletConnect — keeps first paint light & fast.
+window.mmLoadReown=async function(){
+  if(window._reownStarted)return;window._reownStarted=true;window.mmReownLoading=true;
 try{
   const { createAppKit } = await import('https://esm.sh/@reown/appkit@1.7.8?bundle-deps');
   const { EthersAdapter } = await import('https://esm.sh/@reown/appkit-adapter-ethers@1.7.8?deps=@reown/appkit@1.7.8&bundle-deps');
@@ -1444,7 +1453,8 @@ try{
     if(p&&typeof p.request==="function"&&last&&!window.mmConnected&&window.mmOnConnect)window.mmOnConnect(p,null);});}catch(e){}
   window.mmReownReady=true;window.mmReownLoading=false;
   console.log('Reown AppKit ready');
-}catch(e){ window.mmReownLoading=false; console.warn('Reown AppKit unavailable — injected-wallet fallback active:', e&&e.message); }
+}catch(e){ window.mmReownLoading=false;window._reownStarted=false; console.warn('Reown AppKit failed to load:', e&&e.message); }
+};
 </script>
 </body>
 </html>
