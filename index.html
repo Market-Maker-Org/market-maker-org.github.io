@@ -314,6 +314,14 @@
   ::selection{background:rgba(0,200,5,.3);color:#fff}
   .brand{transition:filter .2s}.brand:hover{filter:brightness(1.1)}
   #connectBtn{min-width:92px}
+  /* ===== loading & transitions ===== */
+  #bootbar{position:fixed;top:0;left:0;height:2px;width:38%;z-index:300;background:linear-gradient(90deg,transparent,var(--green),var(--green2),transparent);box-shadow:0 0 10px var(--green);animation:bootslide 1.05s cubic-bezier(.4,0,.6,1) infinite}
+  @keyframes bootslide{0%{left:-38%}100%{left:100%}}
+  .term{animation:fadeUp .5s ease both}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:none}}
+  #pv-proto,#pv-swap,#pv-wallet{animation:fadeUp .22s ease}
+  .sk{display:inline-block;min-width:46px;height:12px;border-radius:4px;background:linear-gradient(90deg,#141414 25%,#1e1e1e 37%,#141414 63%);background-size:400% 100%;animation:shimmer2 1.3s ease infinite;vertical-align:middle}
+  @keyframes shimmer2{0%{background-position:100% 0}100%{background-position:-100% 0}}
   /* ===== premium polish ===== */
   header{box-shadow:0 1px 0 rgba(0,200,5,.07),0 10px 30px -24px #000}
   .brand b{text-shadow:0 0 14px rgba(0,200,5,.4)}
@@ -344,6 +352,7 @@
 </style>
 </head>
 <body>
+<div id="bootbar"></div>
 <header>
   <div class="brand"><img src="mm.png" class="mmlogo" style="width:26px;height:26px" alt="MM">Market <b>Maker</b><span class="rh-wrap"><svg class="feather" viewBox="0 0 32 32" aria-hidden="true"><path d="M27 4.5c-9.4.6-17 6.8-20.4 17.2-.5 1.5 1 2.8 2.4 2 1-.6 1.4-1.8 1.8-2.9C13.6 14.4 19 9.4 27 8.2c.7-.1 1.1-.8.9-1.5-.2-.6-.8-.9-1.4-.8.7-.2 1.1-.9.9-1.5-.2-.6-.8-1-1.4-.9z" fill="#00C805"/><path d="M8.5 25.5l3.2-6.4" stroke="#00C805" stroke-width="1.7" stroke-linecap="round"/></svg><span class="rh2">ROBINHOOD</span></span></div>
   <div class="spacer"></div>
@@ -743,6 +752,7 @@ async function boot(){
   buildPools();buildChartTools();fetchEthUsd();
   await fetchSlow();          // prime rarely-changing config first
   await refresh();            // then live state
+  {const bb=$("bootbar");if(bb){bb.style.opacity="0";bb.style.transition="opacity .4s";setTimeout(()=>bb.remove(),450);}}
   buildHistory();             // then load history (retries if RPC was busy)
   setTimeout(getHolders,700); // stagger the heavy balanceOf sweep
   setTimeout(fetchPumpStats,1400);
@@ -774,12 +784,15 @@ async function ensureChain(){
 function paintChain(id){const el=$("acct");if(!el||!account)return;
   const ok=id===4663;el.textContent=account.slice(0,7)+"…"+account.slice(-5)+(ok?"":" · wrong chain");
   el.style.color=ok?"":"var(--orange2)";}
+let _connecting=false;
 async function connectWallet(){
   if(window.mmOpenConnect){try{window.mmOpenConnect();return;}catch(e){}}
   if(!window.ethereum){toast("No wallet found — install a wallet or use the Connect popup","warn");return;}
-  walletEip=window.ethereum;
-  const bp=new E.BrowserProvider(walletEip);await bp.send("eth_requestAccounts",[]);
-  await finishConnect(await bp.getSigner());
+  if(_connecting){toast("Check your wallet — a request is already open","warn");return;}
+  _connecting=true;
+  try{walletEip=window.ethereum;const bp=new E.BrowserProvider(walletEip);await bp.send("eth_requestAccounts",[]);await finishConnect(await bp.getSigner());}
+  catch(e){toast("Connection cancelled","warn");}
+  finally{_connecting=false;}
 }
 let walProfile=null;
 async function finishConnect(sgnr,profile){
@@ -789,7 +802,9 @@ async function finishConnect(sgnr,profile){
     $("connectBtn").textContent="Wallet ▾";$("connectBtn").onclick=()=>protoTab('wallet');
     let cid=0;try{cid=Number((await signer.provider.getNetwork()).chainId);}catch(e){}
     paintChain(cid);
-    if(cid!==4663)ensureChain(); // proactively switch to Robinhood on connect
+    // Don't fire a chain-switch here — it collides with the wallet's just-finished
+    // connect request ("previous request still active"). Writes switch lazily via ensureChain().
+    if(cid!==4663)toast("On the wrong network — switch to Robinhood Chain to transact","warn",4500);
     try{const o=await mmRead.owner();if(o.toLowerCase()===account.toLowerCase())$("adminBtn").style.display="";}catch(e){}
     useMine();updateSwapBalances();renderWallet();if($("pv-swap")&&getComputedStyle($("pv-swap")).display!=="none")quoteSwap();
   }catch(e){}
