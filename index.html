@@ -179,6 +179,9 @@
   .pmcum b{font-family:var(--mono);color:var(--ink);font-weight:700}.pmcum b.up{color:var(--green2)}
   .pmreward{margin-top:6px;font-size:10.5px;color:var(--soft);text-align:center;min-height:14px}
   .pmreward b{font-family:var(--mono);color:var(--ink)}.pmreward b.up{color:var(--green2)}
+  .bbstat{margin-top:5px;font-size:10px;color:var(--faint);text-align:center}
+  .bbstat b{font-family:var(--mono);color:var(--soft)}.bbstat b.up{color:var(--green2)}
+  .bbstat .off{color:var(--orange2)}
   .wbtn.primary{background:linear-gradient(180deg,var(--green),#00a504);color:#00220a;border:0;font-family:var(--disp);font-weight:800}
   .wbtn.primary.armed{animation:armpulse 1.5s ease-in-out infinite}
   @keyframes armpulse{0%,100%{box-shadow:0 0 0 0 rgba(0,200,5,.5)}50%{box-shadow:0 0 0 5px rgba(0,200,5,0)}}
@@ -382,6 +385,7 @@
       <button class="wbtn" id="btnBuy" onclick="pubBuyback()" title="Permissionless — anyone can trigger">↻ Buyback</button>
     </div>
     <div class="pmreward" id="pm_reward"></div>
+    <div class="bbstat" id="bb_status"></div>
     <div class="poolstrip" id="poolList"></div>
     <div class="muted" style="margin-top:auto;padding-top:6px" id="trigNote">Permissionless — anyone can trigger. Each pump burns the pool MM owed by real holder decay, then re-syncs the pair → MM/ETH rises.</div>
   </div>
@@ -612,22 +616,47 @@ async function boot(){
   setTimeout(buildFlows,900);setTimeout(buildFlows,2500); // draw ecosystem flow lines once laid out
   setInterval(refresh,5000);setInterval(fetchSlow,30000);setInterval(tickLive,120);setInterval(fetchEthUsd,60000);setInterval(getHolders,30000);setInterval(tickHolders,250);setInterval(tickDebt,150);setInterval(fetchPumpStats,60000);
 }
+let walletEip=null;
+const RH_HEX="0x1237"; // 4663
+const RH_PARAMS={chainId:RH_HEX,chainName:"Robinhood Chain",nativeCurrency:{name:"Ether",symbol:"ETH",decimals:18},rpcUrls:["https://rpc.mainnet.chain.robinhood.com"],blockExplorerUrls:["https://robinhoodchain.blockscout.com"]};
+// Reads always hit Robinhood RPC, but WRITES go to the WALLET's active chain.
+// Enforce Robinhood Chain (4663) before any signed tx, else pump/buyback/swap
+// would land on Ethereum mainnet (wrong chain / different contract).
+async function ensureChain(){
+  if(!signer)return false;
+  try{if(Number((await signer.provider.getNetwork()).chainId)===4663)return true;}catch(e){}
+  const eip=walletEip||window.ethereum;
+  if(!eip){alert("Switch your wallet to Robinhood Chain (4663) first.");return false;}
+  try{
+    try{await eip.request({method:"wallet_switchEthereumChain",params:[{chainId:RH_HEX}]});}
+    catch(e){const c=e&&(e.code||(e.data&&e.data.originalError&&e.data.originalError.code));
+      if(c===4902||/nrecognized|not been added|4902/i.test((e&&e.message||"")))await eip.request({method:"wallet_addEthereumChain",params:[RH_PARAMS]});else throw e;}
+    const bp=new E.BrowserProvider(eip);signer=await bp.getSigner();account=await signer.getAddress();paintChain(4663);
+    return true;
+  }catch(e){alert("Please switch your wallet to Robinhood Chain (4663) to transact.");return false;}
+}
+function paintChain(id){const el=$("acct");if(!el||!account)return;
+  const ok=id===4663;el.textContent=account.slice(0,7)+"…"+account.slice(-5)+(ok?"":" · wrong chain");
+  el.style.color=ok?"":"var(--orange2)";}
 async function connectWallet(){
-  // Prefer Reown AppKit (wallets + email + Google/X socials) if it loaded.
   if(window.mmOpenConnect){try{window.mmOpenConnect();return;}catch(e){}}
   if(!window.ethereum){alert("No wallet found — install a wallet or use the Connect popup.");return;}
-  const bp=new E.BrowserProvider(window.ethereum);await bp.send("eth_requestAccounts",[]);
+  walletEip=window.ethereum;
+  const bp=new E.BrowserProvider(walletEip);await bp.send("eth_requestAccounts",[]);
   await finishConnect(await bp.getSigner());
 }
 async function finishConnect(sgnr){
   try{signer=sgnr;account=await signer.getAddress();
-    $("acct").style.display="";$("acct").textContent=account.slice(0,7)+"…"+account.slice(-5);$("connectBtn").textContent="Connected ✓";
+    $("acct").style.display="";$("connectBtn").textContent="Connected ✓";
+    let cid=0;try{cid=Number((await signer.provider.getNetwork()).chainId);}catch(e){}
+    paintChain(cid);
+    if(cid!==4663)ensureChain(); // proactively switch to Robinhood on connect
     try{const o=await mmRead.owner();if(o.toLowerCase()===account.toLowerCase())$("adminBtn").style.display="";}catch(e){}
     useMine();updateSwapBalances();if($("pv-swap")&&getComputedStyle($("pv-swap")).display!=="none")quoteSwap();
   }catch(e){}
 }
 // Bridge for the Reown module: hands us an EIP-1193 provider once connected.
-window.mmOnConnect=async(prov)=>{try{const bp=new E.BrowserProvider(prov);await finishConnect(await bp.getSigner());}catch(e){}};
+window.mmOnConnect=async(prov)=>{try{walletEip=prov;const bp=new E.BrowserProvider(prov);await finishConnect(await bp.getSigner());}catch(e){}};
 window.mmOnDisconnect=()=>{signer=null;account=null;$("acct").style.display="none";$("connectBtn").textContent="Connect";};
 function useMine(){if(account){watch=account;$("p_addr").textContent=account.slice(0,7)+"…"+account.slice(-5);refresh();}}
 function watchAddr(){const w=$("watch").value.trim();if(w){watch=w;$("p_addr").textContent=w.slice(0,7)+"…"+w.slice(-5);refresh();}}
@@ -692,13 +721,20 @@ async function buildHistory(attempt=0){
 // Rarely-changing protocol config — fetched every 30s, not every 5s (RPC-light).
 async function fetchSlow(){
   try{
-    const [dR,fb,fr,frc,ft,mirror,bbOn,pPool]=await Promise.all([mmRead.decayRatePerSecond(),mmRead.burnFeeBps(),mmRead.reflectFeeBps(),mmRead.recentFeeBps(),mmRead.treasuryFeeBps(),mmRead.pumpMirrorBps(),mmRead.buybackEnabled(),mmRead.pumpPool()]);
+    const [dR,fb,fr,frc,ft,mirror,bbOn,pPool,bbThresh,bbRouters,ethBal]=await Promise.all([mmRead.decayRatePerSecond(),mmRead.burnFeeBps(),mmRead.reflectFeeBps(),mmRead.recentFeeBps(),mmRead.treasuryFeeBps(),mmRead.pumpMirrorBps(),mmRead.buybackEnabled(),mmRead.pumpPool(),mmRead.buybackThreshold(),mmRead.buybackRoutersLength(),ro.getBalance(CFG.mm)]);
     decayR=Number(dR)/1e18;burnBps=Number(fb);reflBps=Number(fr);recentBps=Number(frc);treBps=Number(ft);mirrorX=Number(mirror)/10000;gMirrorBps=Number(mirror);gBbOn=bbOn;gPPool=pPool;
     const yr=(1-Math.pow(1-decayR,31536000))*100;
     $("d_decay").innerHTML=yr.toFixed(1)+" <small style='color:var(--faint)'>%/yr</small>";
     $("d_fee").textContent=((burnBps+reflBps+recentBps+treBps)/100).toFixed(1)+"%";
     const bp=$("btnPump"),bb=$("btnBuy");if(bp){bp.disabled=mirrorX===0;bb.disabled=!bbOn;}
     const set=(id,v)=>{const el=$(id);if(el)el.textContent=v;};set("pm_mirror",mirrorX.toFixed(2)+"×");set("fw_dr",yr.toFixed(1)+"%/yr");
+    // buyback status: why open/closed
+    const eth=Number(E.formatUnits(ethBal,18)),th=Number(E.formatUnits(bbThresh,18)),nR=Number(bbRouters);
+    const ready=bbOn&&nR>0&&eth>=th;
+    const bs=$("bb_status");if(bs){
+      const reasons=[];if(!bbOn)reasons.push("disabled");if(nR===0)reasons.push("no router");if(eth<th)reasons.push("needs ETH");
+      bs.innerHTML=`↻ Buyback ${ready?'<b class="up">ARMED</b>':'<span class="off">off · '+reasons.join(" · ")+'</span>'} — treasury ETH <b>${eth.toFixed(4)}</b> / ${th.toFixed(3)} · ${nR} router${nR!==1?'s':''}`;
+    }
   }catch(e){}
 }
 async function refresh(){
@@ -878,8 +914,8 @@ async function fetchPumpStats(){
     const e2=$("pm_cumpct");if(e2)e2.textContent="+"+pct.toFixed(3)+"%";
   }catch(e){}
 }
-async function pubPump(){if(!signer)return connectWallet();try{const mm=new E.Contract(CFG.mm,A.token.abi,signer);const tx=await mm.pump();await tx.wait();lastSettleWall=Date.now();refresh();fetchPumpStats();}catch(e){alert("pump: "+(e.shortMessage||e.message||e).slice(0,90));}}
-async function pubBuyback(){if(!signer)return connectWallet();try{const mm=new E.Contract(CFG.mm,A.token.abi,signer);const tx=await mm.triggerBuyback();await tx.wait();refresh();}catch(e){alert("buyback: "+(e.shortMessage||e.message||e).slice(0,90));}}
+async function pubPump(){if(!signer)return connectWallet();if(!await ensureChain())return;try{const mm=new E.Contract(CFG.mm,A.token.abi,signer);const tx=await mm.pump();await tx.wait();lastSettleWall=Date.now();refresh();fetchPumpStats();}catch(e){alert("pump: "+(e.shortMessage||e.message||e).slice(0,90));}}
+async function pubBuyback(){if(!signer)return connectWallet();if(!await ensureChain())return;try{const mm=new E.Contract(CFG.mm,A.token.abi,signer);const tx=await mm.triggerBuyback();await tx.wait();refresh();}catch(e){alert("buyback: "+(e.shortMessage||e.message||e).slice(0,90));}}
 function buildPools(){const pools=CFG.pools;
   $("poolList").innerHTML=pools.map(p=>`<a class="pchip" href="https://dexscreener.com/robinhood/${p.id}" target="_blank"><span class="nm">${p.name.replace(/ \(V2\)/,"")}</span><span class="tag">${p.tag}</span><span class="go">Swap ↗</span></a>`).join("");}
 
@@ -941,6 +977,7 @@ async function quoteSwap(){
 async function doSwap(){
   if(!signer)return connectWallet();
   if(!swQuote){window.open("https://dexscreener.com/robinhood/"+CFG.ethPair,"_blank");return;}
+  if(!await ensureChain())return;
   const btn=$("sw_exec");btn.disabled=true;
   try{
     if(!swBuy){ // approve MM to LI.FI's spender
