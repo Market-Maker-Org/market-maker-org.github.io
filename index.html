@@ -951,6 +951,7 @@ async function refresh(){
       $("p_badge").textContent=excluded?"EXCLUDED":"INCLUDED · decaying";$("p_badge").className="badge "+(excluded?"exc":"inc");
       const ex=$("p_expl");if(ex){ex.href=EXPLORER+"/address/"+watch;ex.target="_blank";}
       renderPnL(liveBal);}
+    if(account&&$("pv-wallet")&&getComputedStyle($("pv-wallet")).display!=="none")renderWallet(); // keep wallet balances live
     if(feedTick%3===0)getFeed();
     feedTick++;
     refreshFails=0;$("net").classList.add("ok");$("nettxt").textContent="Robinhood · live";
@@ -1319,13 +1320,13 @@ try{
     themeVariables:{ '--w3m-accent':'#00C805','--w3m-color-mix':'#00C805','--w3m-color-mix-strength':8,'--w3m-border-radius-master':'2px','--w3m-font-family':"'IBM Plex Sans',system-ui,sans-serif" }
   });
   const DARKCSS=":host{--wui-color-modal-bg:#0a0f0c!important;--wui-color-modal-bg-base:#0a0f0c!important;--wui-color-bg-100:#0e1411!important;--wui-color-bg-125:#131a16!important;--wui-color-bg-150:#18201b!important;--wui-color-bg-175:#1e2721!important;--wui-color-bg-200:#232e27!important;--wui-color-fg-100:#f4f7f5!important;--wui-color-fg-125:#d7ded9!important;--wui-color-fg-150:#9aa8a1!important;--wui-color-fg-200:#5f6b64!important;--wui-color-accent-100:#00C805!important}";
-  function injectDark(root,d){try{if(!root||d>8)return;if(root.querySelector&&!root.querySelector(':scope>style[data-mm]')){const s=document.createElement('style');s.setAttribute('data-mm','1');s.textContent=DARKCSS;root.appendChild(s);}
-    if(root.querySelectorAll)for(const el of root.querySelectorAll('*'))if(el.shadowRoot)injectDark(el.shadowRoot,d+1);}catch(e){}}
-  const forceDark=()=>{try{appKit.setThemeMode&&appKit.setThemeMode('dark');}catch(e){}
-    try{appKit.setThemeVariables&&appKit.setThemeVariables({'--w3m-accent':'#00C805','--w3m-border-radius-master':'2px','--w3m-font-family':"'IBM Plex Sans',system-ui,sans-serif"});}catch(e){}
-    const m=document.querySelector('w3m-modal');if(m&&m.shadowRoot)injectDark(m.shadowRoot,0);};
+  // Custom props on the modal host inherit into ALL nested shadow roots, so a single
+  // top-level injection is enough (no recursive DOM walk → no jank during auth).
+  function injectDark(){try{const m=document.querySelector('w3m-modal');
+    if(m&&m.shadowRoot&&!m.shadowRoot.querySelector('style[data-mm]')){const s=document.createElement('style');s.setAttribute('data-mm','1');s.textContent=DARKCSS;m.shadowRoot.appendChild(s);}}catch(e){}}
+  const forceDark=()=>{try{appKit.setThemeMode&&appKit.setThemeMode('dark');}catch(e){}injectDark();};
   forceDark();
-  const darkBurst=()=>[80,250,600,1200].forEach(t=>setTimeout(forceDark,t));
+  const darkBurst=()=>[150,700].forEach(t=>setTimeout(forceDark,t));
   window.mmOpenConnect=()=>{appKit.open();darkBurst();};
   window.mmOpenAccount=()=>{appKit.open({view:'Account'});darkBurst();}; // deposit/withdraw/export/onramp/disconnect (native)
   window.mmOpenOnRamp=()=>{try{appKit.open({view:'OnRampProviders'});}catch(e){appKit.open({view:'Account'});}darkBurst();};
