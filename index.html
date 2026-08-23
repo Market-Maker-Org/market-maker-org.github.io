@@ -1,0 +1,659 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<title>Market Maker Terminal</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23000'/%3E%3Crect x='1' y='1' width='30' height='30' rx='7' fill='none' stroke='%2300C805' stroke-opacity='.6'/%3E%3Cpath d='M6 21 L12 13 L17 18 L26 7' fill='none' stroke='%2300C805' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='26' cy='7' r='2.7' fill='%23ff7a18'/%3E%3C/svg%3E">
+<meta name="theme-color" content="#000000">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800;900&family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<script src="ethers.umd.min.js"></script>
+<script src="artifacts.js"></script>
+<style>
+  :root{
+    --bg:#000000; --panel:#0a0e0c; --panel2:#0f1512; --ink:#f4f7f5; --soft:#9aa8a1; --faint:#5f6b64; --line:#182019; --line2:#232e27;
+    --green:#00C805; --green2:#38ff7e; --greenDim:#0a2e14; --orange:#ff7a18; --orange2:#ffa24d; --white:#ffffff;
+    --up:#00C805; --down:#ff5a2c;
+    --mono:"IBM Plex Mono",ui-monospace,monospace; --sans:"IBM Plex Sans",system-ui,sans-serif; --disp:"Archivo",sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:radial-gradient(130% 90% at 88% -12%,#06160b 0%,transparent 55%),radial-gradient(90% 60% at -5% 0%,#0a0f0c,transparent 55%),var(--bg);
+    color:var(--ink);font-family:var(--sans);font-size:13.5px;line-height:1.5;-webkit-font-smoothing:antialiased;overflow:hidden}
+  .mono{font-family:var(--mono);font-variant-numeric:tabular-nums} a{color:var(--green2);text-decoration:none}
+  /* header */
+  header{display:flex;align-items:center;gap:14px;height:52px;padding:0 18px;border-bottom:1px solid var(--line);background:rgba(0,0,0,.6);backdrop-filter:blur(8px)}
+  .brand{font-family:var(--disp);font-weight:900;font-size:18px;letter-spacing:-.02em;display:flex;align-items:center;gap:9px}
+  .logo{width:24px;height:24px;border-radius:6px;border:1px solid var(--green);display:grid;place-items:center}
+  .logo svg{width:16px;height:16px}
+  .brand b{color:var(--green)} .brand .rh{color:var(--faint);font-family:var(--mono);font-size:10px;letter-spacing:.1em;margin-left:2px}
+  .spacer{flex:1}
+  .chip{font-family:var(--mono);font-size:11px;color:var(--soft);border:1px solid var(--line2);border-radius:100px;padding:5px 10px;display:flex;gap:6px;align-items:center}
+  .chip .d{width:7px;height:7px;border-radius:50%;background:var(--orange)}.chip.ok .d{background:var(--green);box-shadow:0 0 8px var(--green)}
+  .hbtn{background:var(--panel2);border:1px solid var(--line2);color:var(--ink);font-family:var(--disp);font-weight:700;font-size:12px;padding:7px 12px;border-radius:8px;cursor:pointer}
+  .hbtn.green{background:var(--green);color:#00220a;border:0}
+  /* terminal grid */
+  .term{display:grid;grid-template-columns:repeat(4,1fr);grid-template-rows:minmax(0,1.5fr) minmax(0,1fr);gap:10px;padding:10px;height:calc(100vh - 52px)}
+  .cell{background:linear-gradient(180deg,var(--panel),#060908);border:1px solid var(--line);border-radius:14px;padding:13px;overflow:hidden;display:flex;flex-direction:column;min-height:0;
+    box-shadow:0 1px 0 rgba(255,255,255,.03) inset,0 8px 24px -18px rgba(0,0,0,.9);transition:border-color .2s}
+  .cell:hover{border-color:var(--line2)}
+  .cell h3{font-family:var(--disp);font-size:11px;margin:0 0 9px;letter-spacing:.13em;text-transform:uppercase;color:var(--faint);display:flex;align-items:center;gap:7px}
+  .cell h3::before{content:"";width:12px;height:2px;background:var(--green);border-radius:2px}
+  .c-chart{grid-column:1/4;grid-row:1} .c-stats{grid-column:4;grid-row:1}
+  .c-feed{grid-column:1;grid-row:2} .c-pos{grid-column:2;grid-row:2} .c-pools{grid-column:3;grid-row:2} .c-holders{grid-column:4;grid-row:2}
+  /* holders */
+  .hrow{display:flex;align-items:center;gap:8px;padding:6px 4px;border-bottom:1px solid var(--line)}
+  .hrow:last-child{border-bottom:0} .hrow .rk{font-family:var(--mono);font-size:11px;color:var(--faint);width:16px}
+  .hrow .ad{font-family:var(--mono);font-size:11.5px} .hrow .tg{font-family:var(--mono);font-size:8.5px;padding:1px 5px;border-radius:100px;border:1px solid var(--line2);color:var(--soft)}
+  .hrow .bl{margin-left:auto;font-family:var(--mono);font-size:12px;font-weight:600} .hrow .dn{color:var(--down);font-size:10px;margin-left:4px} .hrow .st{color:var(--green2);font-size:10px;margin-left:4px}
+  .tg.owner{color:var(--orange);border-color:#3a2a12} .tg.pool{color:var(--green2);border-color:var(--greenDim)} .tg.you{color:var(--white);border-color:var(--line2)}
+  /* price hero */
+  .phead{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
+  .plabel{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint)}
+  .price{font-family:var(--mono);font-size:clamp(26px,3.4vw,40px);font-weight:700;letter-spacing:-.02em;line-height:1.05;transition:color .35s}
+  .price.up{color:var(--up);text-shadow:0 0 26px rgba(0,200,5,.35)} .price.down{color:var(--down);text-shadow:0 0 26px rgba(255,90,44,.28)} .price .u{font-size:.4em;color:var(--faint);margin-left:6px}
+  .psub{font-size:11.5px;color:var(--faint);margin-top:3px}
+  .chg{font-family:var(--mono);font-size:12px;padding:3px 9px;border-radius:7px;background:var(--panel2)}.chg.up{color:var(--up)}.chg.down{color:var(--down)}
+  .pmini{display:flex;gap:18px;flex-wrap:wrap;text-align:right}
+  .pmini .l{font-size:9.5px;color:var(--faint);text-transform:uppercase;letter-spacing:.06em}.pmini .v{font-family:var(--mono);font-size:14px;font-weight:600}
+  #c_price{flex:1;width:100%;min-height:0;background:transparent;border:0;margin-top:8px}
+  /* stats */
+  .slist{display:flex;flex-direction:column;gap:0;overflow:auto}
+  .srow{display:flex;justify-content:space-between;align-items:center;padding:7px 2px;border-bottom:1px solid var(--line)}
+  .srow:last-child{border-bottom:0}
+  .srow .l{font-size:11px;color:var(--soft)} .srow .v{font-family:var(--mono);font-size:14px;font-weight:600;transition:color .4s} .srow .v.flash{color:var(--green2)}
+  /* feed */
+  .feed{display:flex;flex-direction:column;gap:5px;overflow:auto}
+  .ev{display:flex;gap:8px;align-items:center;padding:6px 8px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;font-size:12px;animation:sl .3s ease}
+  @keyframes sl{from{opacity:0;transform:translateX(-5px)}to{opacity:1}}
+  .ev .ic{font-size:14px}.ev .mono{margin-left:auto;color:var(--soft)}
+  .ev.buy{border-left:2px solid var(--green)} .ev.sell{border-left:2px solid var(--down)} .ev.burnE{border-left:2px solid var(--orange)} .ev.refl{border-left:2px solid var(--green2)}
+  .livedot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green);animation:pulse 1.4s infinite;display:inline-block}
+  @keyframes pulse{50%{opacity:.35}}
+  /* position */
+  .bigbal{font-family:var(--mono);font-size:clamp(20px,2.4vw,30px);font-weight:700;letter-spacing:-.01em;line-height:1.1}.bigbal .u{font-size:.4em;color:var(--faint);margin-left:5px}
+  .tick{font-family:var(--mono);font-size:11px;color:var(--down);height:13px;margin-top:3px}
+  .badge{font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:100px;border:1px solid var(--line2)}.badge.inc{color:var(--orange);border-color:#3a2a12}.badge.exc{color:var(--green2);border-color:var(--greenDim)}
+  .proj{width:100%;border-collapse:collapse;font-size:11.5px;margin-top:6px}.proj td{padding:3.5px 4px;border-bottom:1px solid var(--line)}.proj td:last-child{text-align:right;font-family:var(--mono)}
+  .win{display:flex;gap:6px;margin-top:8px}.wbtn{flex:1;background:var(--panel2);border:1px solid var(--line2);color:var(--ink);border-radius:7px;padding:6px;font-family:var(--mono);font-size:11px;cursor:pointer}
+  input.mm{width:100%;background:#060908;color:var(--ink);border:1px solid var(--line2);border-radius:8px;padding:7px 9px;font-family:var(--mono);font-size:11.5px;outline:none;margin-top:6px}input.mm:focus{border-color:var(--green)}
+  /* pools */
+  .pool{display:flex;align-items:center;gap:9px;padding:8px;background:var(--panel2);border:1px solid var(--line);border-radius:9px;margin-bottom:7px}
+  .pool .nm{font-family:var(--disp);font-weight:700;font-size:12.5px}.pool .sub{font-size:10.5px;color:var(--faint)}
+  .pool a{margin-left:auto;background:var(--green);color:#00220a;font-family:var(--disp);font-weight:700;font-size:11px;padding:6px 10px;border-radius:7px}
+  .pool .tag{font-family:var(--mono);font-size:9px;color:var(--orange);border:1px solid #3a2a12;border-radius:100px;padding:1px 6px}
+  /* modal */
+  .modal{position:fixed;inset:0;background:rgba(0,0,0,.72);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;z-index:50;padding:20px}
+  .modal.on{display:flex} .modal-in{background:var(--panel);border:1px solid var(--line2);border-radius:16px;max-width:820px;width:100%;max-height:88vh;overflow:auto;padding:20px}
+  .modal-in h2{font-family:var(--disp);margin:0 0 4px} .mclose{float:right;cursor:pointer;color:var(--faint);font-size:20px}
+  .flywheel{display:block;margin:6px auto;max-width:460px;width:100%}.fw-dash{stroke-dasharray:6 8;animation:dash 1.1s linear infinite}@keyframes dash{to{stroke-dashoffset:-28}}
+  .feebar{display:grid;grid-template-columns:120px 1fr auto;gap:10px;align-items:center;font-size:12.5px;margin:7px 0}
+  .feebar .track{height:10px;background:var(--panel2);border-radius:6px;overflow:hidden;border:1px solid var(--line)}.feebar .fill{height:100%;width:0;border-radius:6px;transition:width 1s ease}
+  .icards{display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-top:10px}@media(max-width:640px){.icards{grid-template-columns:1fr}}
+  .icard{background:var(--panel2);border:1px solid var(--line);border-radius:11px;padding:13px}.icard h4{font-family:var(--disp);margin:4px 0;font-size:14px}.icard p{color:var(--soft);font-size:12px;margin:0}
+  .muted{color:var(--faint);font-size:11.5px}
+  /* custom scrollbars — never white */
+  *{scrollbar-width:thin;scrollbar-color:#1c2a22 transparent}
+  ::-webkit-scrollbar{width:8px;height:8px}
+  ::-webkit-scrollbar-track{background:transparent}
+  ::-webkit-scrollbar-thumb{background:linear-gradient(var(--green),#0a5c22);border-radius:100px;border:2px solid var(--bg)}
+  ::-webkit-scrollbar-thumb:hover{background:var(--green)}
+  ::-webkit-scrollbar-corner{background:transparent}
+  /* MM icon set — consistent themed glyphs (our own set, not OS emoji) */
+  .ico{display:inline-grid;place-items:center;width:17px;height:17px;border-radius:5px;border:1px solid;font-size:10px;line-height:1;font-family:var(--mono);flex:0 0 auto}
+  /* chart toolbar + legend */
+  .ctools{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:2px 0 0}
+  .cbtn{font-family:var(--mono);font-size:10px;letter-spacing:.03em;padding:3px 8px;border-radius:100px;border:1px solid var(--line2);background:var(--panel2);color:var(--soft);cursor:pointer;display:flex;align-items:center;gap:5px;transition:.15s}
+  .cbtn .dot{width:7px;height:7px;border-radius:50%;background:currentColor;opacity:.35}
+  .cbtn.on{color:var(--ink);border-color:var(--line2);background:#0d140f}.cbtn.on .dot{opacity:1}
+  .cbtn:hover{border-color:var(--faint)}
+  .crange{margin-left:auto;display:flex;gap:4px}
+  .crange .cbtn.on{background:var(--green);color:#00220a;border-color:transparent}
+  .clegend{display:flex;gap:12px;flex-wrap:wrap;margin-top:4px;font-family:var(--mono);font-size:10.5px}
+  .clegend .li{display:flex;align-items:center;gap:5px;color:var(--soft)}.clegend .li b{color:var(--ink);font-weight:600}
+  .clegend .sw{width:10px;height:2.5px;border-radius:2px}
+  /* holder-economics / PnL */
+  .pnl{margin-top:8px;border-top:1px solid var(--line);padding-top:7px}
+  .pnl .row{display:flex;justify-content:space-between;align-items:center;padding:3px 0;font-size:11.5px}
+  .pnl .row .l{color:var(--soft);display:flex;align-items:center;gap:6px}
+  .pnl .row .v{font-family:var(--mono);font-weight:600}
+  .pnl .v.pos{color:var(--green2)}.pnl .v.neg{color:var(--down)}
+  .pnl .net{border-top:1px dashed var(--line2);margin-top:4px;padding-top:6px}
+  .pnl .net .l{color:var(--ink);font-weight:600}.pnl .net .v{font-size:14px}
+  .netpill{font-family:var(--mono);font-size:9.5px;padding:1px 7px;border-radius:100px;margin-left:6px}
+  .netpill.pos{color:var(--green2);background:rgba(0,200,5,.1);border:1px solid var(--greenDim)}
+  .netpill.neg{color:var(--down);background:rgba(255,90,44,.08);border:1px solid #3a1c14}
+  .pooldelta{font-family:var(--mono);font-size:9px;margin-left:5px}
+  .pooldelta.down{color:var(--green2)}.pooldelta.up{color:var(--orange2)}
+  /* pump engine panel */
+  .pm-state{font-family:var(--mono);font-size:8.5px;letter-spacing:.06em;padding:2px 7px;border-radius:100px;border:1px solid var(--line2);margin-left:auto;text-transform:none}
+  .pm-state.on{color:var(--green2);border-color:var(--greenDim);background:rgba(0,200,5,.07)}
+  .pm-state.off{color:var(--faint)}
+  .fwline{display:flex;align-items:stretch;gap:5px;margin-bottom:9px}
+  .fwnode{flex:1;background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:7px 6px;text-align:center;transition:opacity .4s,border-color .4s}
+  .fwnode .fl{font-size:8.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--faint);white-space:nowrap}
+  .fwnode .fv{font-size:13px;font-weight:700;margin-top:3px;color:var(--ink)}.fwnode .fv.up{color:var(--green2)}
+  .fwnode.dec{border-color:#3a2a12}.fwnode.dec .fl{color:var(--orange2)}
+  .fwnode.debt{border-color:var(--line2)}
+  .fwnode.burn{border-color:var(--greenDim)}.fwnode.burn .fl{color:var(--green2)}
+  .fwarrow{width:26px;flex:0 0 26px;align-self:center}
+  .pmgrid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
+  .pmcell{background:#060908;border:1px solid var(--line);border-radius:8px;padding:6px 7px}
+  .pmcell .l{font-size:8.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--faint)}
+  .pmcell .v{font-size:13px;font-weight:700;margin-top:2px}.pmcell .v.up{color:var(--green2)}
+  .pmcum{display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding:8px 10px;border-radius:9px;
+    background:linear-gradient(100deg,rgba(0,200,5,.08),rgba(255,122,24,.05));border:1px solid var(--greenDim);font-size:11px}
+  .pmcum .lab{color:var(--soft);display:flex;align-items:center;gap:6px}
+  .pmcum b{font-family:var(--mono);color:var(--ink);font-weight:700}.pmcum b.up{color:var(--green2)}
+  .wbtn.primary{background:linear-gradient(180deg,var(--green),#00a504);color:#00220a;border:0;font-family:var(--disp);font-weight:800}
+  .wbtn.primary:disabled{opacity:.4;cursor:not-allowed}
+  .wbtn:disabled{opacity:.4;cursor:not-allowed}
+  .poolstrip{display:flex;flex-direction:column;gap:5px;margin-top:9px;overflow:auto;min-height:0}
+  .pchip{display:flex;align-items:center;gap:8px;padding:6px 9px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;font-size:11.5px}
+  .pchip .nm{font-family:var(--disp);font-weight:700;color:var(--ink)}
+  .pchip .tag{font-family:var(--mono);font-size:8.5px;color:var(--orange2);border:1px solid #3a2a12;border-radius:100px;padding:1px 6px}
+  .pchip .go{margin-left:auto;color:var(--green2);font-family:var(--mono);font-size:10.5px}
+  .pchip:hover{border-color:var(--line2)}
+  .hrow .bl.dec{color:var(--orange2)}
+  /* responsive: allow scroll on small screens */
+  @media(max-width:900px){body{overflow:auto}.term{grid-template-columns:1fr;grid-template-rows:none;height:auto}.c-chart,.c-stats,.c-feed,.c-pos,.c-pools{grid-column:auto;grid-row:auto}#c_price{height:220px}}
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><span class="logo"><svg viewBox="0 0 32 32"><path d="M6 21 L12 13 L17 18 L26 7" fill="none" stroke="#00C805" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="26" cy="7" r="3" fill="#ff7a18"/></svg></span>Market <b>Maker</b><span class="rh">· ROBINHOOD</span></div>
+  <div class="spacer"></div>
+  <span class="chip" id="net"><span class="d"></span><span id="nettxt">connecting…</span></span>
+  <button class="hbtn" onclick="openLearn()">How it works</button>
+  <button class="hbtn green" id="connectBtn" onclick="connectWallet()">Connect</button>
+  <span class="chip" id="acct" style="display:none"></span>
+  <button class="hbtn" id="adminBtn" style="display:none" onclick="window.open('admin.html','_blank')">Admin</button>
+</header>
+
+<div class="term">
+  <!-- CHART -->
+  <div class="cell c-chart">
+    <div class="phead">
+      <div>
+        <div class="plabel">MM / ETH · Robinhood</div>
+        <div class="price" id="d_price">—<span class="u">gwei</span></div>
+        <div class="psub"><span class="chg" id="d_chg">—</span> <span id="d_priceSub">—</span></div>
+      </div>
+      <div class="pmini">
+        <div><div class="l">Market cap</div><div class="v" id="d_mcap">—</div></div>
+        <div><div class="l">Liquidity</div><div class="v" id="d_depth">—</div></div>
+        <div><div class="l">Swap fee</div><div class="v" id="d_fee">—</div></div>
+      </div>
+    </div>
+    <div class="ctools" id="cseries"></div>
+    <div class="clegend" id="clegend"></div>
+    <canvas id="c_price"></canvas>
+  </div>
+
+  <!-- STATS -->
+  <div class="cell c-stats">
+    <h3>Protocol · live</h3>
+    <div class="slist">
+      <div class="srow"><span class="l">Total supply</span><span class="v" id="d_supply">—</span></div>
+      <div class="srow"><span class="l">Circulating · decaying</span><span class="v" id="d_circ">—</span></div>
+      <div class="srow"><span class="l">Burned 🔥</span><span class="v" id="d_burn">—</span></div>
+      <div class="srow"><span class="l">Treasury (MM)</span><span class="v" id="d_tre">—</span></div>
+      <div class="srow"><span class="l">Reward pot</span><span class="v" id="d_pot">—</span></div>
+      <div class="srow"><span class="l">Pump debt ⚙</span><span class="v" id="d_pumpdebt">—</span></div>
+      <div class="srow"><span class="l">Decay</span><span class="v" id="d_decay">—</span></div>
+      <div class="srow"><span class="l">Reflection index</span><span class="v" id="d_idx">—</span></div>
+      <div class="srow"><span class="l">Pump pool MM 💧</span><span class="v" id="d_pool">—</span></div>
+      <div class="srow"><span class="l">All-pool MM <span id="d_allpoolD" class="pooldelta"></span></span><span class="v" id="d_allpool">—</span></div>
+      <div class="srow"><span class="l">Decay : pool → pump</span><span class="v" id="d_ratio">—</span></div>
+    </div>
+  </div>
+
+  <!-- FEED -->
+  <div class="cell c-feed">
+    <h3>Live activity <span class="livedot"></span></h3>
+    <div class="feed" id="feed"><div class="muted">listening…</div></div>
+  </div>
+
+  <!-- POSITION -->
+  <div class="cell c-pos">
+    <h3>Your position</h3>
+    <div class="bigbal"><span id="p_bal">—</span><span class="u">MM</span></div>
+    <div class="tick" id="p_tick"></div>
+    <div style="margin-top:5px"><span class="badge" id="p_badge">—</span> <span class="muted" id="p_addr"></span></div>
+    <div class="pnl" id="pnl"></div>
+    <table class="proj" id="p_proj" style="display:none"></table>
+    <input class="mm" id="watch" placeholder="0x… watch another wallet">
+    <div class="win"><button class="wbtn" onclick="watchAddr()">Watch</button><button class="wbtn" onclick="useMine()">Use my wallet</button></div>
+  </div>
+
+  <!-- PUMP ENGINE -->
+  <div class="cell c-pools">
+    <h3>Pump engine <span class="pm-state off" id="pm_state">reading…</span></h3>
+    <!-- live decay→pump flow -->
+    <div class="fwline">
+      <div class="fwnode dec"><div class="fl">holder decay</div><div class="fv mono" id="fw_dr">—</div></div>
+      <svg class="fwarrow" viewBox="0 0 40 24"><path d="M2 12 H30" stroke="var(--orange)" stroke-width="2" fill="none" class="fw-dash"/><path d="M28 6 L38 12 L28 18" fill="var(--orange)"/></svg>
+      <div class="fwnode debt" id="fwDebt"><div class="fl">pump debt</div><div class="fv mono" id="pm_debt">—</div></div>
+      <svg class="fwarrow" viewBox="0 0 40 24"><path d="M2 12 H30" stroke="var(--green)" stroke-width="2" fill="none" class="fw-dash"/><path d="M28 6 L38 12 L28 18" fill="var(--green)"/></svg>
+      <div class="fwnode burn"><div class="fl">burn → price↑</div><div class="fv mono up" id="pm_impact">—</div></div>
+    </div>
+    <div class="pmgrid">
+      <div class="pmcell"><div class="l">Mirror</div><div class="v mono" id="pm_mirror">—</div></div>
+      <div class="pmcell"><div class="l">Pool MM 💧</div><div class="v mono" id="pm_pool">—</div></div>
+      <div class="pmcell"><div class="l">Next pump burns</div><div class="v mono up" id="pm_impact2">—</div></div>
+    </div>
+    <div class="pmcum">
+      <span class="lab">⚙ Pumped to date <b id="pm_cum">—</b> <span class="muted">MM</span></span>
+      <span class="lab">total lift <b class="up" id="pm_cumpct">—</b></span>
+    </div>
+    <div class="win" style="margin-top:9px">
+      <button class="wbtn primary" id="btnPump" onclick="pubPump()" title="Permissionless — anyone can trigger">⚙ Pump</button>
+      <button class="wbtn" id="btnBuy" onclick="pubBuyback()" title="Permissionless — anyone can trigger">↻ Buyback</button>
+    </div>
+    <div class="poolstrip" id="poolList"></div>
+    <div class="muted" style="margin-top:auto;padding-top:6px" id="trigNote">Permissionless — anyone can trigger. Each pump burns the pool MM owed by real holder decay, then re-syncs the pair → MM/ETH rises.</div>
+  </div>
+
+  <!-- HOLDERS -->
+  <div class="cell c-holders">
+    <h3>Top holders</h3>
+    <div id="holderList" style="overflow:auto"><div class="muted">scanning holders…</div></div>
+  </div>
+</div>
+
+<!-- LEARN MODAL -->
+<div class="modal" id="learn"><div class="modal-in">
+  <span class="mclose" onclick="closeLearn()">✕</span>
+  <h2>How Market Maker works</h2>
+  <p class="muted">A self-balancing economy: idle balances decay; that decay is burned, funds the treasury, and is redistributed. Every swap also burns, reflects to all holders, and funds treasury — the V4 hook enforces the same on-chain.</p>
+  <svg class="flywheel" viewBox="0 0 520 300">
+    <circle cx="130" cy="150" r="64" fill="var(--panel2)" stroke="var(--green)" stroke-width="1.5"/><circle cx="130" cy="150" r="90" fill="none" stroke="var(--line2)" stroke-width="2" class="fw-dash"/>
+    <text x="130" y="146" text-anchor="middle" fill="var(--ink)" font-family="Archivo" font-weight="800" font-size="18">DECAY</text><text x="130" y="165" text-anchor="middle" fill="var(--faint)" font-family="IBM Plex Mono" font-size="10">~50%/yr</text>
+    <path id="pB" d="M194,150 L250,64" stroke="var(--orange)" stroke-width="1.2" fill="none" opacity=".35"/>
+    <path id="pT" d="M194,150 L250,150" stroke="var(--green)" stroke-width="1.2" fill="none" opacity=".35"/>
+    <path id="pR" d="M194,150 L250,236" stroke="var(--green2)" stroke-width="1.2" fill="none" opacity=".35"/>
+    <rect x="250" y="42" width="150" height="44" rx="9" fill="rgba(255,122,24,.12)" stroke="var(--orange)"/><text x="325" y="63" text-anchor="middle" fill="var(--orange)" font-family="Archivo" font-weight="700" font-size="12">50% Burn</text><text x="325" y="77" text-anchor="middle" fill="var(--soft)" font-size="9.5">deflation</text>
+    <rect x="250" y="128" width="150" height="44" rx="9" fill="rgba(0,200,5,.1)" stroke="var(--green)"/><text x="325" y="149" text-anchor="middle" fill="var(--green)" font-family="Archivo" font-weight="700" font-size="12">20% Treasury</text><text x="325" y="163" text-anchor="middle" fill="var(--soft)" font-size="9.5">funding</text>
+    <rect x="250" y="214" width="150" height="44" rx="9" fill="rgba(56,255,126,.1)" stroke="var(--green2)"/><text x="325" y="235" text-anchor="middle" fill="var(--green2)" font-family="Archivo" font-weight="700" font-size="12">30% Reward</text><text x="325" y="249" text-anchor="middle" fill="var(--soft)" font-size="9.5">to holders</text>
+    <circle r="3.2" fill="var(--orange)"><animateMotion dur="1.8s" repeatCount="indefinite"><mpath href="#pB"/></animateMotion></circle>
+    <circle r="3.2" fill="var(--green)"><animateMotion dur="2.1s" repeatCount="indefinite"><mpath href="#pT"/></animateMotion></circle>
+    <circle r="3.2" fill="var(--green2)"><animateMotion dur="1.6s" repeatCount="indefinite"><mpath href="#pR"/></animateMotion></circle>
+    <!-- reflection: a pulse radiating from Reward to holders -->
+    <g id="rHolders">
+      <circle cx="440" cy="212" r="4" fill="var(--green2)" opacity=".5"><animate attributeName="r" values="3;6;3" dur="2s" repeatCount="indefinite"/></circle>
+      <circle cx="470" cy="236" r="4" fill="var(--green2)" opacity=".5"><animate attributeName="r" values="3;6;3" dur="2s" begin=".4s" repeatCount="indefinite"/></circle>
+      <circle cx="500" cy="212" r="4" fill="var(--green2)" opacity=".5"><animate attributeName="r" values="3;6;3" dur="2s" begin=".8s" repeatCount="indefinite"/></circle>
+    </g>
+  </svg>
+  <h3 style="font-family:var(--disp);font-size:13px;color:var(--faint);letter-spacing:.1em;text-transform:uppercase">Swap tax · 4%</h3>
+  <div id="l_feebars">
+    <div class="feebar"><span>🔥 Burn 1.5%</span><div class="track"><div class="fill" data-w="37.5" style="background:var(--orange)"></div></div><span class="mono">supply↓</span></div>
+    <div class="feebar"><span>💧 Reflection 1%</span><div class="track"><div class="fill" data-w="25" style="background:var(--green2)"></div></div><span class="mono">all holders</span></div>
+    <div class="feebar"><span>🎯 Recent 0.5%</span><div class="track"><div class="fill" data-w="12.5" style="background:var(--green)"></div></div><span class="mono">active</span></div>
+    <div class="feebar"><span>🏦 Treasury 1%</span><div class="track"><div class="fill" data-w="25" style="background:var(--orange2)"></div></div><span class="mono">team</span></div>
+  </div>
+  <div class="icards">
+    <div class="icard"><h4>🛡️ Liquidity never bricks</h4><p>Pools/owner/treasury/hook are excluded — balances never drift passively; V2/V3/V4 liquidity stays fully withdrawable.</p></div>
+    <div class="icard"><h4>💧 Reflection</h4><p>Every swap lifts the index — all holders grow instantly, no transaction.</p></div>
+    <div class="icard"><h4>🕒 Decay = time, not trades</h4><p>Hold 1h ≈ −0.006%, 1wk ≈ −1.3%. Short-term traders barely feel it; idle holders slowly bleed.</p></div>
+    <div class="icard"><h4>💵 V4 hook</h4><p>Fee taken inside the swap: MM side runs burn/reflect/treasury; ETH side becomes treasury cash.</p></div>
+  </div>
+  <p class="muted" style="text-align:center;margin-top:12px">Hard cap 1B · no mint · owner can't seize · 46/46 tests + invariants.</p>
+</div></div>
+
+<script>
+// Local dev has the server.js proxy (/rpc,/holders,/ethusd). Static hosting
+// (GitHub Pages) has no proxy → hit the public endpoints directly (CORS-enabled).
+const LOCAL=/^(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])$/.test(location.hostname);
+const CFG={rpc:(LOCAL?location.origin+"/rpc":"https://rpc.mainnet.chain.robinhood.com"),mm:"0xA6FA16a2257d5cF8755216311837955904FD8271",
+  hook:"0xbc1a927A61fe72a52E046afce0817771C3BB0044",pm:"0x8366a39CC670B4001A1121B8F6A443A643e40951",cap:1e9,
+  defaultWatch:"0x87A7A3D8f13f92795e2Ce5016B36E15893439B4F",
+  ethPair:"0x66f6f74235f113Cf39B821C6566057FbC1271434", // V2 WETH/MM (token0=WETH, token1=MM)
+  pools:[{name:"MM / ETH (V2)",id:"0x66f6f74235f113Cf39B821C6566057FbC1271434",tag:"V2 · main"},
+         {name:"MM / THROBBIN (V2)",id:"0x3014706B83aff71A4Ef5550900A0A437f3F1e25F",tag:"V2"},
+         {name:"MM / PACK (V2)",id:"0x1b66ECa284b18D83BF7F5fFBaD3cA278E76Ca24D",tag:"V2"}]};
+const A=window.MM_ARTIFACTS,E=ethers,$=id=>document.getElementById(id);
+const PM_ABI=["function extsload(bytes32) view returns (bytes32)"];
+let ro,signer,account,mmRead,poolMgr,poolId,price0=0,feedTick=0,histLoaded=false;
+let watch=null,decayR=0,liveBal=0,excluded=false,holderRows=[];
+const priceHist=[];
+// ---- MM icon set (our own consistent themed glyph set) ----
+const IC={buy:{g:"▲",c:"#00C805"},sell:{g:"▼",c:"#ff5a2c"},burn:{g:"✷",c:"#ff7a18"},pump:{g:"⚙",c:"#38ff7e"},
+  reflect:{g:"❖",c:"#38ff7e"},treasury:{g:"▮",c:"#ffa24d"},decay:{g:"⌁",c:"#ff7a18"},reward:{g:"✦",c:"#00C805"},transfer:{g:"↔",c:"#9aa8a1"}};
+const icon=k=>{const o=IC[k]||IC.transfer;return `<span class="ico" style="color:${o.c};border-color:${o.c}44">${o.g}</span>`;};
+// ---- multi-series chart model (real on-chain data) ----
+const SERIES={
+  price :{label:"Price",   color:"#00C805",on:true, data:[],fmtV:v=>ethUsd?usd(v*ethUsd):gwei(v).toFixed(4)+"g"},
+  pool  :{label:"Liquidity",color:"#38ff7e",on:false,data:[],fmtV:v=>fmt(v,0)+" MM"},
+  supply:{label:"Supply",  color:"#e8f0ea",on:false,data:[],fmtV:v=>fmt(v,0)},
+  burn  :{label:"Deflation",color:"#ff7a18",on:false,data:[],fmtV:v=>fmt(v,0)+" 🔥"},
+  index :{label:"Reflection",color:"#ffa24d",on:false,data:[],fmtV:v=>v.toFixed(6)},
+  vol   :{label:"Volume",  color:"#9aa8a1",on:true, data:[],fmtV:v=>fmt(v,0)+" MM"}};
+let chartRange=200; // last N points; 0 = all
+let volYr=0,incSupply=0,reflBps=0,burnBps=0,recentBps=0,treBps=0,mirrorX=1,poolMMg=0,debtBase=0,debtBaseT=0,allPool0=0,refreshFails=0;
+let gMirrorBps=10000,gBbOn=false,gPPool=null;
+const fmt=(x,d=2)=>Number(typeof x==="bigint"?E.formatUnits(x,18):x).toLocaleString("en-US",{maximumFractionDigits:d});
+const gwei=p=>p*1e9; // ETH per MM -> gwei per MM
+let ethUsd=0;
+const BS="https://robinhoodchain.blockscout.com";
+function usd(x){if(!x)return "$0";if(x>=1)return "$"+x.toLocaleString("en-US",{maximumFractionDigits:2});if(x>=0.01)return "$"+x.toFixed(4);
+  const s=x.toFixed(15).replace(/0+$/,"");return "$"+s;} // full digits, no e-notation
+function usdBig(x){return "$"+x.toLocaleString("en-US",{maximumFractionDigits:x>=100?0:2});}
+async function fetchEthUsd(){try{const r=await fetch(LOCAL?"/ethusd":BS+"/api/v2/stats");const j=await r.json();if(j.coin_price)ethUsd=Number(j.coin_price);}catch(e){}}
+
+function computePoolId(){return E.keccak256(E.AbiCoder.defaultAbiCoder().encode(["tuple(address,address,uint24,int24,address)"],[[E.ZeroAddress,CFG.mm,3000,60,CFG.hook]]));}
+function priceFromSqrt(sqrtP){if(sqrtP===0n)return null;const mmPerEth=(Number(sqrtP)/2**96)**2;return mmPerEth>0?1/mmPerEth:null;}
+
+async function boot(){
+  ro=new E.JsonRpcProvider(CFG.rpc);mmRead=new E.Contract(CFG.mm,A.token.abi,ro);poolMgr=new E.Contract(CFG.pm,PM_ABI,ro);poolId=computePoolId();
+  try{await ro.getBlockNumber();$("net").classList.add("ok");$("nettxt").textContent="Robinhood · live";}catch(e){$("nettxt").textContent="RPC error";}
+  if(CFG.defaultWatch){watch=CFG.defaultWatch;$("p_addr").textContent=watch.slice(0,7)+"…"+watch.slice(-5);}
+  buildPools();buildChartTools();fetchEthUsd();
+  await fetchSlow();          // prime rarely-changing config first
+  await refresh();            // then live state
+  buildHistory();             // then load history (retries if RPC was busy)
+  setTimeout(getHolders,700); // stagger the heavy balanceOf sweep
+  setTimeout(fetchPumpStats,1400);
+  setInterval(refresh,5000);setInterval(fetchSlow,30000);setInterval(tickLive,120);setInterval(fetchEthUsd,60000);setInterval(getHolders,30000);setInterval(tickHolders,250);setInterval(tickDebt,150);setInterval(fetchPumpStats,60000);
+}
+async function connectWallet(){
+  if(!window.ethereum){alert("No wallet found — dashboard is read-only.");return;}
+  const bp=new E.BrowserProvider(window.ethereum);await bp.send("eth_requestAccounts",[]);signer=await bp.getSigner();account=await signer.getAddress();
+  $("acct").style.display="";$("acct").textContent=account.slice(0,7)+"…"+account.slice(-5);$("connectBtn").textContent="Connected ✓";
+  try{const o=await mmRead.owner();if(o.toLowerCase()===account.toLowerCase())$("adminBtn").style.display="";}catch(e){}
+  useMine();
+}
+function useMine(){if(account){watch=account;$("p_addr").textContent=account.slice(0,7)+"…"+account.slice(-5);refresh();}}
+function watchAddr(){const w=$("watch").value.trim();if(w){watch=w;$("p_addr").textContent=w.slice(0,7)+"…"+w.slice(-5);refresh();}}
+
+const PAIR_ABI=["function getReserves() view returns (uint112,uint112,uint32)"];let pair;
+async function getPrice(){ // ETH per MM from the V2 WETH/MM pair (token0=WETH, token1=MM)
+  try{if(!pair)pair=new E.Contract(CFG.ethPair,PAIR_ABI,ro);const r=await pair.getReserves();
+    const w=Number(E.formatUnits(r[0],18)),m=Number(E.formatUnits(r[1],18));return m>0?w/m:null;}catch(e){return null;}}
+
+const SYNC_TOPIC=E.id("Sync(uint112,uint112)");
+const V2SWAP_TOPIC=E.id("Swap(address,uint256,uint256,uint256,uint256,address)");
+const DECAY_TOPIC=E.id("Decay(uint256,uint256,uint256,uint256,uint256)");
+// Build a real historical multi-series dataset from the V2 WETH/MM pair (price,
+// liquidity, volume) and the token's Decay events (reflection index, deflation).
+async function buildHistory(attempt=0){
+  try{
+    const cur=await ro.getBlockNumber();const c=E.AbiCoder.defaultAbiCoder();const CH=45000,N=4;
+    const sync=[],swaps=[],decays=[];
+    // SEQUENTIAL fetches — the /rpc proxy returns empty arrays under concurrent getLogs load.
+    for(let i=N-1;i>=0;i--){const to=cur-i*CH,from=Math.max(0,to-CH+1);if(to<=0)continue;
+      try{const ls=await ro.getLogs({address:CFG.ethPair,topics:[SYNC_TOPIC],fromBlock:from,toBlock:to});
+        ls.forEach(l=>{const d=c.decode(["uint112","uint112"],l.data);const w=Number(E.formatUnits(d[0],18)),m=Number(E.formatUnits(d[1],18));if(m>0)sync.push({b:l.blockNumber,price:w/m,pool:m});});}catch(e){}
+      try{const ls=await ro.getLogs({address:CFG.ethPair,topics:[V2SWAP_TOPIC],fromBlock:from,toBlock:to});
+        ls.forEach(l=>{const d=c.decode(["uint256","uint256","uint256","uint256"],l.data);swaps.push({b:l.blockNumber,vol:Number(E.formatUnits(d[1],18))+Number(E.formatUnits(d[3],18))});});}catch(e){}
+      try{const ls=await ro.getLogs({address:CFG.mm,topics:[DECAY_TOPIC],fromBlock:from,toBlock:to});
+        ls.forEach(l=>{const d=c.decode(["uint256","uint256","uint256","uint256","uint256"],l.data);decays.push({b:l.blockNumber,burn:Number(E.formatUnits(d[1],18)),idx:Number(E.formatUnits(d[4],18))});});}catch(e){}
+    }
+    sync.sort((a,b)=>a.b-b.b);swaps.sort((a,b)=>a.b-b.b);decays.sort((a,b)=>a.b-b.b);
+    if(!sync.length&&!decays.length)return;
+    const blks=[...sync,...swaps,...decays].map(x=>x.b);
+    const mnB=Math.min(...blks),mxB=Math.max(...blks),span=(mxB-mnB)||1,B=120;
+    const capMM=CFG.cap;
+    Object.values(SERIES).forEach(s=>s.data=[]);
+    let si=0,di=0,lastP=sync[0]?.price||0,lastPool=sync[0]?.pool||0,lastIdx=decays[0]?.idx||1,burnCum=0;
+    // seed cumulative burn before window with 0 (relative deflation over the window)
+    for(let k=0;k<B;k++){
+      const lo=mnB+span*k/B,hi=mnB+span*(k+1)/B;
+      while(si<sync.length&&sync[si].b<=hi){lastP=sync[si].price;lastPool=sync[si].pool;si++;}
+      let vol=0;
+      // volume + burn in this bucket
+      for(const sw of swaps)if(sw.b>lo&&sw.b<=hi)vol+=sw.vol;
+      while(di<decays.length&&decays[di].b<=hi){burnCum+=decays[di].burn;lastIdx=decays[di].idx;di++;}
+      SERIES.price.data.push(lastP);
+      SERIES.pool.data.push(lastPool);
+      SERIES.index.data.push(lastIdx);
+      SERIES.burn.data.push(burnCum);
+      SERIES.supply.data.push(capMM-burnCum);
+      SERIES.vol.data.push(vol);
+    }
+    // hero price coloring uses priceHist
+    priceHist.length=0;priceHist.push(...SERIES.price.data.filter(x=>x>0));
+    if(priceHist.length){price0=priceHist[0];histLoaded=true;}
+    // annualized MM volume from the window (for reflection-yield math)
+    try{const b0=await ro.getBlock(mnB),b1=await ro.getBlock(mxB);const el=(b1.timestamp-b0.timestamp)||1;
+      const totVol=swaps.reduce((a,s)=>a+s.vol,0);volYr=totVol*(31536000/el);}catch(e){}
+    drawChart();
+    // if RPC contention starved the fetch, retry a couple times
+    if(SERIES.price.data.every(v=>!v)&&attempt<3)setTimeout(()=>buildHistory(attempt+1),1600);
+  }catch(e){if(attempt<3)setTimeout(()=>buildHistory(attempt+1),1600);}
+}
+
+// Rarely-changing protocol config — fetched every 30s, not every 5s (RPC-light).
+async function fetchSlow(){
+  try{
+    const [dR,fb,fr,frc,ft,mirror,bbOn,pPool]=await Promise.all([mmRead.decayRatePerSecond(),mmRead.burnFeeBps(),mmRead.reflectFeeBps(),mmRead.recentFeeBps(),mmRead.treasuryFeeBps(),mmRead.pumpMirrorBps(),mmRead.buybackEnabled(),mmRead.pumpPool()]);
+    decayR=Number(dR)/1e18;burnBps=Number(fb);reflBps=Number(fr);recentBps=Number(frc);treBps=Number(ft);mirrorX=Number(mirror)/10000;gMirrorBps=Number(mirror);gBbOn=bbOn;gPPool=pPool;
+    const yr=(1-Math.pow(1-decayR,31536000))*100;
+    $("d_decay").innerHTML=yr.toFixed(1)+" <small style='color:var(--faint)'>%/yr</small>";
+    $("d_fee").textContent=((burnBps+reflBps+recentBps+treBps)/100).toFixed(1)+"%";
+    const bp=$("btnPump"),bb=$("btnBuy");if(bp){bp.disabled=mirrorX===0;bb.disabled=!bbOn;}
+    const set=(id,v)=>{const el=$(id);if(el)el.textContent=v;};set("pm_mirror",mirrorX.toFixed(2)+"×");set("fw_dr",yr.toFixed(1)+"%/yr");
+  }catch(e){}
+}
+async function refresh(){
+  try{
+    const [sup,tre,pot,idx,exc,poolMM,pDebt,pThrob,pPack]=await Promise.all([mmRead.totalSupply(),mmRead.treasuryBalance(),mmRead.holderRewardPot(),
+      mmRead.currentIndex(),mmRead.excludedSupply(),mmRead.balanceOf(CFG.ethPair),mmRead.pumpDebt(),mmRead.balanceOf(CFG.pools[1].id),mmRead.balanceOf(CFG.pools[2].id)]);
+    updatePumpPanel(pDebt,poolMM,gMirrorBps,gPPool);
+    const yr=(1-Math.pow(1-decayR,31536000))*100;
+    const sv=(id,v)=>{const el=$(id);if(el&&el.textContent!==v){el.textContent=v;el.classList.add("flash");setTimeout(()=>el.classList.remove("flash"),450);}};
+    sv("d_supply",fmt(sup,2));sv("d_circ",fmt(sup-exc,0));sv("d_burn",fmt((10n**18n)*BigInt(CFG.cap)-sup,2));
+    sv("d_tre",fmt(tre,2));sv("d_pot",fmt(pot,2));sv("d_pool",fmt(poolMM,0));
+    // all-pool MM aggregate + live decrease + decay:pool ratio (pump-strength gauge)
+    const allPoolN=Number(E.formatUnits(poolMM,18))+Number(E.formatUnits(pThrob,18))+Number(E.formatUnits(pPack,18));
+    if(!allPool0)allPool0=allPoolN;
+    $("d_allpool").textContent=fmt(allPoolN,0);
+    const dP=allPoolN-allPool0,dE=$("d_allpoolD");
+    if(dE&&Math.abs(dP)>=0.5){dE.textContent=(dP<0?"▼ ":"▲ ")+fmt(Math.abs(dP),0);dE.className="pooldelta "+(dP<0?"down":"up");}
+    $("d_idx").textContent=Number(E.formatUnits(idx,18)).toFixed(6);
+    // live values for PnL + debt ticking (fee/decay/mirror come from fetchSlow)
+    const supN0=Number(E.formatUnits(sup,18)),excN0=Number(E.formatUnits(exc,18)),idxN=Number(E.formatUnits(idx,18));
+    incSupply=supN0-excN0;
+    const ratio=allPoolN>0?incSupply/allPoolN:0,pumpYr=ratio*(1-Math.pow(1-decayR,31536000))*mirrorX*100;
+    $("d_ratio").innerHTML=ratio.toFixed(2)+" <small style='color:var(--faint)'>→ "+pumpYr.toFixed(0)+"%/yr</small>";
+    const price=await getPrice(); // ETH per MM
+    if(price){if(!price0)price0=price;
+      const pe=$("d_price");if(priceHist.length)pe.classList.toggle("up",price>=priceHist[priceHist.length-1]),pe.classList.toggle("down",price<priceHist[priceHist.length-1]);
+      const pUsd=ethUsd?price*ethUsd:0;const supN=Number(E.formatUnits(sup,18)),pmN=Number(E.formatUnits(poolMM,18));
+      pe.innerHTML=ethUsd?usd(pUsd):(gwei(price).toFixed(4)+"<span class='u'>gwei</span>");
+      const chg=(price/price0-1)*100;$("d_chg").textContent=(chg>=0?"▲ +":"▼ ")+chg.toFixed(2)+"%";$("d_chg").className="chg "+(chg>=0?"up":"down");
+      $("d_priceSub").textContent=`${gwei(price).toFixed(4)} gwei · ${price.toExponential(3)} ETH / MM`;
+      $("d_mcap").textContent=ethUsd?usdBig(pUsd*supN):fmt(price*supN,3)+" ETH";
+      $("d_depth").textContent=ethUsd?usdBig(pUsd*pmN*2):fmt(price*pmN*2,4)+" ETH";
+      priceHist.push(price);if(priceHist.length>400)priceHist.shift();
+      // append a live sample to every series so the chart keeps moving
+      if(histLoaded){pushLive({price,pool:pmN,supply:supN,burn:CFG.cap-supN,index:idxN});drawChart();}
+    }
+    if(watch){const b=await mmRead.balanceOf(watch);excluded=await mmRead.isExcluded(watch);liveBal=Number(E.formatUnits(b,18));
+      $("p_badge").textContent=excluded?"EXCLUDED":"INCLUDED · decaying";$("p_badge").className="badge "+(excluded?"exc":"inc");renderPnL(liveBal);}
+    if(feedTick%3===0)getFeed();
+    feedTick++;
+    refreshFails=0;$("net").classList.add("ok");$("nettxt").textContent="Robinhood · live";
+  }catch(e){refreshFails++;if(refreshFails>=2){$("net").classList.remove("ok");$("nettxt").textContent="reconnecting…";}}
+}
+function tickLive(){if(!watch||excluded||liveBal<=0)return;liveBal*=Math.pow(1-decayR,0.12);
+  $("p_bal").textContent=liveBal.toLocaleString("en-US",{minimumFractionDigits:4,maximumFractionDigits:4});$("p_tick").textContent="↓ decaying live";}
+function projFor(bal){const r=[["1h",3600],["1d",86400],["1w",604800],["1mo",2592000],["1y",31536000]];
+  $("p_proj").innerHTML=r.map(([l,s])=>{const v=bal*Math.pow(1-decayR,s);return `<tr><td class="muted">${l}</td><td>${fmt(v,2)} <span class="muted">(${((v/bal-1)*100).toFixed(1)}%)</span></td></tr>`;}).join("");}
+function pushLive(o){for(const k in o){if(SERIES[k]){SERIES[k].data.push(o[k]);if(SERIES[k].data.length>720)SERIES[k].data.shift();}}}
+function fmtSigned(v,d=2){return (v>=0?"+":"−")+fmt(Math.abs(v),d);}
+// Holder economics: reflection (gain) vs decay (loss) → net. Not just loss.
+function renderPnL(bal){
+  const box=$("pnl");if(!box)return;
+  if(excluded){box.innerHTML=`<div class="row"><span class="l">${icon('treasury')} Status</span><span class="v">Excluded · stable</span></div>
+    <div class="row"><span class="l muted">No decay · no reflection</span><span class="v" style="color:var(--faint)">flat ═</span></div>`;return;}
+  // value terms (%/yr): balance shrinks (decay), balance grows (reflection MM),
+  // each MM worth more (pump burns LP supply). ex-swap net = pump lift − decay.
+  const dFrac=1-Math.pow(1-decayR,31536000);            // ~0.5
+  const rf=reflBps/10000;                               // 1% reflect fee
+  const decayPct=dFrac*100;                             // your MM shrinks
+  const reflPct=incSupply>0?(volYr*rf/incSupply)*100:0; // your MM grows (swap-fee, vol-based)
+  const pumpBurnYr=incSupply*dFrac*mirrorX;             // MM burned from LP/yr (mirror of all decay)
+  const pumpPct=poolMMg>0?(pumpBurnYr/poolMMg)*100:0;   // price lift from LP burn
+  const netEx=pumpPct-decayPct;                         // SWAP-HARİÇ net: decay vs pump lift
+  const netAll=pumpPct+reflPct-decayPct;                // all-in value net
+  const pill=v=>`<span class="netpill ${v>=0?'pos':'neg'}">${v>=0?'net +':'net −'}</span>`;
+  const cls=v=>v>=0?'pos':'neg',sg=v=>(v>=0?'+':'−')+Math.abs(v).toFixed(0)+'%';
+  box.innerHTML=`
+   <div class="row"><span class="l">${icon('decay')} Decay <span class="muted">/yr · your MM</span></span><span class="v neg">−${decayPct.toFixed(0)}%</span></div>
+   <div class="row"><span class="l">${icon('pump')} Pump lift <span class="muted">/yr · LP burn</span></span><span class="v pos">+${pumpPct.toFixed(0)}%</span></div>
+   <div class="row"><span class="l">${icon('reflect')} Reflection <span class="muted">/yr · fees</span></span><span class="v pos">+${reflPct.toFixed(0)}%</span></div>
+   <div class="row net"><span class="l">Net · ex-swap ${pill(netEx)}</span><span class="v ${cls(netEx)}">${sg(netEx)}<span class="muted">/yr</span></span></div>
+   <div class="row"><span class="l">Net · all-in ${pill(netAll)}</span><span class="v ${cls(netAll)}">${sg(netAll)}<span class="muted">/yr</span></span></div>
+   <div class="row"><span class="l muted" style="font-size:9.5px">value terms · pump bounded by pool refill · refl by volume run-rate</span></div>`;
+}
+// adaptive: show tiny debt down to ~1e-9 so accrual is visible live
+function fmtDebt(v){if(!v)return "0";if(Math.abs(v)>=1)return v.toLocaleString("en-US",{maximumFractionDigits:4});
+  return v.toFixed(12).replace(/0+$/,"").replace(/\.$/,"");}
+// pumpDebt is lazy on-chain; show the live *pending* accrual (decay×mirror since last read)
+function tickDebt(){
+  if(!decayR||!incSupply||!debtBaseT)return;
+  const dt=(Date.now()-debtBaseT)/1000;
+  const live=debtBase+incSupply*(1-Math.pow(1-decayR,dt))*mirrorX;
+  const set=id=>{const el=$(id);if(el)el.textContent=fmtDebt(live);};
+  set("pm_debt");set("d_pumpdebt");
+  const burnNow=Math.min(live,poolMMg*0.20),impact=poolMMg>0?burnNow/(poolMMg-burnNow)*100:0;
+  const imp=(impact>=1e-6?"+"+impact.toFixed(6):"~0")+"%";
+  const a=$("pm_impact"),b=$("pm_impact2");if(a)a.textContent=imp;if(b)b.textContent=imp;
+  const st=$("pm_state");if(st){st.textContent="LIVE · pending "+fmtDebt(live)+" MM";st.className="pm-state on";}
+  const fw=$("fwDebt");if(fw)fw.style.opacity="1";
+}
+
+const TT=E.id("Transfer(address,address,uint256)"),tif=new E.Interface(["event Transfer(address indexed from,address indexed to,uint256 value)"]);
+async function getFeed(){try{const cur=await ro.getBlockNumber();const logs=await ro.getLogs({address:CFG.mm,topics:[TT],fromBlock:Math.max(0,cur-40000),toBlock:cur});
+  const pm=CFG.pm.toLowerCase(),hk=CFG.hook.toLowerCase(),mm=CFG.mm.toLowerCase(),Z="0x0000000000000000000000000000000000000000",D=10n**15n;
+  const evs=logs.map(l=>{const p=tif.parseLog(l);return{f:p.args.from.toLowerCase(),t:p.args.to.toLowerCase(),v:p.args.value};}).filter(e=>e.v>=D).slice(-14).reverse();
+  $("feed").innerHTML=evs.map(e=>{let k="transfer",cls="",lb="transfer";
+    if(e.f===pm){k="buy";cls="buy";lb="buy";}else if(e.t===pm){k="sell";cls="sell";lb="sell";}
+    else if(e.t===Z){k="burn";cls="burnE";lb="burn";}else if(e.f===Z&&e.t===mm){k="decay";cls="refl";lb="decay → treasury/pot";}else if(e.t===mm||e.t===hk){k="treasury";cls="refl";lb="fee → treasury";}
+    return `<div class="ev ${cls}">${icon(k)}<span>${lb}</span><span class="mono">${fmt(e.v,2)}</span></div>`;}).join("")||'<div class="muted">no recent activity</div>';
+}catch(e){}}
+
+const KNOWN={};
+async function getHolders(){
+  try{
+    const r=await fetch(LOCAL?"/holders":BS+"/api/v2/tokens/"+CFG.mm+"/holders");const j=await r.json();
+    if(!j.items||!j.items.length)return; // transient / empty -> keep existing list
+    const items=j.items.slice(0,14);
+    const pm=CFG.pm.toLowerCase(),hk=CFG.hook.toLowerCase(),mm=CFG.mm.toLowerCase(),sd="0x0bc6146b349446458383093e39b6c30a7c7bb571",me=(account||watch||"").toLowerCase();
+    const rows=[];
+    for(const it of items){const a=(it.address&&it.address.hash||"").toLowerCase();
+      let tag="",tc="",infra=false;
+      if(a===pm){tag="pool";tc="pool";infra=true;}else if(a===hk){tag="hook";tc="pool";infra=true;}else if(a===mm){tag="treasury";tc="pool";infra=true;}
+      else if(a===sd){tag="seeder";tc="";infra=true;}else if(a===me){tag="you";tc="you";}
+      let ex=infra;if(!infra){if(KNOWN[a]===undefined){try{KNOWN[a]=await mmRead.isExcluded(a);}catch(e){KNOWN[a]=false;}}ex=KNOWN[a];}
+      // LIVE balance from chain (Blockscout value is stale for elastic supply); fall back to indexed value
+      let balN;try{balN=Number(E.formatUnits(await mmRead.balanceOf(a),18));}catch(e){balN=Number(E.formatUnits(BigInt(it.value||"0"),18));}
+      if(balN<=0)continue;
+      rows.push({a,tag,tc,ex,bal:balN});
+      if(rows.length>=10)break;
+    }
+    rows.sort((x,y)=>y.bal-x.bal);
+    holderRows=rows.map(r=>({...r,t0:Date.now()}));
+    renderHolders();
+  }catch(e){if(!document.querySelector("#holderList .hrow"))$("holderList").innerHTML='<div class="muted">loading holders…</div>';}
+}
+// Decaying rows carry decimals so the live erosion is actually visible per tick;
+// excluded (stable) rows stay clean integers.
+const hbal=(v,ex)=>{if(ex)return fmt(v,0);
+  const d=v>=1e5?3:v>=1e3?4:6; // smaller balances -> more decimals so the drop is visible
+  return v.toLocaleString("en-US",{minimumFractionDigits:d,maximumFractionDigits:d});};
+function renderHolders(){
+  if(!holderRows.length){$("holderList").innerHTML='<div class="muted">no holders yet</div>';return;}
+  $("holderList").innerHTML=holderRows.map((r,i)=>{
+    const ind=r.ex?'<span class="st">═ stable</span>':'<span class="dn">↓ live</span>';
+    return `<div class="hrow"><span class="rk">${i+1}</span><span class="ad">${r.a.slice(0,6)}…${r.a.slice(-4)}</span>${r.tag?`<span class="tg ${r.tc}">${r.tag}</span>`:""}<span class="bl ${r.ex?'':'dec'}" id="hb_${i}">${hbal(r.bal,r.ex)}</span>${ind}</div>`;
+  }).join("");
+}
+// Between chain refreshes, non-excluded holders visibly bleed at the real decay rate.
+function tickHolders(){
+  if(!holderRows.length||!decayR)return;const now=Date.now();
+  holderRows.forEach((r,i)=>{if(r.ex)return;const live=r.bal*Math.pow(1-decayR,(now-r.t0)/1000);const el=$("hb_"+i);if(el)el.textContent=hbal(live,false);});
+}
+function updatePumpPanel(pDebt,poolMM,mirror,pPool){
+  const debtN=Number(E.formatUnits(pDebt,18)),poolN=Number(E.formatUnits(poolMM,18));
+  debtBase=debtN;debtBaseT=Date.now();poolMMg=poolN;   // baseline for live tickDebt()
+  const set=(id,v)=>{const el=$(id);if(el)el.textContent=v;};
+  set("pm_mirror",(Number(mirror)/10000).toFixed(2)+"×");
+  set("pm_pool",fmt(poolN,0));
+  if(decayR){const yr=(1-Math.pow(1-decayR,31536000))*100;set("fw_dr",yr.toFixed(1)+"%/yr");}
+  tickDebt(); // paint debt + impact + state immediately
+}
+// Cumulative pump stats — total MM ever burned from the pool + approx total price lift.
+const PUMP_TOPIC=E.id("Pump(uint256,uint256,uint256)");
+let pumpCumMM=0;
+async function fetchPumpStats(){
+  try{const cur=await ro.getBlockNumber();const c=E.AbiCoder.defaultAbiCoder();const CH=45000,N=6;let removed=0,n=0;
+    for(let i=N-1;i>=0;i--){const to=cur-i*CH,from=Math.max(0,to-CH+1);if(to<=0)continue;
+      try{const ls=await ro.getLogs({address:CFG.mm,topics:[PUMP_TOPIC],fromBlock:from,toBlock:to});
+        ls.forEach(l=>{const d=c.decode(["uint256","uint256","uint256"],l.data);removed+=Number(E.formatUnits(d[0],18))+Number(E.formatUnits(d[1],18));n++;});}catch(e){}}
+    pumpCumMM=removed;
+    const el=$("pm_cum");if(el)el.textContent=fmt(removed,2);
+    const pct=poolMMg>0?removed/(poolMMg+removed)*100:0; // removed as % of what the pool would hold w/o pumps
+    const e2=$("pm_cumpct");if(e2)e2.textContent="+"+pct.toFixed(3)+"%";
+  }catch(e){}
+}
+async function pubPump(){if(!signer)return connectWallet();try{const mm=new E.Contract(CFG.mm,A.token.abi,signer);const tx=await mm.pump();await tx.wait();refresh();}catch(e){alert("pump: "+(e.shortMessage||e.message||e).slice(0,90));}}
+async function pubBuyback(){if(!signer)return connectWallet();try{const mm=new E.Contract(CFG.mm,A.token.abi,signer);const tx=await mm.triggerBuyback();await tx.wait();refresh();}catch(e){alert("buyback: "+(e.shortMessage||e.message||e).slice(0,90));}}
+function buildPools(){const pools=CFG.pools;
+  $("poolList").innerHTML=pools.map(p=>`<a class="pchip" href="https://dexscreener.com/robinhood/${p.id}" target="_blank"><span class="nm">${p.name.replace(/ \(V2\)/,"")}</span><span class="tag">${p.tag}</span><span class="go">Swap ↗</span></a>`).join("");}
+
+function openLearn(){$("learn").classList.add("on");setTimeout(()=>document.querySelectorAll("#l_feebars .fill").forEach(f=>f.style.width=f.dataset.w+"%"),60);}
+function closeLearn(){$("learn").classList.remove("on");}
+$("learn").addEventListener("click",e=>{if(e.target.id==="learn")closeLearn();});
+
+function buildChartTools(){
+  const box=$("cseries");if(!box)return;
+  const chips=Object.entries(SERIES).map(([k,s])=>
+    `<button class="cbtn ${s.on?'on':''}" data-k="${k}" style="color:${s.color}" onclick="toggleSeries('${k}')"><span class="dot"></span>${s.label}</button>`).join("");
+  const ranges=[["50",50],["200",200],["All",0]].map(([l,n])=>
+    `<button class="cbtn ${chartRange==n?'on':''}" data-r="${n}" onclick="setRange(${n})">${l}</button>`).join("");
+  box.innerHTML=chips+`<span class="crange">${ranges}</span>`;
+}
+function toggleSeries(k){const on=Object.values(SERIES).filter(s=>s.on).length;if(SERIES[k].on&&on<=1)return;SERIES[k].on=!SERIES[k].on;buildChartTools();drawChart();}
+function setRange(n){chartRange=n;buildChartTools();drawChart();}
+function sliceN(a){return chartRange>0?a.slice(-chartRange):a;}
+function drawChart(){
+  const c=$("c_price"),ctx=c.getContext("2d");const dpr=devicePixelRatio||1,W=c.clientWidth,H=c.clientHeight;if(!W||!H)return;
+  c.width=W*dpr;c.height=H*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,W,H);
+  const active=Object.entries(SERIES).filter(([k,s])=>s.on&&s.data.length>1);
+  const PADT=14,PADB=14;
+  ctx.strokeStyle="rgba(255,255,255,.045)";ctx.lineWidth=1;
+  for(let g=0;g<=4;g++){const y=PADT+g*(H-PADT-PADB)/4;ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+  if(!active.length){ctx.fillStyle="#5f6b64";ctx.font="12px 'IBM Plex Mono',monospace";ctx.textAlign="center";ctx.fillText("loading history…",W/2,H/2);return;}
+  const maxLen=Math.max(...active.map(([k,s])=>sliceN(s.data).length));
+  const X=i=>maxLen<2?W-3:i/(maxLen-1)*(W-6)+3;
+  active.forEach(([k,s],ai)=>{
+    const d=sliceN(s.data);const mn=Math.min(...d),mx=Math.max(...d),rg=(mx-mn)||Math.abs(mx)||1;
+    const Y=v=>H-PADB-((v-mn)/rg)*(H-PADT-PADB);
+    const off=maxLen-d.length; // right-align shorter series
+    // primary (first active) gets a gradient fill
+    if(ai===0){ctx.beginPath();ctx.moveTo(X(off),Y(d[0]));for(let i=1;i<d.length;i++)ctx.lineTo(X(off+i),Y(d[i]));
+      ctx.lineTo(X(maxLen-1),H);ctx.lineTo(X(off),H);ctx.closePath();
+      const gr=ctx.createLinearGradient(0,0,0,H);gr.addColorStop(0,s.color+"2e");gr.addColorStop(1,s.color+"00");ctx.fillStyle=gr;ctx.fill();}
+    ctx.beginPath();ctx.moveTo(X(off),Y(d[0]));for(let i=1;i<d.length;i++)ctx.lineTo(X(off+i),Y(d[i]));
+    ctx.strokeStyle=s.color;ctx.lineWidth=ai===0?2:1.5;ctx.globalAlpha=ai===0?1:.9;ctx.stroke();ctx.globalAlpha=1;
+    ctx.fillStyle=s.color;ctx.beginPath();ctx.arc(X(maxLen-1),Y(d[d.length-1]),3,0,7);ctx.fill();
+  });
+  updateLegend(active);
+}
+function updateLegend(active){
+  const lg=$("clegend");if(!lg)return;
+  lg.innerHTML=active.map(([k,s])=>{const d=sliceN(s.data);const last=d[d.length-1],first=d[0];
+    const chg=first?((last/first-1)*100):0;const arw=chg>=0?"▲":"▼";
+    return `<span class="li"><span class="sw" style="background:${s.color}"></span>${s.label} <b>${s.fmtV(last)}</b> <span style="color:${chg>=0?'var(--green2)':'var(--down)'}">${arw}${Math.abs(chg).toFixed(2)}%</span></span>`;}).join("");
+}
+function drawPrice(){drawChart();}
+window.addEventListener("resize",drawChart);
+boot();
+</script>
+</body>
+</html>
