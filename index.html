@@ -87,7 +87,7 @@
   .srow .l{font-size:11px;color:var(--soft)} .srow .v{font-family:var(--mono);font-size:14px;font-weight:600;transition:color .4s} .srow .v.flash{color:var(--green2)}
   /* feed */
   .feed{display:flex;flex-direction:column;gap:5px;overflow:auto}
-  .ev{display:flex;gap:8px;align-items:center;padding:6px 8px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;font-size:12px;animation:sl .3s ease}
+  .ev{display:flex;gap:8px;align-items:center;padding:6px 8px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;font-size:12px;animation:sl .3s ease;color:var(--ink);text-decoration:none}
   @keyframes sl{from{opacity:0;transform:translateX(-5px)}to{opacity:1}}
   .ev .ic{font-size:14px}.ev .mono{margin-left:auto;color:var(--soft)}
   .ev.buy{border-left:2px solid var(--green)} .ev.sell{border-left:2px solid var(--down)} .ev.burnE{border-left:2px solid var(--orange)} .ev.refl{border-left:2px solid var(--green2)}
@@ -449,7 +449,7 @@
     <div style="margin-top:5px"><span class="badge" id="p_badge">—</span> <span class="muted cpy" id="p_addr" title="Copy address" onclick="cp(watch,'Wallet')"></span> <a class="cpy" id="p_expl" title="View on explorer" style="font-size:11px">↗</a></div>
     <div class="pnl" id="pnl"></div>
     <table class="proj" id="p_proj" style="display:none"></table>
-    <input class="mm" id="watch" placeholder="0x… watch another wallet">
+    <input class="mm" id="watch" placeholder="0x… watch another wallet" autocomplete="off" onkeydown="if(event.key==='Enter')watchAddr()">
     <div class="win"><button class="wbtn" onclick="watchAddr()">Watch</button><button class="wbtn" onclick="useMine()">Use my wallet</button></div>
   </div>
 
@@ -731,7 +731,10 @@ async function boot(){
   setTimeout(getHolders,700); // stagger the heavy balanceOf sweep
   setTimeout(fetchPumpStats,1400);
   setTimeout(buildFlows,900);setTimeout(buildFlows,2500); // draw ecosystem flow lines once laid out
-  setInterval(refresh,5000);setInterval(fetchSlow,30000);setInterval(tickLive,120);setInterval(fetchEthUsd,60000);setInterval(getHolders,30000);setInterval(tickHolders,250);setInterval(tickDebt,150);setInterval(fetchPumpStats,60000);
+  // pause network polling while the tab is hidden (saves RPC + battery); UI ticks keep running cheaply
+  const vis=fn=>()=>{if(!document.hidden)fn();};
+  setInterval(vis(refresh),5000);setInterval(vis(fetchSlow),30000);setInterval(tickLive,120);setInterval(vis(fetchEthUsd),60000);setInterval(vis(getHolders),30000);setInterval(tickHolders,250);setInterval(tickDebt,150);setInterval(vis(fetchPumpStats),60000);
+  document.addEventListener("visibilitychange",()=>{if(!document.hidden){refresh();fetchSlow();}});
 }
 let walletEip=null;
 const RH_HEX="0x1237"; // 4663
@@ -1002,11 +1005,11 @@ async function getFeed(){try{const cur=await ro.getBlockNumber();const logs=awai
   try{if(logs.length){const lastTx=Math.max(...logs.map(l=>l.blockNumber));const[bl,now]=await Promise.all([ro.getBlock(lastTx),ro.getBlock("latest")]);
     const elapsed=Math.max(0,now.timestamp-bl.timestamp);lastSettleWall=Date.now()-elapsed*1000;}}catch(e){}
   const pm=CFG.pm.toLowerCase(),hk=CFG.hook.toLowerCase(),mm=CFG.mm.toLowerCase(),Z="0x0000000000000000000000000000000000000000",D=10n**15n;
-  const evs=logs.map(l=>{const p=tif.parseLog(l);return{f:p.args.from.toLowerCase(),t:p.args.to.toLowerCase(),v:p.args.value};}).filter(e=>e.v>=D).slice(-14).reverse();
+  const evs=logs.map(l=>{const p=tif.parseLog(l);return{f:p.args.from.toLowerCase(),t:p.args.to.toLowerCase(),v:p.args.value,h:l.transactionHash};}).filter(e=>e.v>=D).slice(-14).reverse();
   $("feed").innerHTML=evs.map(e=>{let k="transfer",cls="",lb="transfer";
     if(e.f===pm){k="buy";cls="buy";lb="buy";}else if(e.t===pm){k="sell";cls="sell";lb="sell";}
     else if(e.t===Z){k="burn";cls="burnE";lb="burn";}else if(e.f===Z&&e.t===mm){k="decay";cls="refl";lb="decay → treasury/pot";}else if(e.t===mm||e.t===hk){k="treasury";cls="refl";lb="fee → treasury";}
-    return `<div class="ev ${cls}">${icon(k)}<span>${lb}</span><span class="mono">${fmt(e.v,2)}</span></div>`;}).join("")||'<div class="muted">no recent activity</div>';
+    return `<a class="ev ${cls}" href="${EXPLORER}/tx/${e.h}" target="_blank" title="View tx on explorer">${icon(k)}<span>${lb}</span><span class="mono">${fmt(e.v,2)}</span></a>`;}).join("")||'<div class="muted">no recent activity</div>';
 }catch(e){}}
 
 const KNOWN={};
@@ -1160,6 +1163,7 @@ function learnTab(id,btn){
 function openLearn(){$("learn").classList.add("on");}
 function closeLearn(){$("learn").classList.remove("on");}
 $("learn").addEventListener("click",e=>{if(e.target.id==="learn")closeLearn();});
+document.addEventListener("keydown",e=>{if(e.key==="Escape")closeLearn();});
 // ===== ecosystem flow overlay: animated data lines between panels =====
 function edgePt(el,term,side){const r=el.getBoundingClientRect(),t=term.getBoundingClientRect();
   const x=r.left-t.left,y=r.top-t.top;
