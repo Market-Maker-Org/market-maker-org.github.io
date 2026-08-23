@@ -443,6 +443,7 @@
             <select class="mm walsel" id="wal_tok" onchange="renderWallet()"><option value="MM">MM</option><option value="ETH">ETH</option></select></div>
           <button class="swexec" onclick="sendAsset()" style="margin-top:8px">Send</button>
           <div class="swnote" id="wal_note"></div>
+          <div class="swnote" style="opacity:.7">MM &amp; ETH sent directly on Robinhood Chain — no token list needed.</div>
         </div>
         <div class="win"><button class="wbtn" onclick="window.mmOpenOnRamp?window.mmOpenOnRamp():protoTab('swap')">＋ Buy ETH</button><button class="wbtn" onclick="window.mmOpenAccount?window.mmOpenAccount():toast('Key export is available for email/social (embedded) wallets','warn')">⚙ Account · Export</button></div>
         <button class="wbtn" style="width:100%;margin-top:6px" onclick="disconnectWallet()">Disconnect</button>
