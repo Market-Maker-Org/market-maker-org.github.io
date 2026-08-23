@@ -433,7 +433,8 @@
     </div>
     <div id="pv-wallet" style="display:none;overflow:auto">
       <div class="wal-empty" id="wal_empty"><button class="swexec" onclick="connectWallet()">Connect wallet</button>
-        <div class="swnote" style="text-align:center">Wallet, email, Google or X — then deposit, withdraw & export here.</div></div>
+        <button class="wbtn" style="width:100%;margin-top:8px" onclick="openSocial()">✉ Email · Google · X login</button>
+        <div class="swnote" style="text-align:center">Extension wallet connects directly. Email/social via Reown — then deposit, withdraw & export here.</div></div>
       <div id="wal_body" style="display:none">
         <div class="wal-card">
           <div class="l"><span id="wal_profile"></span> Your address <span class="muted">· deposit here</span></div>
@@ -791,17 +792,24 @@ function paintChain(id){const el=$("acct");if(!el||!account)return;
   const ok=id===4663;el.textContent=account.slice(0,7)+"…"+account.slice(-5)+(ok?"":" · wrong chain");
   el.style.color=ok?"":"var(--orange2)";}
 let _connecting=false;
+// Injected wallets (Rabby / MetaMask) connect DIRECTLY via window.ethereum — the
+// most reliable path, no Reown/WalletConnect relay in the loop (avoids the
+// "previous request still active" collisions). Reown is used for social / mobile.
 async function connectWallet(){
-  if(window.mmOpenConnect){try{window.mmOpenConnect();return;}catch(e){}}
-  // Reown loads from CDN — if the user clicks while it's still loading, wait for it
-  // instead of firing an injected request that would later collide ("request active").
-  if(window.mmReownLoading){toast("Loading wallet options…");for(let i=0;i<24&&!window.mmOpenConnect;i++)await new Promise(r=>setTimeout(r,150));if(window.mmOpenConnect){try{window.mmOpenConnect();return;}catch(e){}}}
-  if(!window.ethereum){toast("No wallet found — install a wallet or use the Connect popup","warn");return;}
-  if(_connecting){toast("Check your wallet — a request is already open","warn");return;}
-  _connecting=true;
-  try{walletEip=window.ethereum;const bp=new E.BrowserProvider(walletEip);await bp.send("eth_requestAccounts",[]);await finishConnect(await bp.getSigner());}
-  catch(e){toast("Connection cancelled","warn");}
-  finally{_connecting=false;}
+  if(window.ethereum){
+    if(_connecting){toast("Check your wallet — a request is already open","warn");return;}
+    _connecting=true;
+    try{walletEip=window.ethereum;const bp=new E.BrowserProvider(walletEip);await bp.send("eth_requestAccounts",[]);await finishConnect(await bp.getSigner());}
+    catch(e){toast(e&&e.code===4001?"Connection rejected in wallet":"Connect failed: "+((e&&(e.shortMessage||e.message)||e)+"").slice(0,60),"warn");}
+    finally{_connecting=false;}
+    return;
+  }
+  openSocial(); // no injected extension → email / Google / X / WalletConnect via Reown
+}
+async function openSocial(){
+  if(window.mmOpenConnect){window.mmOpenConnect();return;}
+  if(window.mmReownLoading){toast("Loading login options…");for(let i=0;i<24&&!window.mmOpenConnect;i++)await new Promise(r=>setTimeout(r,150));if(window.mmOpenConnect){window.mmOpenConnect();return;}}
+  toast("Install MetaMask/Rabby, or try again in a moment for social login","warn");
 }
 let walProfile=null;
 async function finishConnect(sgnr,profile){
