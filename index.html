@@ -21,7 +21,8 @@
   }
   *{box-sizing:border-box}
   html,body{height:100%}
-  body{margin:0;background:radial-gradient(130% 90% at 88% -12%,#06160b 0%,transparent 55%),radial-gradient(90% 60% at -5% 0%,#0a0f0c,transparent 55%),var(--bg);
+  body{margin:0;background:radial-gradient(130% 90% at 88% -12%,#06160b 0%,transparent 55%),radial-gradient(90% 60% at -5% 0%,#0a0f0c,transparent 55%),
+    linear-gradient(rgba(120,160,140,.028) 1px,transparent 1px) 0 0/40px 40px,linear-gradient(90deg,rgba(120,160,140,.028) 1px,transparent 1px) 0 0/40px 40px,var(--bg);
     color:var(--ink);font-family:var(--sans);font-size:13.5px;line-height:1.5;-webkit-font-smoothing:antialiased;overflow:hidden}
   .mono{font-family:var(--mono);font-variant-numeric:tabular-nums} a{color:var(--green2);text-decoration:none}
   .mmlogo{border-radius:50%;object-fit:cover;vertical-align:middle;border:1px solid var(--line2);background:#000;flex:0 0 auto}
@@ -41,7 +42,8 @@
   @keyframes shimmer{to{background-position:-220% center}}
   .spacer{flex:1}
   .chip{font-family:var(--mono);font-size:11px;color:var(--soft);border:1px solid var(--line2);border-radius:100px;padding:5px 10px;display:flex;gap:6px;align-items:center}
-  .chip .d{width:7px;height:7px;border-radius:50%;background:var(--orange)}.chip.ok .d{background:var(--green);box-shadow:0 0 8px var(--green)}
+  .chip .d{width:7px;height:7px;border-radius:50%;background:var(--orange)}.chip.ok .d{background:var(--green);box-shadow:0 0 8px var(--green);animation:pulse 1.6s infinite}
+  #netblk{color:var(--faint);font-size:10px;padding-left:6px;margin-left:2px;border-left:1px solid var(--line2)}
   .hbtn{background:var(--panel2);border:1px solid var(--line2);color:var(--ink);font-family:var(--disp);font-weight:700;font-size:12px;padding:7px 12px;border-radius:8px;cursor:pointer}
   .hbtn.green{background:var(--green);color:#00220a;border:0}
   /* terminal grid */
@@ -313,7 +315,7 @@
 <header>
   <div class="brand"><img src="mm.png" class="mmlogo" style="width:26px;height:26px" alt="MM">Market <b>Maker</b><span class="rh-wrap"><svg class="feather" viewBox="0 0 32 32" aria-hidden="true"><path d="M27 4.5c-9.4.6-17 6.8-20.4 17.2-.5 1.5 1 2.8 2.4 2 1-.6 1.4-1.8 1.8-2.9C13.6 14.4 19 9.4 27 8.2c.7-.1 1.1-.8.9-1.5-.2-.6-.8-.9-1.4-.8.7-.2 1.1-.9.9-1.5-.2-.6-.8-1-1.4-.9z" fill="#00C805"/><path d="M8.5 25.5l3.2-6.4" stroke="#00C805" stroke-width="1.7" stroke-linecap="round"/></svg><span class="rh2">ROBINHOOD</span></span></div>
   <div class="spacer"></div>
-  <span class="chip" id="net"><span class="d"></span><span id="nettxt">connecting…</span></span>
+  <span class="chip" id="net"><span class="d"></span><span id="nettxt">connecting…</span><span id="netblk" class="mono"></span></span>
   <button class="hbtn" onclick="openLearn()">How it works</button>
   <button class="hbtn green" id="connectBtn" onclick="connectWallet()">Connect</button>
   <span class="chip" id="acct" style="display:none"></span>
@@ -896,6 +898,7 @@ async function refresh(){
     if(feedTick%3===0)getFeed();
     feedTick++;
     refreshFails=0;$("net").classList.add("ok");$("nettxt").textContent="Robinhood · live";
+    ro.getBlockNumber().then(b=>{const el=$("netblk");if(el)el.textContent="#"+b.toLocaleString("en-US");}).catch(()=>{});
   }catch(e){refreshFails++;if(refreshFails>=2){$("net").classList.remove("ok");$("nettxt").textContent="reconnecting…";}}
 }
 function tickLive(){if(!watch||excluded||liveBal<=0)return;liveBal*=Math.pow(1-decayR,0.12);
