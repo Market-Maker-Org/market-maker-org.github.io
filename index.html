@@ -141,9 +141,12 @@
   .cbtn:hover{border-color:var(--faint)}
   .crange{margin-left:auto;display:flex;gap:4px}
   .crange .cbtn.on{background:var(--green);color:#00220a;border-color:transparent}
-  .clegend{display:flex;gap:12px;flex-wrap:wrap;margin-top:4px;font-family:var(--mono);font-size:10.5px}
-  .clegend .li{display:flex;align-items:center;gap:5px;color:var(--soft)}.clegend .li b{color:var(--ink);font-weight:600}
-  .clegend .sw{width:10px;height:2.5px;border-radius:2px}
+  .chartwrap{position:relative;flex:1;min-height:0;display:flex;margin-top:6px}
+  #c_price{flex:1;width:100%;min-height:0;background:transparent;border:0;margin-top:0}
+  .clegend{position:absolute;top:6px;left:6px;z-index:3;display:flex;flex-direction:column;align-items:flex-start;gap:3px;
+    font-family:var(--mono);font-size:10.5px;background:rgba(4,7,5,.62);backdrop-filter:blur(3px);border:1px solid var(--line);border-radius:9px;padding:7px 9px;max-width:62%}
+  .clegend .li{display:flex;align-items:center;gap:6px;color:var(--soft);white-space:nowrap}.clegend .li b{color:var(--ink);font-weight:600}
+  .clegend .sw{width:14px;height:3px;border-radius:2px;flex:0 0 auto}
   /* holder-economics / PnL */
   .pnl{margin-top:8px;border-top:1px solid var(--line);padding-top:7px}
   .pnl .row{display:flex;justify-content:space-between;align-items:center;padding:3px 0;font-size:11.5px}
@@ -306,8 +309,10 @@
       </div>
     </div>
     <div class="ctools" id="cseries"></div>
-    <div class="clegend" id="clegend"></div>
-    <canvas id="c_price"></canvas>
+    <div class="chartwrap">
+      <div class="clegend" id="clegend"></div>
+      <canvas id="c_price"></canvas>
+    </div>
   </div>
 
   <!-- STATS + SWAP (tabbed) -->
@@ -1149,6 +1154,17 @@ function drawChart(){
       ctx.fillStyle=s.color;ctx.fillRect(W-PADR+1,Math.max(PADT,Math.min(plotB-14,ly-7)),PADR-2,14);
       ctx.fillStyle="#001a06";ctx.font="bold 9.5px 'IBM Plex Mono'";ctx.fillText(axisFmt(k,d[d.length-1]),W-PADR+4,Math.max(PADT+3,Math.min(plotB-4,ly+3)));}
   });
+  // end-of-line name tags (which line is which)
+  const ABBR={price:"Price",pool:"Liq",supply:"Supply",burn:"Defl",index:"Refl"};
+  const lx=X(maxLen-1);const placed=[];
+  meta.forEach((m,ai)=>{if(ai===0)return; // primary already has the axis value tag
+    const t=ABBR[m.k]||m.s.label;ctx.font="bold 9px 'IBM Plex Mono'";const tw=ctx.measureText(t).width;
+    let ly=m.Y(m.d[m.d.length-1]);ly=Math.max(PADT+6,Math.min(plotB-3,ly));
+    while(placed.some(p=>Math.abs(p-ly)<11))ly+=11; placed.push(ly); // de-overlap
+    const tx=Math.max(PADL+2,lx-tw-8);
+    ctx.fillStyle="rgba(3,6,4,.7)";ctx.fillRect(tx-3,ly-8,tw+6,12);
+    ctx.fillStyle=m.s.color;ctx.textAlign="left";ctx.fillText(t,tx,ly+1);
+    ctx.beginPath();ctx.arc(lx,m.Y(m.d[m.d.length-1]),2.5,0,7);ctx.fill();});
   // crosshair
   if(_hoverI!=null&&meta.length){const hi=Math.max(0,Math.min(maxLen-1,_hoverI)),hx=X(hi);
     ctx.strokeStyle="rgba(255,255,255,.25)";ctx.setLineDash([3,4]);ctx.beginPath();ctx.moveTo(hx,PADT);ctx.lineTo(hx,plotB);ctx.stroke();ctx.setLineDash([]);
