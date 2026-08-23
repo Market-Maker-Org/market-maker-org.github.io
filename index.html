@@ -83,12 +83,12 @@
   .pmini .l{font-size:9.5px;color:var(--faint);text-transform:uppercase;letter-spacing:.06em}.pmini .v{font-family:var(--mono);font-size:14px;font-weight:600}
   #c_price{flex:1;width:100%;min-height:0;background:transparent;border:0;margin-top:8px}
   /* stats */
-  .slist{display:flex;flex-direction:column;gap:0;overflow:auto}
+  .slist{display:flex;flex-direction:column;gap:0;overflow-y:auto;overflow-x:hidden}
   .srow{display:flex;justify-content:space-between;align-items:center;padding:7px 2px;border-bottom:1px solid var(--line)}
   .srow:last-child{border-bottom:0}
   .srow .l{font-size:11px;color:var(--soft)} .srow .v{font-family:var(--mono);font-size:14px;font-weight:600;transition:color .4s} .srow .v.flash{color:var(--green2)}
   /* feed */
-  .feed{display:flex;flex-direction:column;gap:5px;overflow:auto}
+  .feed{display:flex;flex-direction:column;gap:5px;overflow-y:auto;overflow-x:hidden}
   .ev{display:flex;gap:8px;align-items:center;padding:6px 8px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;font-size:12px;animation:sl .3s ease;color:var(--ink);text-decoration:none}
   @keyframes sl{from{opacity:0;transform:translateX(-5px)}to{opacity:1}}
   .ev .ic{font-size:14px}.ev .mono{margin-left:auto;color:var(--soft)}
@@ -156,10 +156,14 @@
   .crange .cbtn.on{background:var(--green);color:#00220a;border-color:transparent}
   .chartwrap{position:relative;flex:1;min-height:0;display:flex;margin-top:6px}
   #c_price{flex:1;width:100%;min-height:0;background:transparent;border:0;margin-top:0}
-  .clegend{position:absolute;top:6px;left:6px;z-index:3;display:flex;flex-direction:column;align-items:flex-start;gap:3px;
-    font-family:var(--mono);font-size:10.5px;background:rgba(4,7,5,.62);backdrop-filter:blur(3px);border:1px solid var(--line);border-radius:9px;padding:7px 9px;max-width:62%}
-  .clegend .li{display:flex;align-items:center;gap:6px;color:var(--soft);white-space:nowrap}.clegend .li b{color:var(--ink);font-weight:600}
-  .clegend .sw{width:14px;height:3px;border-radius:2px;flex:0 0 auto}
+  .clegend{position:absolute;top:6px;left:6px;z-index:3;display:flex;flex-direction:column;align-items:stretch;gap:3px;
+    font-family:var(--mono);font-size:10.5px;background:rgba(3,5,4,.72);backdrop-filter:blur(4px);border:1px solid var(--line);border-radius:10px;padding:6px 7px;min-width:150px}
+  .clegend .li{display:grid;grid-template-columns:52px 1fr auto;align-items:center;gap:7px;white-space:nowrap;
+    border-left:2px solid;padding:1.5px 0 1.5px 7px}
+  .clegend .lnm{font-family:var(--disp);font-weight:800;font-size:10px;letter-spacing:.03em}
+  .clegend .li b{color:var(--ink);font-weight:600;text-align:right;letter-spacing:-.01em}
+  .clegend .lchg{font-size:9.5px;font-weight:600;text-align:right}
+  .clegend .lchg.u{color:var(--green2)}.clegend .lchg.d{color:var(--down)}
   /* holder-economics / PnL */
   .pnl{margin-top:8px;border-top:1px solid var(--line);padding-top:7px}
   .pnl .row{display:flex;justify-content:space-between;align-items:center;padding:3px 0;font-size:11.5px}
@@ -207,7 +211,7 @@
   @keyframes armpulse{0%,100%{box-shadow:0 0 0 0 rgba(0,200,5,.5)}50%{box-shadow:0 0 0 5px rgba(0,200,5,0)}}
   .wbtn.primary:disabled{opacity:.4;cursor:not-allowed}
   .wbtn:disabled{opacity:.4;cursor:not-allowed}
-  .poolstrip{display:flex;flex-direction:column;gap:5px;margin-top:9px;overflow:auto;min-height:0}
+  .poolstrip{display:flex;flex-direction:column;gap:5px;margin-top:9px;overflow-y:auto;overflow-x:hidden;min-height:0}
   .pchip{display:flex;align-items:center;gap:8px;padding:6px 9px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;font-size:11.5px}
   .pchip .nm{font-family:var(--disp);font-weight:700;color:var(--ink)}
   .pchip .tag{font-family:var(--mono);font-size:8.5px;color:var(--orange2);border:1px solid #3a2a12;border-radius:100px;padding:1px 6px}
@@ -436,7 +440,7 @@
       <button class="ptab" id="ptab-swap" onclick="protoTab('swap')"><span class="tg">⇄</span>Swap</button>
       <button class="ptab" id="ptab-wallet" onclick="protoTab('wallet')"><span class="tg">◈</span>Wallet</button>
     </div>
-    <div id="pv-analytics" style="display:none;overflow:auto"></div>
+    <div id="pv-analytics" style="display:none;overflow-y:auto;overflow-x:hidden"></div>
     <div class="slist" id="pv-proto">
       <div class="srow"><span class="l"><img src="mm.png" class="mmtag" alt="">Total supply</span><span class="v" id="d_supply">—</span></div>
       <div class="srow" title="Supply that actually decays — excludes pools, treasury, owner & hook"><span class="l">Circulating · decaying</span><span class="v" id="d_circ">—</span></div>
@@ -450,7 +454,7 @@
       <div class="srow"><span class="l"><img src="mm.png" class="mmtag" alt="">All-pool MM <span id="d_allpoolD" class="pooldelta"></span></span><span class="v" id="d_allpool">—</span></div>
       <div class="srow" title="Decaying supply ÷ all-pool MM × decay% × mirror ≈ annual pump rate"><span class="l">Decay : pool → pump</span><span class="v" id="d_ratio">—</span></div>
     </div>
-    <div id="pv-swap" style="display:none;overflow:auto">
+    <div id="pv-swap" style="display:none;overflow-y:auto;overflow-x:hidden">
       <div class="swapbox compact">
         <div class="swrow">
           <div class="top"><span>You pay</span><span id="sw_balA"></span></div>
@@ -475,7 +479,7 @@
       <div class="swnote" id="sw_note"></div>
       <div class="swnote" style="text-align:center;opacity:.7">Routed by LI.FI · best-price aggregator</div>
     </div>
-    <div id="pv-wallet" style="display:none;overflow:auto">
+    <div id="pv-wallet" style="display:none;overflow-y:auto;overflow-x:hidden">
       <div class="wal-empty" id="wal_empty"><button class="swexec" onclick="connectWallet()">Connect wallet</button>
         <button class="wbtn" style="width:100%;margin-top:8px" onclick="openSocial()">✉ Email · Google · X login</button>
         <div class="swnote" style="text-align:center">Extension wallet connects directly. Email/social via Reown — then deposit, withdraw & export here.</div></div>
@@ -556,7 +560,7 @@
   <!-- HOLDERS -->
   <div class="cell c-holders">
     <h3><span class="h3g">≡</span>Top holders</h3>
-    <div id="holderList" style="overflow:auto"><div class="muted">scanning holders…</div></div>
+    <div id="holderList" style="overflow-y:auto;overflow-x:hidden"><div class="muted">scanning holders…</div></div>
   </div>
 </div>
 
@@ -1426,10 +1430,9 @@ function drawChart(){
 function updateLegend(all,hi,maxLen){
   const lg=$("clegend");if(!lg)return;
   lg.innerHTML=all.map(([k,s])=>{const d=sliceN(s.data);
-    let val,idx;
-    if(hi!=null){const off=maxLen-d.length;idx=hi-off;val=(idx>=0&&idx<d.length)?d[idx]:d[d.length-1];}else val=d[d.length-1];
-    const first=d[0],chg=first?((val/first-1)*100):0,arw=chg>=0?"▲":"▼";
-    return `<span class="li"><span class="sw" style="background:${s.color}"></span>${s.label} <b>${s.fmtV(val)}</b> <span style="color:${chg>=0?'var(--green2)':'var(--down)'}">${arw}${Math.abs(chg).toFixed(2)}%</span></span>`;}).join("");
+    let val;if(hi!=null){const off=maxLen-d.length,idx=hi-off;val=(idx>=0&&idx<d.length)?d[idx]:d[d.length-1];}else val=d[d.length-1];
+    const first=d.find(x=>x>0)||d[0],chg=first?((val/first-1)*100):0,up=chg>=0;
+    return `<span class="li" style="border-left-color:${s.color}"><span class="lnm" style="color:${s.color}">${s.ab||s.label}</span><b>${s.fmtV(val)}</b><span class="lchg ${up?'u':'d'}">${up?'▲':'▼'}${Math.abs(chg).toFixed(1)}%</span></span>`;}).join("");
 }
 function drawPrice(){drawChart();}
 window.addEventListener("resize",()=>{clearTimeout(_flowT);_flowT=setTimeout(buildFlows,200);drawChart();});
