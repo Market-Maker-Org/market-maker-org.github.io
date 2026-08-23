@@ -20,15 +20,15 @@
     --wui-color-bg-100:#0e1411; --wui-color-bg-125:#131a16; --wui-color-bg-150:#18201b; --wui-color-bg-175:#1e2721; --wui-color-bg-200:#232e27;
     --wui-color-fg-100:#f4f7f5; --wui-color-fg-125:#d7ded9; --wui-color-fg-150:#9aa8a1; --wui-color-fg-175:#7c8a83; --wui-color-fg-200:#5f6b64;
     --wui-color-accent-100:#00C805; --w3m-color-mix:#0a0f0c; --w3m-color-mix-strength:0;
-    --bg:#000000; --panel:#0a0e0c; --panel2:#0f1512; --ink:#f4f7f5; --soft:#9aa8a1; --faint:#5f6b64; --line:#182019; --line2:#232e27;
+    --bg:#000000; --panel:#080808; --panel2:#101010; --ink:#f4f7f5; --soft:#9aa39e; --faint:#616763; --line:#1b1b1b; --line2:#2a2a2a;
     --green:#00C805; --green2:#38ff7e; --greenDim:#0a2e14; --orange:#ff7a18; --orange2:#ffa24d; --white:#ffffff;
     --up:#00C805; --down:#ff5a2c;
     --mono:"IBM Plex Mono",ui-monospace,monospace; --sans:"IBM Plex Sans",system-ui,sans-serif; --disp:"Archivo",sans-serif;
   }
   *{box-sizing:border-box}
   html,body{height:100%}
-  body{margin:0;background:radial-gradient(130% 90% at 88% -12%,#06160b 0%,transparent 55%),radial-gradient(90% 60% at -5% 0%,#0a0f0c,transparent 55%),
-    linear-gradient(rgba(120,160,140,.028) 1px,transparent 1px) 0 0/40px 40px,linear-gradient(90deg,rgba(120,160,140,.028) 1px,transparent 1px) 0 0/40px 40px,var(--bg);
+  body{margin:0;background:radial-gradient(130% 90% at 88% -12%,#0c0c0c 0%,transparent 55%),radial-gradient(90% 60% at -5% 0%,#0a0a0a,transparent 55%),
+    linear-gradient(rgba(255,255,255,.018) 1px,transparent 1px) 0 0/40px 40px,linear-gradient(90deg,rgba(255,255,255,.018) 1px,transparent 1px) 0 0/40px 40px,var(--bg);
     color:var(--ink);font-family:var(--sans);font-size:13.5px;line-height:1.5;-webkit-font-smoothing:antialiased;overflow:hidden}
   .mono{font-family:var(--mono);font-variant-numeric:tabular-nums} a{color:var(--green2);text-decoration:none}
   .mmlogo{border-radius:50%;object-fit:cover;vertical-align:middle;border:1px solid var(--line2);background:#000;flex:0 0 auto}
@@ -55,7 +55,7 @@
   /* terminal grid */
   .term{display:grid;grid-template-columns:repeat(4,1fr);grid-template-rows:minmax(0,1.5fr) minmax(0,1fr);gap:10px;padding:10px;height:calc(100vh - 52px);position:relative}
   .flowlayer{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:6;overflow:visible}
-  .cell{background:linear-gradient(180deg,var(--panel),#060908);border:1px solid var(--line);border-radius:14px;padding:13px;overflow:hidden;display:flex;flex-direction:column;min-height:0;
+  .cell{background:linear-gradient(180deg,var(--panel),#000);border:1px solid var(--line);border-radius:14px;padding:13px;overflow:hidden;display:flex;flex-direction:column;min-height:0;
     box-shadow:0 1px 0 rgba(255,255,255,.03) inset,0 8px 24px -18px rgba(0,0,0,.9);transition:border-color .2s}
   .cell:hover{border-color:var(--line2)}
   .cell h3{font-family:var(--disp);font-size:11px;margin:0 0 9px;letter-spacing:.13em;text-transform:uppercase;color:var(--faint);display:flex;align-items:center;gap:7px}
@@ -663,12 +663,12 @@ const IC={buy:{g:"▲",c:"#00C805"},sell:{g:"▼",c:"#ff5a2c"},burn:{g:"✷",c:"
 const icon=k=>{const o=IC[k]||IC.transfer;return `<span class="ico" style="color:${o.c};border-color:${o.c}44">${o.g}</span>`;};
 // ---- multi-series chart model (real on-chain data) ----
 const SERIES={
-  price :{label:"Price",   color:"#00C805",on:true, data:[],fmtV:v=>ethUsd?usd(v*ethUsd):gwei(v).toFixed(4)+"g"},
-  pool  :{label:"Liquidity",color:"#38ff7e",on:true, data:[],fmtV:v=>fmt(v,0)+" MM"},
-  supply:{label:"Supply",  color:"#e8f0ea",on:true, data:[],fmtV:v=>fmt(v,0)},
-  burn  :{label:"Deflation",color:"#ff7a18",on:true, data:[],fmtV:v=>fmt(v,0)+" 🔥"},
-  index :{label:"Reflection",color:"#ffa24d",on:true, data:[],fmtV:v=>v.toFixed(6)},
-  vol   :{label:"Volume",  color:"#9aa8a1",on:true, data:[],fmtV:v=>fmt(v,0)+" MM"}};
+  price :{label:"Price",   ab:"PRICE",color:"#00C805",on:true, data:[],fmtV:v=>ethUsd?usd(v*ethUsd):gwei(v).toFixed(4)+"g"},
+  pool  :{label:"Liquidity",ab:"LIQ", color:"#ffffff",on:true, data:[],fmtV:v=>compactNum(v)+" MM"},
+  supply:{label:"Supply",  ab:"SUPPLY",color:"#8a938e",on:false,data:[],fmtV:v=>compactNum(v)},
+  burn  :{label:"Deflation",ab:"DEFL",color:"#ff7a18",on:true, data:[],fmtV:v=>compactNum(v)},
+  index :{label:"Reflection",ab:"REFL",color:"#ff4d4d",on:true, data:[],fmtV:v=>v.toFixed(5)},
+  vol   :{label:"Volume",  ab:"VOL", color:"#5a635e",on:true, data:[],fmtV:v=>compactNum(v)+" MM"}};
 let chartRange=0; // last N points; 0 = all (full history)
 let chartLog=true; // logarithmic Y (per-series normalized)
 let volYr=0,incSupply=0,reflBps=0,burnBps=0,recentBps=0,treBps=0,mirrorX=1,poolMMg=0,debtBase=0,debtBaseT=0,allPool0=0,refreshFails=0;
@@ -1176,7 +1176,7 @@ function drawChart(){
   c.width=W*dpr;c.height=H*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,W,H);
   const all=Object.entries(SERIES).filter(([k,s])=>s.on&&s.data.length>1);
   const lines=all.filter(([k])=>k!=="vol"),volOn=SERIES.vol.on&&SERIES.vol.data.length>1;
-  const PADT=12,PADR=54,PADL=4,volH=volOn?Math.round(H*0.20):0,plotB=H-6-volH;
+  const PADT=12,PADR=52,PADL=4,volH=volOn?Math.round(H*0.20):0,plotB=H-6-volH;
   ctx.strokeStyle="rgba(255,255,255,.05)";ctx.lineWidth=1;
   for(let g=0;g<=4;g++){const y=PADT+g*(plotB-PADT)/4;ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W-PADR,y);ctx.stroke();}
   if(!lines.length&&!volOn){ctx.fillStyle="#5f6b64";ctx.font="12px 'IBM Plex Mono',monospace";ctx.textAlign="center";ctx.fillText("loading history…",W/2,H/2);return;}
@@ -1202,23 +1202,26 @@ function drawChart(){
     ctx.strokeStyle=s.color;ctx.lineWidth=ai===0?2:1.4;ctx.globalAlpha=ai===0?1:.85;
     if(ai===0){ctx.shadowColor=s.color;ctx.shadowBlur=9;}ctx.stroke();ctx.shadowBlur=0;ctx.globalAlpha=1;
     const lx=X(maxLen-1),ly=Y(d[d.length-1]);ctx.fillStyle=s.color;ctx.beginPath();ctx.arc(lx,ly,3,0,7);ctx.fill();
-    if(ai===0){ // Y-axis labels + last-value tag for primary
-      ctx.font="9.5px 'IBM Plex Mono'";ctx.textAlign="left";ctx.fillStyle="#7c8a83";
-      for(let g=0;g<=4;g++){const val=useLog?Math.exp(lmx-(lmx-lmn)*g/4):mx-(mx-mn)*g/4,y=PADT+g*(plotB-PADT)/4;ctx.fillText(axisFmt(k,val),W-PADR+4,y+3);}
-      ctx.fillStyle=s.color;ctx.fillRect(W-PADR+1,Math.max(PADT,Math.min(plotB-14,ly-7)),PADR-2,14);
-      ctx.fillStyle="#001a06";ctx.font="bold 9.5px 'IBM Plex Mono'";ctx.fillText(axisFmt(k,d[d.length-1]),W-PADR+4,Math.max(PADT+3,Math.min(plotB-4,ly+3)));}
+    if(ai===0){ // price gridline values on the LEFT edge
+      ctx.font="9px 'IBM Plex Mono'";ctx.textAlign="left";ctx.fillStyle="#6f7a74";
+      for(let g=0;g<=4;g++){const val=useLog?Math.exp(lmx-(lmx-lmn)*g/4):mx-(mx-mn)*g/4,yy=PADT+g*(plotB-PADT)/4;
+        ctx.fillText(axisFmt(k,val),3,g===0?yy+9:yy-2);}
+    }
   });
-  // end-of-line name tags (which line is which)
-  const ABBR={price:"Price",pool:"Liq",supply:"Supply",burn:"Defl",index:"Refl"};
-  const lx=X(maxLen-1);const placed=[];
-  meta.forEach((m,ai)=>{if(ai===0)return; // primary already has the axis value tag
-    const t=ABBR[m.k]||m.s.label;ctx.font="bold 9px 'IBM Plex Mono'";const tw=ctx.measureText(t).width;
-    let ly=m.Y(m.d[m.d.length-1]);ly=Math.max(PADT+6,Math.min(plotB-3,ly));
-    while(placed.some(p=>Math.abs(p-ly)<11))ly+=11; placed.push(ly); // de-overlap
-    const tx=Math.max(PADL+2,lx-tw-8);
-    ctx.fillStyle="rgba(3,6,4,.7)";ctx.fillRect(tx-3,ly-8,tw+6,12);
-    ctx.fillStyle=m.s.color;ctx.textAlign="left";ctx.fillText(t,tx,ly+1);
-    ctx.beginPath();ctx.arc(lx,m.Y(m.d[m.d.length-1]),2.5,0,7);ctx.fill();});
+  // right-edge markers: each line's name chip AT its endpoint, connector line from the point
+  {const lx=X(maxLen-1);
+   const items=meta.map(m=>({m,ry:m.Y(m.d[m.d.length-1])}));
+   items.forEach(it=>it.y=Math.max(PADT+7,Math.min(plotB-5,it.ry)));
+   items.sort((a,b)=>a.y-b.y);
+   for(let i=1;i<items.length;i++)if(items[i].y-items[i-1].y<13)items[i].y=items[i-1].y+13;
+   for(let i=items.length-1;i>0;i--)if(items[i].y>plotB-5){items[i].y=plotB-5;if(items[i].y-items[i-1].y<13)items[i-1].y=items[i].y-13;}
+   items.forEach(({m,y,ry})=>{
+     ctx.strokeStyle=m.s.color;ctx.globalAlpha=.4;ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(lx,ry);ctx.lineTo(W-PADR+2,y);ctx.stroke();ctx.globalAlpha=1;
+     ctx.fillStyle=m.s.color;ctx.beginPath();ctx.arc(lx,ry,2.6,0,7);ctx.fill();
+     const t=m.s.ab||m.s.label;ctx.font="bold 8.5px 'IBM Plex Mono'";const tw=ctx.measureText(t).width;
+     ctx.fillStyle=m.s.color;ctx.globalAlpha=.15;ctx.fillRect(W-PADR+3,y-6,Math.min(PADR-5,tw+6),12);ctx.globalAlpha=1;
+     ctx.fillStyle=m.s.color;ctx.textAlign="left";ctx.fillText(t,W-PADR+6,y+2.5);
+   });}
   // crosshair
   if(_hoverI!=null&&meta.length){const hi=Math.max(0,Math.min(maxLen-1,_hoverI)),hx=X(hi);
     ctx.strokeStyle="rgba(255,255,255,.25)";ctx.setLineDash([3,4]);ctx.beginPath();ctx.moveTo(hx,PADT);ctx.lineTo(hx,plotB);ctx.stroke();ctx.setLineDash([]);
