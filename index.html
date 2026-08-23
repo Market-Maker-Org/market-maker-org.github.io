@@ -1052,26 +1052,38 @@ async function getFeed(){try{const cur=await ro.getBlockNumber();const logs=awai
 }catch(e){}}
 
 const KNOWN={};
+const MULTICALL="0xcA11bde05977b3631167028862bE2a173976CA11";
+const MC_ABI=["function aggregate3((address target,bool allowFailure,bytes callData)[] calls) view returns ((bool success,bytes returnData)[])"];
+let multicall;const mif=new E.Interface(["function balanceOf(address) view returns(uint256)","function isExcluded(address) view returns(bool)"]);
+async function mcall(calls){if(!multicall)multicall=new E.Contract(MULTICALL,MC_ABI,ro);return rr(()=>multicall.aggregate3(calls));}
 async function getHolders(){
   try{
     const r=await fetch(LOCAL?"/holders":BS+"/api/v2/tokens/"+CFG.mm+"/holders");const j=await r.json();
     if(!j.items||!j.items.length)return; // transient / empty -> keep existing list
     const items=j.items.slice(0,14);
     const pm=CFG.pm.toLowerCase(),hk=CFG.hook.toLowerCase(),mm=CFG.mm.toLowerCase(),sd="0x0bc6146b349446458383093e39b6c30a7c7bb571",me=(account||watch||"").toLowerCase();
-    const rows=[];
-    for(const it of items){const a=(it.address&&it.address.hash||"").toLowerCase();
+    const cand=[];
+    for(const it of items){const a=(it.address&&it.address.hash||"").toLowerCase();if(!a)continue;
       let tag="",tc="",infra=false;
       if(a===pm){tag="pool";tc="pool";infra=true;}else if(a===hk){tag="hook";tc="pool";infra=true;}else if(a===mm){tag="treasury";tc="pool";infra=true;}
       else if(a===sd){tag="seeder";tc="";infra=true;}else if(a===me){tag="you";tc="you";}
-      let ex=infra;if(!infra){if(KNOWN[a]===undefined){try{KNOWN[a]=await mmRead.isExcluded(a);}catch(e){KNOWN[a]=false;}}ex=KNOWN[a];}
-      // LIVE balance from chain (Blockscout value is stale for elastic supply); fall back to indexed value
-      let balN;try{balN=Number(E.formatUnits(await mmRead.balanceOf(a),18));}catch(e){balN=Number(E.formatUnits(BigInt(it.value||"0"),18));}
-      if(balN<=0)continue;
-      rows.push({a,tag,tc,ex,bal:balN});
-      if(rows.length>=10)break;
-    }
+      cand.push({a,tag,tc,infra,fallback:it.value||"0"});}
+    // ONE multicall for all balances (+ isExcluded for unknown, non-infra addresses)
+    const unknown=cand.filter(c=>!c.infra&&KNOWN[c.a]===undefined).map(c=>c.a);
+    const calls=cand.map(c=>({target:CFG.mm,allowFailure:true,callData:mif.encodeFunctionData("balanceOf",[c.a])}))
+      .concat(unknown.map(a=>({target:CFG.mm,allowFailure:true,callData:mif.encodeFunctionData("isExcluded",[a])})));
+    let res;try{res=await mcall(calls);}catch(e){res=null;}
+    const rows=[];
+    cand.forEach((c,i)=>{
+      let balN;
+      if(res&&res[i]&&res[i].success){try{balN=Number(E.formatUnits(mif.decodeFunctionResult("balanceOf",res[i].returnData)[0],18));}catch(e){balN=Number(E.formatUnits(BigInt(c.fallback),18));}}
+      else balN=Number(E.formatUnits(BigInt(c.fallback),18));
+      let ex=c.infra;
+      if(!c.infra){if(KNOWN[c.a]===undefined&&res){const ui=unknown.indexOf(c.a);if(ui>=0){const rr2=res[cand.length+ui];if(rr2&&rr2.success){try{KNOWN[c.a]=mif.decodeFunctionResult("isExcluded",rr2.returnData)[0];}catch(e){KNOWN[c.a]=false;}}}}ex=KNOWN[c.a]||false;}
+      if(balN>0)rows.push({a:c.a,tag:c.tag,tc:c.tc,ex,bal:balN});
+    });
     rows.sort((x,y)=>y.bal-x.bal);
-    holderRows=rows.map(r=>({...r,t0:Date.now()}));
+    holderRows=rows.slice(0,10).map(r=>({...r,t0:Date.now()}));
     renderHolders();
   }catch(e){if(!document.querySelector("#holderList .hrow"))$("holderList").innerHTML='<div class="muted">loading holders…</div>';}
 }
