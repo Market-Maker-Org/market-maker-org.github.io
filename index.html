@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <title>Market Maker Terminal</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23000'/%3E%3Crect x='1' y='1' width='30' height='30' rx='7' fill='none' stroke='%2300C805' stroke-opacity='.6'/%3E%3Cpath d='M6 21 L12 13 L17 18 L26 7' fill='none' stroke='%2300C805' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='26' cy='7' r='2.7' fill='%23ff7a18'/%3E%3C/svg%3E">
+<link rel="icon" href="mm.png">
 <meta name="theme-color" content="#000000">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -23,6 +23,8 @@
   body{margin:0;background:radial-gradient(130% 90% at 88% -12%,#06160b 0%,transparent 55%),radial-gradient(90% 60% at -5% 0%,#0a0f0c,transparent 55%),var(--bg);
     color:var(--ink);font-family:var(--sans);font-size:13.5px;line-height:1.5;-webkit-font-smoothing:antialiased;overflow:hidden}
   .mono{font-family:var(--mono);font-variant-numeric:tabular-nums} a{color:var(--green2);text-decoration:none}
+  .mmlogo{border-radius:50%;object-fit:cover;vertical-align:middle;border:1px solid var(--line2);background:#000;flex:0 0 auto}
+  .mmtag{display:inline-block;width:15px;height:15px;border-radius:50%;object-fit:cover;vertical-align:-3px;margin-right:3px;border:1px solid var(--line2)}
   /* header */
   header{display:flex;align-items:center;gap:14px;height:52px;padding:0 18px;border-bottom:1px solid var(--line);background:rgba(0,0,0,.6);backdrop-filter:blur(8px)}
   .brand{font-family:var(--disp);font-weight:900;font-size:18px;letter-spacing:-.02em;display:flex;align-items:center;gap:9px}
@@ -35,7 +37,8 @@
   .hbtn{background:var(--panel2);border:1px solid var(--line2);color:var(--ink);font-family:var(--disp);font-weight:700;font-size:12px;padding:7px 12px;border-radius:8px;cursor:pointer}
   .hbtn.green{background:var(--green);color:#00220a;border:0}
   /* terminal grid */
-  .term{display:grid;grid-template-columns:repeat(4,1fr);grid-template-rows:minmax(0,1.5fr) minmax(0,1fr);gap:10px;padding:10px;height:calc(100vh - 52px)}
+  .term{display:grid;grid-template-columns:repeat(4,1fr);grid-template-rows:minmax(0,1.5fr) minmax(0,1fr);gap:10px;padding:10px;height:calc(100vh - 52px);position:relative}
+  .flowlayer{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:6;overflow:visible}
   .cell{background:linear-gradient(180deg,var(--panel),#060908);border:1px solid var(--line);border-radius:14px;padding:13px;overflow:hidden;display:flex;flex-direction:column;min-height:0;
     box-shadow:0 1px 0 rgba(255,255,255,.03) inset,0 8px 24px -18px rgba(0,0,0,.9);transition:border-color .2s}
   .cell:hover{border-color:var(--line2)}
@@ -181,28 +184,85 @@
   .pchip .go{margin-left:auto;color:var(--green2);font-family:var(--mono);font-size:10.5px}
   .pchip:hover{border-color:var(--line2)}
   .hrow .bl.dec{color:var(--orange2)}
-  /* responsive: allow scroll on small screens */
-  @media(max-width:900px){body{overflow:auto}.term{grid-template-columns:1fr;grid-template-rows:none;height:auto}.c-chart,.c-stats,.c-feed,.c-pos,.c-pools{grid-column:auto;grid-row:auto}#c_price{height:220px}}
+  /* swap modal */
+  .modal-in.swap2{max-width:440px}
+  .swapbox{display:flex;flex-direction:column;gap:2px;margin-top:8px}
+  .swrow{background:var(--panel2);border:1px solid var(--line);border-radius:13px;padding:12px 13px}
+  .swrow .top{display:flex;justify-content:space-between;font-size:10.5px;color:var(--faint);text-transform:uppercase;letter-spacing:.06em}
+  .swrow .mid{display:flex;align-items:center;gap:10px;margin-top:6px}
+  .swrow input{flex:1;background:transparent;border:0;outline:none;color:var(--ink);font-family:var(--mono);font-size:24px;font-weight:700;width:100%;min-width:0}
+  .swrow .rcv{flex:1;font-family:var(--mono);font-size:24px;font-weight:700;color:var(--ink);overflow:hidden;text-overflow:ellipsis}
+  .tokchip{display:flex;align-items:center;gap:7px;background:#060908;border:1px solid var(--line2);border-radius:100px;padding:5px 11px 5px 6px;font-family:var(--disp);font-weight:800;font-size:14px;white-space:nowrap}
+  .tokchip svg{width:22px;height:22px;border-radius:50%}
+  .swflip{align-self:center;margin:-9px 0;z-index:2;width:34px;height:34px;border-radius:10px;background:var(--panel);border:1px solid var(--line2);color:var(--green2);cursor:pointer;display:grid;place-items:center;font-size:15px;transition:.15s}
+  .swflip:hover{border-color:var(--green);transform:rotate(180deg)}
+  .swinfo{margin-top:10px;font-size:11.5px;color:var(--soft);display:flex;flex-direction:column;gap:5px}
+  .swinfo .r{display:flex;justify-content:space-between}.swinfo .r .v{font-family:var(--mono);color:var(--ink)}
+  .swinfo .r .v.warn{color:var(--orange2)}
+  .slips{display:flex;gap:6px;align-items:center;margin-top:9px}
+  .slip{font-family:var(--mono);font-size:11px;padding:4px 9px;border-radius:100px;border:1px solid var(--line2);background:var(--panel2);color:var(--soft);cursor:pointer}
+  .slip.on{background:var(--green);color:#00220a;border-color:transparent}
+  .swexec{margin-top:12px;width:100%;padding:13px;border-radius:12px;border:0;font-family:var(--disp);font-weight:800;font-size:15px;cursor:pointer;background:linear-gradient(180deg,var(--green),#00a504);color:#00220a}
+  .swexec.alt{background:var(--panel2);color:var(--ink);border:1px solid var(--line2)}
+  .swexec:disabled{opacity:.5;cursor:not-allowed}
+  .swrouter{margin-top:10px}
+  .swrouter summary{font-size:11px;color:var(--faint);cursor:pointer}
+  .swnote{font-size:10.5px;color:var(--faint);margin-top:9px;line-height:1.5}
+  /* ===== responsive ===== */
+  /* tablet: 2 columns, page scrolls */
+  @media(max-width:1150px) and (min-width:781px){
+    body{overflow:auto}
+    .term{grid-template-columns:1fr 1fr;grid-template-rows:none;height:auto;min-height:calc(100vh - 52px)}
+    .c-chart{grid-column:1/3;grid-row:auto}.c-stats{grid-column:1/3;grid-row:auto}
+    .c-feed,.c-pos,.c-pools,.c-holders{grid-column:auto;grid-row:auto}
+    #c_price{min-height:260px}
+  }
+  /* mobile: single column, tuned typography + controls */
+  @media(max-width:780px){
+    body{overflow:auto;font-size:13px}
+    header{height:auto;min-height:52px;flex-wrap:wrap;padding:8px 12px;gap:8px}
+    .brand{font-size:15px}.brand .rh{display:none}
+    header .chip{order:5}
+    .term{display:flex;flex-direction:column;height:auto;min-height:0;gap:10px;padding:10px}
+    .cell{grid-column:auto!important;grid-row:auto!important;min-height:0}
+    #c_price{height:210px;min-height:210px}
+    .price{font-size:clamp(24px,8vw,34px)}
+    .phead{gap:10px}.pmini{gap:14px}
+    .ctools{gap:5px}.cbtn{font-size:10px;padding:3px 7px}
+    .clegend{font-size:10px;gap:9px}
+    .pmgrid{grid-template-columns:1fr 1fr}
+    .fwline{flex-wrap:wrap;gap:6px}.fwarrow{display:none}.fwnode{flex:1 1 40%}
+    .pmcum{flex-direction:column;gap:4px;align-items:flex-start}
+    .feed,.slist,.poolstrip{max-height:260px}
+    #holderList,#poolList{max-height:280px}
+    .modal{padding:0}.modal-in{border-radius:0;max-height:100vh;padding:16px}
+    .lnav{overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch}.lnb{flex:0 0 auto}
+    .lkey{grid-template-columns:1fr}
+    .swapbox{max-width:100%}
+    .flowlayer{display:none} /* flow overlay off on mobile */
+  }
   @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
 <body>
 <header>
-  <div class="brand"><span class="logo"><svg viewBox="0 0 32 32"><path d="M6 21 L12 13 L17 18 L26 7" fill="none" stroke="#00C805" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="26" cy="7" r="3" fill="#ff7a18"/></svg></span>Market <b>Maker</b><span class="rh">· ROBINHOOD</span></div>
+  <div class="brand"><img src="mm.png" class="mmlogo" style="width:26px;height:26px" alt="MM">Market <b>Maker</b><span class="rh">· ROBINHOOD</span></div>
   <div class="spacer"></div>
   <span class="chip" id="net"><span class="d"></span><span id="nettxt">connecting…</span></span>
   <button class="hbtn" onclick="openLearn()">How it works</button>
+  <button class="hbtn" onclick="openSwap()">⇄ Swap</button>
   <button class="hbtn green" id="connectBtn" onclick="connectWallet()">Connect</button>
   <span class="chip" id="acct" style="display:none"></span>
   <button class="hbtn" id="adminBtn" style="display:none" onclick="window.open('admin.html','_blank')">Admin</button>
 </header>
 
 <div class="term">
+  <svg class="flowlayer" id="flow" aria-hidden="true"></svg>
   <!-- CHART -->
   <div class="cell c-chart">
     <div class="phead">
       <div>
-        <div class="plabel">MM / ETH · Robinhood</div>
+        <div class="plabel"><img src="mm.png" class="mmtag" alt="">MM / ETH · Robinhood</div>
         <div class="price" id="d_price">—<span class="u">gwei</span></div>
         <div class="psub"><span class="chg" id="d_chg">—</span> <span id="d_priceSub">—</span></div>
       </div>
@@ -244,7 +304,7 @@
   <!-- POSITION -->
   <div class="cell c-pos">
     <h3>Your position</h3>
-    <div class="bigbal"><span id="p_bal">—</span><span class="u">MM</span></div>
+    <div class="bigbal"><span id="p_bal">—</span><span class="u"><img src="mm.png" class="mmtag" alt="">MM</span></div>
     <div class="tick" id="p_tick"></div>
     <div style="margin-top:5px"><span class="badge" id="p_badge">—</span> <span class="muted" id="p_addr"></span></div>
     <div class="pnl" id="pnl"></div>
@@ -450,6 +510,48 @@
   </div>
 </div></div>
 
+<!-- SWAP MODAL -->
+<div class="modal" id="swap"><div class="modal-in swap2">
+  <span class="mclose" onclick="closeSwap()">✕</span>
+  <h2>Swap</h2>
+  <p class="muted" style="margin:0 0 4px">Uniswap-V2 MM/ETH pair · live quote from on-chain reserves.</p>
+  <div class="swapbox">
+    <div class="swrow">
+      <div class="top"><span>You pay</span><span id="sw_balA"></span></div>
+      <div class="mid">
+        <input id="sw_in" type="text" inputmode="decimal" placeholder="0.0" oninput="quoteSwap()" autocomplete="off">
+        <span class="tokchip" id="sw_tokA"></span>
+      </div>
+    </div>
+    <button class="swflip" onclick="flipSwap()" title="Flip direction">⇅</button>
+    <div class="swrow">
+      <div class="top"><span>You receive <span class="muted">(est.)</span></span><span id="sw_balB"></span></div>
+      <div class="mid">
+        <div class="rcv" id="sw_out">0.0</div>
+        <span class="tokchip" id="sw_tokB"></span>
+      </div>
+    </div>
+  </div>
+  <div class="slips"><span class="muted" style="font-size:11px">Max slippage</span>
+    <span class="slip" data-s="0.5" onclick="setSlip(0.5,this)">0.5%</span>
+    <span class="slip on" data-s="1" onclick="setSlip(1,this)">1%</span>
+    <span class="slip" data-s="3" onclick="setSlip(3,this)">3%</span>
+  </div>
+  <div class="swinfo">
+    <div class="r"><span>Rate</span><span class="v" id="sw_rate">—</span></div>
+    <div class="r"><span>Price impact</span><span class="v" id="sw_impact">—</span></div>
+    <div class="r"><span>Min received</span><span class="v" id="sw_min">—</span></div>
+    <div class="r"><span>Token tax (this leg)</span><span class="v" id="sw_tax">—</span></div>
+  </div>
+  <button class="swexec" id="sw_exec" onclick="doSwap()">Connect wallet</button>
+  <details class="swrouter">
+    <summary>Advanced · V2 router address (for 1-click in-app swap)</summary>
+    <input class="mm" id="sw_router" placeholder="0x… router (fee-on-transfer compatible)" oninput="saveRouter()">
+    <div class="swnote">Robinhood's DEX uses a modified router, so no router is preset. Paste a fee-on-transfer-compatible V2 router to enable atomic, slippage-protected in-app swaps (funds are safe — the router reverts if output &lt; min received). Without one, Swap opens the pair on the DEX.</div>
+  </details>
+  <div class="swnote" id="sw_note"></div>
+</div></div>
+
 <script>
 // Local dev has the server.js proxy (/rpc,/holders,/ethusd). Static hosting
 // (GitHub Pages) has no proxy → hit the public endpoints directly (CORS-enabled).
@@ -504,6 +606,7 @@ async function boot(){
   buildHistory();             // then load history (retries if RPC was busy)
   setTimeout(getHolders,700); // stagger the heavy balanceOf sweep
   setTimeout(fetchPumpStats,1400);
+  setTimeout(buildFlows,900);setTimeout(buildFlows,2500); // draw ecosystem flow lines once laid out
   setInterval(refresh,5000);setInterval(fetchSlow,30000);setInterval(tickLive,120);setInterval(fetchEthUsd,60000);setInterval(getHolders,30000);setInterval(tickHolders,250);setInterval(tickDebt,150);setInterval(fetchPumpStats,60000);
 }
 async function connectWallet(){
@@ -767,6 +870,76 @@ async function pubBuyback(){if(!signer)return connectWallet();try{const mm=new E
 function buildPools(){const pools=CFG.pools;
   $("poolList").innerHTML=pools.map(p=>`<a class="pchip" href="https://dexscreener.com/robinhood/${p.id}" target="_blank"><span class="nm">${p.name.replace(/ \(V2\)/,"")}</span><span class="tag">${p.tag}</span><span class="go">Swap ↗</span></a>`).join("");}
 
+// ===== Swap =====
+const WETH="0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73";
+const LOGO_ETH='<svg viewBox="0 0 24 24"><rect width="24" height="24" rx="12" fill="#0a0f16"/><path d="M12 3.2 L12 9.9 L17.6 12.3 Z" fill="#8ab4ff"/><path d="M12 3.2 L6.4 12.3 L12 9.9 Z" fill="#dbe6ff"/><path d="M12 13.3 L12 20.8 L17.7 13.5 Z" fill="#8ab4ff"/><path d="M12 20.8 L12 13.3 L6.4 13.5 Z" fill="#dbe6ff"/></svg>';
+const LOGO_MM='<img src="mm.png" alt="MM" style="width:22px;height:22px;border-radius:50%;object-fit:cover">';
+let swBuy=true,swSlip=1,swRouter="";
+const ROUTER_ABI=["function swapExactETHForTokensSupportingFeeOnTransferTokens(uint256 amountOutMin,address[] path,address to,uint256 deadline) payable","function swapExactTokensForETHSupportingFeeOnTransferTokens(uint256 amountIn,uint256 amountOutMin,address[] path,address to,uint256 deadline)"];
+const ERC20_ABI2=["function allowance(address,address) view returns(uint256)","function approve(address,uint256) returns(bool)"];
+const tokChip=s=>(s==="ETH"?LOGO_ETH+" ETH":LOGO_MM+" MM");
+function openSwap(){swRouter=(localStorage.getItem("mm_router")||"").trim();$("sw_router").value=swRouter;renderSwapTokens();$("swap").classList.add("on");updateSwapBalances();quoteSwap();}
+function closeSwap(){$("swap").classList.remove("on");}
+function renderSwapTokens(){$("sw_tokA").innerHTML=tokChip(swBuy?"ETH":"MM");$("sw_tokB").innerHTML=tokChip(swBuy?"MM":"ETH");}
+function flipSwap(){swBuy=!swBuy;renderSwapTokens();$("sw_in").value="";$("sw_out").textContent="0.0";updateSwapBalances();quoteSwap();}
+function setSlip(s,el){swSlip=s;document.querySelectorAll(".slip").forEach(x=>x.classList.remove("on"));el.classList.add("on");quoteSwap();}
+function saveRouter(){swRouter=$("sw_router").value.trim();localStorage.setItem("mm_router",swRouter);quoteSwap();}
+async function updateSwapBalances(){
+  if(!account){$("sw_balA").textContent="";$("sw_balB").textContent="";return;}
+  try{const [eth,mmb]=await Promise.all([ro.getBalance(account),mmRead.balanceOf(account)]);
+    const e=Number(E.formatUnits(eth,18)),m=Number(E.formatUnits(mmb,18));
+    $("sw_balA").textContent="bal "+fmt(swBuy?e:m,swBuy?5:2);$("sw_balB").textContent="bal "+fmt(swBuy?m:e,swBuy?2:5);}catch(e){}
+}
+async function quoteSwap(){
+  const inv=parseFloat(($("sw_in").value||"").replace(",","."))||0;
+  if(!pair)pair=new E.Contract(CFG.ethPair,PAIR_ABI,ro);
+  let rW,rM;try{const r=await pair.getReserves();rW=Number(E.formatUnits(r[0],18));rM=Number(E.formatUnits(r[1],18));}catch(e){return;}
+  const gao=(a,ri,rO)=>{const aw=a*0.997;return aw*rO/(ri+aw);};
+  const taxFrac=((burnBps+reflBps+recentBps+treBps)||400)/10000;
+  const outSym=swBuy?"MM":"ETH";let out=0,spot=0;
+  if(swBuy){spot=rM/rW;out=inv>0?gao(inv,rW,rM):0;}          // ETH->MM
+  else{spot=rW/rM;out=inv>0?gao(inv*(1-taxFrac),rM,rW):0;}    // MM->ETH (MM taxed to pool)
+  const dp=swBuy?2:8;
+  $("sw_out").textContent=out>0?out.toLocaleString("en-US",{maximumFractionDigits:dp}):"0.0";
+  $("sw_rate").textContent=inv>0?`1 ${swBuy?"ETH":"MM"} ≈ ${(out/inv).toLocaleString("en-US",{maximumFractionDigits:dp})} ${outSym}`:"—";
+  const exec=inv>0?out/inv:0,impact=spot>0&&exec>0?Math.max(0,(1-exec/spot))*100:0;
+  $("sw_impact").textContent=inv>0?impact.toFixed(2)+"%":"—";$("sw_impact").className="v"+(impact>5?" warn":"");
+  const minOut=out*(1-swSlip/100);
+  $("sw_min").textContent=inv>0?minOut.toLocaleString("en-US",{maximumFractionDigits:dp})+" "+outSym:"—";
+  $("sw_tax").textContent=swBuy?"0% · buy leg":(taxFrac*100).toFixed(1)+"% · sell leg";
+  const btn=$("sw_exec"),hasR=/^0x[a-fA-F0-9]{40}$/.test(swRouter);
+  if(!signer){btn.textContent="Connect wallet";btn.className="swexec alt";}
+  else if(hasR){btn.textContent=inv>0?`Swap ${swBuy?"ETH → MM":"MM → ETH"}`:"Enter an amount";btn.className="swexec";}
+  else{btn.textContent="Open swap on DEX ↗";btn.className="swexec alt";}
+}
+async function doSwap(){
+  if(!signer)return connectWallet();
+  const hasR=/^0x[a-fA-F0-9]{40}$/.test(swRouter);
+  if(!hasR){window.open("https://dexscreener.com/robinhood/"+CFG.ethPair,"_blank");return;}
+  const raw=($("sw_in").value||"").replace(",",".");const inv=parseFloat(raw)||0;if(inv<=0)return;
+  const btn=$("sw_exec");btn.disabled=true;$("sw_note").textContent="";
+  try{
+    const router=new E.Contract(swRouter,ROUTER_ABI,signer),dl=Math.floor(Date.now()/1000)+600;
+    const r=await pair.getReserves();const rW=r[0],rM=r[1];
+    const gaoBI=(a,ri,rO)=>{const aw=a*997n;return aw*rO/(ri*1000n+aw);};
+    const slipN=BigInt(Math.floor((1-swSlip/100)*1000));
+    const inWei=E.parseUnits(raw,18);
+    if(swBuy){
+      const minOut=gaoBI(inWei,rW,rM)*slipN/1000n;
+      const tx=await router.swapExactETHForTokensSupportingFeeOnTransferTokens(minOut,[WETH,CFG.mm],account,dl,{value:inWei});
+      $("sw_note").textContent="⏳ swapping…";await tx.wait();
+    }else{
+      const mm=new E.Contract(CFG.mm,ERC20_ABI2,signer);
+      if((await mm.allowance(account,swRouter))<inWei){$("sw_note").textContent="⏳ approving…";await (await mm.approve(swRouter,inWei)).wait();}
+      const taxBps=BigInt(Math.floor(burnBps+reflBps+recentBps+treBps)||400);
+      const minOut=gaoBI(inWei*(10000n-taxBps)/10000n,rM,rW)*slipN/1000n;
+      $("sw_note").textContent="⏳ swapping…";
+      const tx=await router.swapExactTokensForETHSupportingFeeOnTransferTokens(inWei,minOut,[CFG.mm,WETH],account,dl);await tx.wait();
+    }
+    $("sw_note").textContent="✓ Swap complete.";$("sw_in").value="";quoteSwap();updateSwapBalances();refresh();
+  }catch(e){$("sw_note").textContent="Swap failed: "+((e.shortMessage||e.message||e)+"").slice(0,130);}
+  btn.disabled=false;
+}
 function learnTab(id,btn){
   document.querySelectorAll(".lsec").forEach(s=>s.classList.toggle("on",s.id===id));
   document.querySelectorAll(".lnb").forEach(b=>b.classList.remove("on"));if(btn)btn.classList.add("on");
@@ -775,6 +948,32 @@ function learnTab(id,btn){
 function openLearn(){$("learn").classList.add("on");}
 function closeLearn(){$("learn").classList.remove("on");}
 $("learn").addEventListener("click",e=>{if(e.target.id==="learn")closeLearn();});
+$("swap").addEventListener("click",e=>{if(e.target.id==="swap")closeSwap();});
+// ===== ecosystem flow overlay: animated data lines between panels =====
+function edgePt(el,term,side){const r=el.getBoundingClientRect(),t=term.getBoundingClientRect();
+  const x=r.left-t.left,y=r.top-t.top;
+  if(side==="l")return[x,y+r.height/2];if(side==="r")return[x+r.width,y+r.height/2];
+  if(side==="t")return[x+r.width/2,y];return[x+r.width/2,y+r.height];}
+function buildFlows(){
+  const svg=$("flow"),term=document.querySelector(".term");if(!svg||!term)return;
+  if(getComputedStyle(svg).display==="none"){svg.innerHTML="";return;}
+  const W=term.clientWidth,H=term.clientHeight;if(!W||!H)return;svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
+  const q=s=>document.querySelector(s);
+  const F=[
+    [".c-holders","l",".c-pools","r","#ff7a18","decay"],   // holder decay → pump engine
+    [".c-pools","l",".c-pos","r","#00C805","pump"],         // pump → your position
+    [".c-feed","r",".c-pos","l","#38ff7e","reflect"],       // activity → your position
+    [".c-stats","l",".c-chart","r","#38ff7e","data"],       // protocol → chart
+  ];
+  let h="";
+  F.forEach((f,i)=>{const A=q(f[0]),B=q(f[2]);if(!A||!B)return;const a=edgePt(A,term,f[1]),b=edgePt(B,term,f[3]);
+    const mx=(a[0]+b[0])/2,d=`M${a[0]},${a[1]} C${mx},${a[1]} ${mx},${b[1]} ${b[0]},${b[1]}`;
+    h+=`<path d="${d}" fill="none" stroke="${f[4]}" stroke-width="1" opacity=".16" stroke-dasharray="3 9"><animate attributeName="stroke-dashoffset" values="0;-24" dur="1.3s" repeatCount="indefinite"/></path>`;
+    h+=`<circle r="2.4" fill="${f[4]}" opacity=".85"><animateMotion dur="${2.4+i*0.5}s" repeatCount="indefinite" path="${d}" rotate="auto"/></circle>`;
+  });
+  svg.innerHTML=h;
+}
+let _flowT;window.addEventListener("resize",()=>{clearTimeout(_flowT);_flowT=setTimeout(buildFlows,200);});
 
 function buildChartTools(){
   const box=$("cseries");if(!box)return;
