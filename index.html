@@ -793,6 +793,9 @@ function paintChain(id){const el=$("acct");if(!el||!account)return;
 let _connecting=false;
 async function connectWallet(){
   if(window.mmOpenConnect){try{window.mmOpenConnect();return;}catch(e){}}
+  // Reown loads from CDN — if the user clicks while it's still loading, wait for it
+  // instead of firing an injected request that would later collide ("request active").
+  if(window.mmReownLoading){toast("Loading wallet options…");for(let i=0;i<24&&!window.mmOpenConnect;i++)await new Promise(r=>setTimeout(r,150));if(window.mmOpenConnect){try{window.mmOpenConnect();return;}catch(e){}}}
   if(!window.ethereum){toast("No wallet found — install a wallet or use the Connect popup","warn");return;}
   if(_connecting){toast("Check your wallet — a request is already open","warn");return;}
   _connecting=true;
@@ -1344,6 +1347,7 @@ boot();
 <!-- Reown AppKit: full wallet connect (injected + WalletConnect + email + Google/X socials). -->
 <!-- Loaded as an isolated module; on any failure the app keeps the injected-wallet fallback. -->
 <script type="module">
+window.mmReownLoading=true;
 try{
   const { createAppKit } = await import('https://esm.sh/@reown/appkit@1.7.8?bundle-deps');
   const { EthersAdapter } = await import('https://esm.sh/@reown/appkit-adapter-ethers@1.7.8?deps=@reown/appkit@1.7.8&bundle-deps');
@@ -1377,14 +1381,14 @@ try{
   // Embedded (email/Google/X) wallets expose their provider a beat after isConnected
   // flips — poll several accessors until one yields an EIP-1193 provider.
   async function grabProvider(tries){
-    for(let i=0;i<(tries||14);i++){
-      let p=null;
-      try{p=appKit.getWalletProvider&&appKit.getWalletProvider();}catch(e){}
-      if(!p){try{p=await appKit.getProvider('eip155');}catch(e){}}
-      if(!p){try{p=await appKit.getProvider();}catch(e){}}
+    // ONLY use read-only accessors while polling — calling getProvider() repeatedly
+    // can (re)issue eth_requestAccounts and cause "previous request still active".
+    for(let i=0;i<(tries||16);i++){
+      let p=null;try{p=appKit.getWalletProvider&&appKit.getWalletProvider();}catch(e){}
       if(p&&typeof p.request==="function")return p;
-      await new Promise(r=>setTimeout(r,250));
+      await new Promise(r=>setTimeout(r,200));
     }
+    try{const p=await appKit.getProvider('eip155');if(p&&typeof p.request==="function")return p;}catch(e){} // single last-resort
     return null;
   }
   function profileOf(acc){try{const w=appKit.getWalletInfo&&appKit.getWalletInfo();return {name:acc&&acc.profileName||w&&w.name,avatar:acc&&acc.profileImage||w&&w.icon};}catch(e){return null;}}
@@ -1401,9 +1405,9 @@ try{
   // extra safety net: also react when the provider itself becomes available
   try{appKit.subscribeProviders&&appKit.subscribeProviders(s=>{const p=s&&(s.eip155||s['eip155']);
     if(p&&typeof p.request==="function"&&last&&!window.mmConnected&&window.mmOnConnect)window.mmOnConnect(p,null);});}catch(e){}
-  window.mmReownReady=true;
+  window.mmReownReady=true;window.mmReownLoading=false;
   console.log('Reown AppKit ready');
-}catch(e){ console.warn('Reown AppKit unavailable — injected-wallet fallback active:', e&&e.message); }
+}catch(e){ window.mmReownLoading=false; console.warn('Reown AppKit unavailable — injected-wallet fallback active:', e&&e.message); }
 </script>
 </body>
 </html>
