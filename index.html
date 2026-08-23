@@ -6,6 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="icon" href="mm.png">
 <meta name="theme-color" content="#000000">
+<script type="importmap">{"imports":{"@coinbase/wallet-sdk":"https://esm.sh/@coinbase/wallet-sdk@4?bundle"}}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800;900&family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
@@ -55,7 +56,9 @@
   .c-feed{grid-column:1;grid-row:2} .c-pos{grid-column:2;grid-row:2} .c-pools{grid-column:3;grid-row:2} .c-holders{grid-column:4;grid-row:2}
   /* holders */
   .hrow{display:flex;align-items:center;gap:8px;padding:6px 4px;border-bottom:1px solid var(--line)}
-  .hrow:last-child{border-bottom:0} .hrow .rk{font-family:var(--mono);font-size:11px;color:var(--faint);width:16px}
+  .hrow:last-child{border-bottom:0} .hrow .rk{font-family:var(--mono);font-size:10px;color:var(--faint);width:18px;height:18px;display:grid;place-items:center;border:1px solid var(--line2);border-radius:6px;flex:0 0 auto}
+  .hrow:nth-child(1) .rk{color:var(--green2);border-color:var(--greenDim);background:rgba(0,200,5,.08)}
+  .hrow:nth-child(3) .rk{color:var(--orange2)}
   .hrow .ad{font-family:var(--mono);font-size:11.5px} .hrow .tg{font-family:var(--mono);font-size:8.5px;padding:1px 5px;border-radius:100px;border:1px solid var(--line2);color:var(--soft)}
   .hrow .bl{margin-left:auto;font-family:var(--mono);font-size:12px;font-weight:600} .hrow .dn{color:var(--down);font-size:10px;margin-left:4px} .hrow .st{color:var(--green2);font-size:10px;margin-left:4px}
   .tg.owner{color:var(--orange);border-color:#3a2a12} .tg.pool{color:var(--green2);border-color:var(--greenDim)} .tg.you{color:var(--white);border-color:var(--line2)}
@@ -242,6 +245,9 @@
   .wal-b .v{font-size:15px;font-weight:700;margin-top:2px}
   #wal_profile{display:inline-flex;align-items:center;gap:5px;color:var(--green2);text-transform:none;letter-spacing:0}
   #wal_profile img{width:16px;height:16px;border-radius:50%}
+  .wal-fund{display:none;font-size:10.5px;line-height:1.5;color:var(--orange2);background:rgba(255,122,24,.07);border:1px solid #3a2a12;border-radius:9px;padding:8px 10px;margin-bottom:8px}
+  .wal-fund b{color:var(--orange)}
+  .walmax{flex:0 0 auto;padding:7px 10px;font-family:var(--disp);font-weight:700}
   .swrouter{margin-top:10px}
   .swrouter summary{font-size:11px;color:var(--faint);cursor:pointer}
   .swnote{font-size:10.5px;color:var(--faint);margin-top:9px;line-height:1.5}
@@ -278,6 +284,28 @@
     .swapbox{max-width:100%}
     .flowlayer{display:none} /* flow overlay off on mobile */
   }
+  /* ===== polish pass ===== */
+  .hbtn{transition:border-color .15s,background .15s,transform .1s}
+  .hbtn:hover{border-color:var(--faint)}.hbtn:active{transform:translateY(1px)}
+  .hbtn.green{box-shadow:0 0 0 0 rgba(0,200,5,.4);transition:box-shadow .2s,transform .1s}
+  .hbtn.green:hover{box-shadow:0 4px 16px -6px rgba(0,200,5,.6)}
+  .cell h3{position:relative}
+  .srow{transition:background .12s;border-radius:6px;padding-left:6px;padding-right:6px;margin:0 -6px}
+  .srow:hover{background:rgba(255,255,255,.02)}
+  .srow .v.flash{text-shadow:0 0 10px rgba(56,255,126,.5)}
+  .ev{transition:border-color .15s,transform .12s}.ev:hover{border-color:var(--line2);transform:translateX(2px)}
+  .hrow{transition:background .12s;border-radius:6px;margin:0 -4px;padding-left:4px;padding-right:4px}
+  .hrow:hover{background:rgba(255,255,255,.02)}
+  .wbtn{transition:border-color .15s,background .15s,transform .1s}.wbtn:hover{border-color:var(--faint)}.wbtn:active{transform:translateY(1px)}
+  .swexec{transition:filter .15s,transform .1s,box-shadow .2s}.swexec:hover{filter:brightness(1.08)}.swexec:active{transform:translateY(1px)}
+  .swexec:not(.alt):hover{box-shadow:0 6px 20px -8px rgba(0,200,5,.7)}
+  .cbtn,.slip,.lnb,.ptab,.pchip{transition:all .14s}
+  .price{will-change:contents}
+  .chip .d{transition:background .3s,box-shadow .3s}
+  .cell{transition:border-color .2s,box-shadow .2s}
+  ::selection{background:rgba(0,200,5,.3);color:#fff}
+  .brand{transition:filter .2s}.brand:hover{filter:brightness(1.1)}
+  #connectBtn{min-width:92px}
   @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
@@ -368,19 +396,22 @@
           <div class="l"><span id="wal_profile"></span> Your address <span class="muted">· deposit here</span></div>
           <div class="wal-row"><span class="mono" id="wal_addr">—</span><button class="wbtn" onclick="copyAddr()">Copy</button></div>
         </div>
+        <div class="wal-fund" id="wal_fund"></div>
         <div class="wal-bals">
           <div class="wal-b"><div class="l"><img src="mm.png" class="mmtag" alt="">MM</div><div class="v mono" id="wal_mm">—</div></div>
-          <div class="wal-b"><div class="l">ETH</div><div class="v mono" id="wal_eth">—</div></div>
+          <div class="wal-b"><div class="l">ETH <span class="muted">· gas</span></div><div class="v mono" id="wal_eth">—</div></div>
         </div>
         <div class="wal-card">
           <div class="l">Withdraw / Send</div>
           <input class="mm" id="wal_to" placeholder="0x… recipient" autocomplete="off">
           <div class="wal-row" style="margin-top:6px"><input class="mm" id="wal_amt" placeholder="amount" inputmode="decimal" autocomplete="off">
-            <select class="mm walsel" id="wal_tok"><option value="MM">MM</option><option value="ETH">ETH</option></select></div>
+            <button class="wbtn walmax" onclick="setMax()">Max</button>
+            <select class="mm walsel" id="wal_tok" onchange="renderWallet()"><option value="MM">MM</option><option value="ETH">ETH</option></select></div>
           <button class="swexec" onclick="sendAsset()" style="margin-top:8px">Send</button>
           <div class="swnote" id="wal_note"></div>
         </div>
-        <div class="win"><button class="wbtn" onclick="window.mmOpenAccount?window.mmOpenAccount():alert('Export/on-ramp needs a social or email login (Reown).')">Export key · On-ramp</button><button class="wbtn" onclick="disconnectWallet()">Disconnect</button></div>
+        <div class="win"><button class="wbtn" onclick="window.mmOpenOnRamp?window.mmOpenOnRamp():protoTab('swap')">＋ Buy ETH</button><button class="wbtn" onclick="window.mmOpenAccount?window.mmOpenAccount():alert('Key export is available for email/social (embedded) wallets via the account view.')">⚙ Account · Export</button></div>
+        <button class="wbtn" style="width:100%;margin-top:6px" onclick="disconnectWallet()">Disconnect</button>
       </div>
     </div>
   </div>
@@ -636,13 +667,18 @@ let volYr=0,incSupply=0,reflBps=0,burnBps=0,recentBps=0,treBps=0,mirrorX=1,poolM
 let gMirrorBps=10000,gBbOn=false,gPPool=null;
 let lastSettleWall=Date.now(),pumpCumPrev=-1; // pending pump accrues from last realized burn
 const fmt=(x,d=2)=>Number(typeof x==="bigint"?E.formatUnits(x,18):x).toLocaleString("en-US",{maximumFractionDigits:d});
+// retry helper — the public RPC occasionally drops a batched request (500/BAD_DATA)
+async function rr(fn,tries=2){for(let i=0;i<tries;i++){try{return await fn();}catch(e){if(i===tries-1)throw e;await new Promise(r=>setTimeout(r,280));}}}
 const gwei=p=>p*1e9; // ETH per MM -> gwei per MM
 let ethUsd=0;
 const BS="https://robinhoodchain.blockscout.com";
 function usd(x){if(!x)return "$0";if(x>=1)return "$"+x.toLocaleString("en-US",{maximumFractionDigits:2});if(x>=0.01)return "$"+x.toFixed(4);
   const s=x.toFixed(15).replace(/0+$/,"");return "$"+s;} // full digits, no e-notation
 function usdBig(x){return "$"+x.toLocaleString("en-US",{maximumFractionDigits:x>=100?0:2});}
-async function fetchEthUsd(){try{const r=await fetch(LOCAL?"/ethusd":BS+"/api/v2/stats");const j=await r.json();if(j.coin_price)ethUsd=Number(j.coin_price);}catch(e){}}
+async function fetchEthUsd(){
+  const urls=LOCAL?["/ethusd",BS+"/api/v2/stats"]:[BS+"/api/v2/stats"];
+  for(const u of urls){try{const r=await fetch(u);const j=await r.json();if(j&&j.coin_price){ethUsd=Number(j.coin_price);return;}}catch(e){}}
+}
 
 function computePoolId(){return E.keccak256(E.AbiCoder.defaultAbiCoder().encode(["tuple(address,address,uint24,int24,address)"],[[E.ZeroAddress,CFG.mm,3000,60,CFG.hook]]));}
 function priceFromSqrt(sqrtP){if(sqrtP===0n)return null;const mmPerEth=(Number(sqrtP)/2**96)**2;return mmPerEth>0?1/mmPerEth:null;}
@@ -704,6 +740,7 @@ async function finishConnect(sgnr,profile){
 // Bridge for the Reown module: hands us an EIP-1193 provider once connected.
 window.mmOnConnect=async(prov,profile)=>{try{walletEip=prov;const bp=new E.BrowserProvider(prov);await finishConnect(await bp.getSigner(),profile);}catch(e){}};
 window.mmOnDisconnect=()=>{signer=null;account=null;walProfile=null;$("acct").style.display="none";$("connectBtn").textContent="Connect";$("connectBtn").onclick=connectWallet;if($("adminBtn"))$("adminBtn").style.display="none";renderWallet();};
+let walBalETH=0,walBalMM=0;
 function renderWallet(){
   const emp=$("wal_empty"),bod=$("wal_body");if(!emp||!bod)return;
   if(!account){emp.style.display="";bod.style.display="none";return;}
@@ -711,9 +748,17 @@ function renderWallet(){
   $("wal_addr").textContent=account;
   const pf=$("wal_profile");if(pf)pf.innerHTML=(walProfile&&(walProfile.name||walProfile.avatar))?((walProfile.avatar?`<img src="${walProfile.avatar}" alt="">`:"")+(walProfile.name||"")):"";
   Promise.all([ro.getBalance(account),mmRead.balanceOf(account)]).then(([e,m])=>{
-    if($("wal_eth"))$("wal_eth").textContent=fmt(Number(E.formatUnits(e,18)),5);
-    if($("wal_mm"))$("wal_mm").textContent=fmt(Number(E.formatUnits(m,18)),2);}).catch(()=>{});
+    walBalETH=Number(E.formatUnits(e,18));walBalMM=Number(E.formatUnits(m,18));
+    if($("wal_eth"))$("wal_eth").textContent=fmt(walBalETH,5);
+    if($("wal_mm"))$("wal_mm").textContent=fmt(walBalMM,2);
+    const fund=$("wal_fund");
+    if(fund){if(walBalETH<=0){fund.style.display="";fund.innerHTML="⛽ This wallet has <b>0 ETH</b> — you need a little ETH for gas before sending or swapping. Deposit ETH to the address above, or tap <b>Buy ETH</b>.";}
+      else fund.style.display="none";}
+  }).catch(()=>{});
 }
+function setMax(){const tok=$("wal_tok").value;
+  const v=tok==="ETH"?Math.max(0,walBalETH-0.0002):walBalMM; // leave a little ETH for gas
+  $("wal_amt").value=v>0?String(v):"";}
 function copyAddr(){if(account&&navigator.clipboard){navigator.clipboard.writeText(account);const n=$("wal_note");if(n){n.textContent="✓ address copied";setTimeout(()=>{if($("wal_note"))$("wal_note").textContent="";},1500);}}}
 async function sendAsset(){
   if(!signer)return connectWallet();if(!await ensureChain())return;
@@ -738,7 +783,7 @@ function watchAddr(){const w=$("watch").value.trim();if(w){watch=w;$("p_addr").t
 
 const PAIR_ABI=["function getReserves() view returns (uint112,uint112,uint32)"];let pair;
 async function getPrice(){ // ETH per MM from the V2 WETH/MM pair (token0=WETH, token1=MM)
-  try{if(!pair)pair=new E.Contract(CFG.ethPair,PAIR_ABI,ro);const r=await pair.getReserves();
+  try{if(!pair)pair=new E.Contract(CFG.ethPair,PAIR_ABI,ro);const r=await rr(()=>pair.getReserves());
     const w=Number(E.formatUnits(r[0],18)),m=Number(E.formatUnits(r[1],18));return m>0?w/m:null;}catch(e){return null;}}
 
 const SYNC_TOPIC=E.id("Sync(uint112,uint112)");
@@ -796,7 +841,7 @@ async function buildHistory(attempt=0){
 // Rarely-changing protocol config — fetched every 30s, not every 5s (RPC-light).
 async function fetchSlow(){
   try{
-    const [dR,fb,fr,frc,ft,mirror,bbOn,pPool,bbThresh,bbRouters,ethBal]=await Promise.all([mmRead.decayRatePerSecond(),mmRead.burnFeeBps(),mmRead.reflectFeeBps(),mmRead.recentFeeBps(),mmRead.treasuryFeeBps(),mmRead.pumpMirrorBps(),mmRead.buybackEnabled(),mmRead.pumpPool(),mmRead.buybackThreshold(),mmRead.buybackRoutersLength(),ro.getBalance(CFG.mm)]);
+    const [dR,fb,fr,frc,ft,mirror,bbOn,pPool,bbThresh,bbRouters,ethBal]=await rr(()=>Promise.all([mmRead.decayRatePerSecond(),mmRead.burnFeeBps(),mmRead.reflectFeeBps(),mmRead.recentFeeBps(),mmRead.treasuryFeeBps(),mmRead.pumpMirrorBps(),mmRead.buybackEnabled(),mmRead.pumpPool(),mmRead.buybackThreshold(),mmRead.buybackRoutersLength(),ro.getBalance(CFG.mm)]));
     decayR=Number(dR)/1e18;burnBps=Number(fb);reflBps=Number(fr);recentBps=Number(frc);treBps=Number(ft);mirrorX=Number(mirror)/10000;gMirrorBps=Number(mirror);gBbOn=bbOn;gPPool=pPool;
     const yr=(1-Math.pow(1-decayR,31536000))*100;
     $("d_decay").innerHTML=yr.toFixed(1)+" <small style='color:var(--faint)'>%/yr</small>";
@@ -814,8 +859,8 @@ async function fetchSlow(){
 }
 async function refresh(){
   try{
-    const [sup,tre,pot,idx,exc,poolMM,pDebt,pThrob,pPack]=await Promise.all([mmRead.totalSupply(),mmRead.treasuryBalance(),mmRead.holderRewardPot(),
-      mmRead.currentIndex(),mmRead.excludedSupply(),mmRead.balanceOf(CFG.ethPair),mmRead.pumpDebt(),mmRead.balanceOf(CFG.pools[1].id),mmRead.balanceOf(CFG.pools[2].id)]);
+    const [sup,tre,pot,idx,exc,poolMM,pDebt,pThrob,pPack]=await rr(()=>Promise.all([mmRead.totalSupply(),mmRead.treasuryBalance(),mmRead.holderRewardPot(),
+      mmRead.currentIndex(),mmRead.excludedSupply(),mmRead.balanceOf(CFG.ethPair),mmRead.pumpDebt(),mmRead.balanceOf(CFG.pools[1].id),mmRead.balanceOf(CFG.pools[2].id)]));
     updatePumpPanel(pDebt,poolMM,gMirrorBps,gPPool);
     const yr=(1-Math.pow(1-decayR,31536000))*100;
     const sv=(id,v)=>{const el=$(id);if(el&&el.textContent!==v){el.textContent=v;el.classList.add("flash");setTimeout(()=>el.classList.remove("flash"),450);}};
@@ -1203,6 +1248,7 @@ try{
     adapters:[new EthersAdapter()],
     networks:[robinhood], defaultNetwork:robinhood,
     projectId:'0299d75f727f4ded571ce094407cf023',
+    enableCoinbase:false, // its SDK fails to resolve over esm.sh; other wallets + socials unaffected
     metadata:{ name:'Market Maker', description:'Live elastic-supply MM terminal on Robinhood Chain', url:location.origin, icons:[location.origin+'/mm.png'] },
     features:{ analytics:false, email:true, socials:['google','x','github','discord','apple','farcaster'], emailShowWallets:true },
     themeMode:'dark',
@@ -1213,6 +1259,7 @@ try{
   forceDark();
   window.mmOpenConnect=()=>{appKit.open();setTimeout(forceDark,120);};
   window.mmOpenAccount=()=>{appKit.open({view:'Account'});setTimeout(forceDark,120);}; // deposit/withdraw/export/onramp/disconnect (native)
+  window.mmOpenOnRamp=()=>{try{appKit.open({view:'OnRampProviders'});}catch(e){appKit.open({view:'Account'});}setTimeout(forceDark,120);};
   window.mmDisconnect=async()=>{try{await appKit.disconnect();}catch(e){}};
   let last=null;
   appKit.subscribeAccount(async(acc)=>{
