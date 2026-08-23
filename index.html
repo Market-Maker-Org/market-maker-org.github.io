@@ -314,6 +314,17 @@
   ::selection{background:rgba(0,200,5,.3);color:#fff}
   .brand{transition:filter .2s}.brand:hover{filter:brightness(1.1)}
   #connectBtn{min-width:92px}
+  /* toasts */
+  #toasts{position:fixed;right:14px;bottom:14px;z-index:200;display:flex;flex-direction:column;gap:8px;max-width:min(340px,92vw)}
+  .toast{background:linear-gradient(180deg,#101512,#0a0d0b);border:1px solid var(--line2);border-left:3px solid var(--green);border-radius:10px;
+    padding:10px 13px;font-size:12.5px;color:var(--ink);box-shadow:0 10px 30px -12px #000;animation:toastIn .25s ease;display:flex;align-items:center;gap:9px}
+  .toast.err{border-left-color:var(--down)}.toast.warn{border-left-color:var(--orange)}.toast .ic{font-size:15px}
+  .toast.out{animation:toastOut .3s ease forwards}
+  @keyframes toastIn{from{opacity:0;transform:translateX(20px)}to{opacity:1}}
+  @keyframes toastOut{to{opacity:0;transform:translateX(20px)}}
+  .cpy{cursor:pointer;transition:color .12s}.cpy:hover{color:var(--green2)}
+  [title]{cursor:help}
+  .hrow{cursor:pointer}
   @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
@@ -360,16 +371,16 @@
     </div>
     <div class="slist" id="pv-proto">
       <div class="srow"><span class="l"><img src="mm.png" class="mmtag" alt="">Total supply</span><span class="v" id="d_supply">—</span></div>
-      <div class="srow"><span class="l">Circulating · decaying</span><span class="v" id="d_circ">—</span></div>
+      <div class="srow" title="Supply that actually decays — excludes pools, treasury, owner & hook"><span class="l">Circulating · decaying</span><span class="v" id="d_circ">—</span></div>
       <div class="srow"><span class="l">Burned 🔥</span><span class="v" id="d_burn">—</span></div>
       <div class="srow"><span class="l"><img src="mm.png" class="mmtag" alt="">Treasury (MM)</span><span class="v" id="d_tre">—</span></div>
       <div class="srow"><span class="l">Reward pot</span><span class="v" id="d_pot">—</span></div>
-      <div class="srow"><span class="l">Pump debt ⚙</span><span class="v" id="d_pumpdebt">—</span></div>
+      <div class="srow" title="Decay accrued & waiting to be burned from the pool on the next pump() — realizes price↑"><span class="l">Pump debt ⚙</span><span class="v" id="d_pumpdebt">—</span></div>
       <div class="srow"><span class="l">Decay</span><span class="v" id="d_decay">—</span></div>
-      <div class="srow"><span class="l">Reflection index</span><span class="v" id="d_idx">—</span></div>
+      <div class="srow" title="Global multiplier: balance = units × index. Reflection lifts it, decay lowers it"><span class="l">Reflection index</span><span class="v" id="d_idx">—</span></div>
       <div class="srow"><span class="l"><img src="mm.png" class="mmtag" alt="">Pump pool MM 💧</span><span class="v" id="d_pool">—</span></div>
       <div class="srow"><span class="l"><img src="mm.png" class="mmtag" alt="">All-pool MM <span id="d_allpoolD" class="pooldelta"></span></span><span class="v" id="d_allpool">—</span></div>
-      <div class="srow"><span class="l">Decay : pool → pump</span><span class="v" id="d_ratio">—</span></div>
+      <div class="srow" title="Decaying supply ÷ all-pool MM × decay% × mirror ≈ annual pump rate"><span class="l">Decay : pool → pump</span><span class="v" id="d_ratio">—</span></div>
     </div>
     <div id="pv-swap" style="display:none;overflow:auto">
       <div class="swapbox compact">
@@ -418,7 +429,7 @@
           <button class="swexec" onclick="sendAsset()" style="margin-top:8px">Send</button>
           <div class="swnote" id="wal_note"></div>
         </div>
-        <div class="win"><button class="wbtn" onclick="window.mmOpenOnRamp?window.mmOpenOnRamp():protoTab('swap')">＋ Buy ETH</button><button class="wbtn" onclick="window.mmOpenAccount?window.mmOpenAccount():alert('Key export is available for email/social (embedded) wallets via the account view.')">⚙ Account · Export</button></div>
+        <div class="win"><button class="wbtn" onclick="window.mmOpenOnRamp?window.mmOpenOnRamp():protoTab('swap')">＋ Buy ETH</button><button class="wbtn" onclick="window.mmOpenAccount?window.mmOpenAccount():toast('Key export is available for email/social (embedded) wallets','warn')">⚙ Account · Export</button></div>
         <button class="wbtn" style="width:100%;margin-top:6px" onclick="disconnectWallet()">Disconnect</button>
       </div>
     </div>
@@ -435,7 +446,7 @@
     <h3>Your position</h3>
     <div class="bigbal"><span id="p_bal">—</span><span class="u"><img src="mm.png" class="mmtag" alt="">MM</span></div>
     <div class="tick" id="p_tick"></div>
-    <div style="margin-top:5px"><span class="badge" id="p_badge">—</span> <span class="muted" id="p_addr"></span></div>
+    <div style="margin-top:5px"><span class="badge" id="p_badge">—</span> <span class="muted cpy" id="p_addr" title="Copy address" onclick="cp(watch,'Wallet')"></span> <a class="cpy" id="p_expl" title="View on explorer" style="font-size:11px">↗</a></div>
     <div class="pnl" id="pnl"></div>
     <table class="proj" id="p_proj" style="display:none"></table>
     <input class="mm" id="watch" placeholder="0x… watch another wallet">
@@ -640,7 +651,8 @@
   </div>
 </div></div>
 
-<!-- SWAP MODAL -->
+<div id="toasts"></div>
+
 <script>
 // Local dev has the server.js proxy (/rpc,/holders,/ethusd). Static hosting
 // (GitHub Pages) has no proxy → hit the public endpoints directly (CORS-enabled).
@@ -677,6 +689,21 @@ let lastSettleWall=Date.now(),pumpCumPrev=-1; // pending pump accrues from last 
 const fmt=(x,d=2)=>Number(typeof x==="bigint"?E.formatUnits(x,18):x).toLocaleString("en-US",{maximumFractionDigits:d});
 // retry helper — the public RPC occasionally drops a batched request (500/BAD_DATA)
 async function rr(fn,tries=2){for(let i=0;i<tries;i++){try{return await fn();}catch(e){if(i===tries-1)throw e;await new Promise(r=>setTimeout(r,280));}}}
+const EXPLORER="https://robinhoodchain.blockscout.com";
+const short=a=>a?a.slice(0,6)+"…"+a.slice(-4):"";
+function toast(msg,type,ms){const box=document.getElementById("toasts");if(!box){return;}
+  const t=document.createElement("div");t.className="toast"+(type?" "+type:"");
+  const ic=type==="err"?"⚠":type==="warn"?"⚡":"✓";
+  t.innerHTML='<span class="ic">'+ic+'</span><span>'+msg+'</span>';box.appendChild(t);
+  setTimeout(()=>{t.classList.add("out");setTimeout(()=>t.remove(),300);},ms||3200);}
+function cp(text,label){if(!text)return;try{navigator.clipboard.writeText(text);toast((label||"Copied")+" · "+short(text));}catch(e){toast("Copy failed","err");}}
+function savePrefs(){try{localStorage.setItem("mm_prefs",JSON.stringify({watch,range:chartRange,log:chartLog,slip:swSlip,series:Object.fromEntries(Object.entries(SERIES).map(([k,s])=>[k,s.on]))}));}catch(e){}}
+function loadPrefs(){try{const p=JSON.parse(localStorage.getItem("mm_prefs")||"{}");
+  if(p.watch&&/^0x[a-fA-F0-9]{40}$/.test(p.watch))watch=p.watch;
+  if(typeof p.range==="number")chartRange=p.range;
+  if(typeof p.log==="boolean")chartLog=p.log;
+  if(typeof p.slip==="number")swSlip=p.slip;
+  if(p.series)Object.entries(p.series).forEach(([k,v])=>{if(SERIES[k])SERIES[k].on=!!v;});}catch(e){}}
 const gwei=p=>p*1e9; // ETH per MM -> gwei per MM
 let ethUsd=0;
 const BS="https://robinhoodchain.blockscout.com";
@@ -694,7 +721,9 @@ function priceFromSqrt(sqrtP){if(sqrtP===0n)return null;const mmPerEth=(Number(s
 async function boot(){
   ro=new E.JsonRpcProvider(CFG.rpc);mmRead=new E.Contract(CFG.mm,A.token.abi,ro);poolMgr=new E.Contract(CFG.pm,PM_ABI,ro);poolId=computePoolId();
   try{await ro.getBlockNumber();$("net").classList.add("ok");$("nettxt").textContent="Robinhood · live";}catch(e){$("nettxt").textContent="RPC error";}
-  if(CFG.defaultWatch){watch=CFG.defaultWatch;$("p_addr").textContent=watch.slice(0,7)+"…"+watch.slice(-5);}
+  loadPrefs(); // restore saved chart series/range/log, slippage, watched wallet
+  if(!watch&&CFG.defaultWatch)watch=CFG.defaultWatch;
+  if(watch)$("p_addr").textContent=short(watch);
   buildPools();buildChartTools();fetchEthUsd();
   await fetchSlow();          // prime rarely-changing config first
   await refresh();            // then live state
@@ -714,21 +743,21 @@ async function ensureChain(){
   if(!signer)return false;
   try{if(Number((await signer.provider.getNetwork()).chainId)===4663)return true;}catch(e){}
   const eip=walletEip||window.ethereum;
-  if(!eip){alert("Switch your wallet to Robinhood Chain (4663) first.");return false;}
+  if(!eip){toast("Switch your wallet to Robinhood Chain (4663) first","warn");return false;}
   try{
     try{await eip.request({method:"wallet_switchEthereumChain",params:[{chainId:RH_HEX}]});}
     catch(e){const c=e&&(e.code||(e.data&&e.data.originalError&&e.data.originalError.code));
       if(c===4902||/nrecognized|not been added|4902/i.test((e&&e.message||"")))await eip.request({method:"wallet_addEthereumChain",params:[RH_PARAMS]});else throw e;}
     const bp=new E.BrowserProvider(eip);signer=await bp.getSigner();account=await signer.getAddress();paintChain(4663);
     return true;
-  }catch(e){alert("Please switch your wallet to Robinhood Chain (4663) to transact.");return false;}
+  }catch(e){toast("Please switch your wallet to Robinhood Chain (4663)","warn");return false;}
 }
 function paintChain(id){const el=$("acct");if(!el||!account)return;
   const ok=id===4663;el.textContent=account.slice(0,7)+"…"+account.slice(-5)+(ok?"":" · wrong chain");
   el.style.color=ok?"":"var(--orange2)";}
 async function connectWallet(){
   if(window.mmOpenConnect){try{window.mmOpenConnect();return;}catch(e){}}
-  if(!window.ethereum){alert("No wallet found — install a wallet or use the Connect popup.");return;}
+  if(!window.ethereum){toast("No wallet found — install a wallet or use the Connect popup","warn");return;}
   walletEip=window.ethereum;
   const bp=new E.BrowserProvider(walletEip);await bp.send("eth_requestAccounts",[]);
   await finishConnect(await bp.getSigner());
@@ -786,8 +815,8 @@ async function disconnectWallet(){
   $("acct").style.display="none";$("connectBtn").textContent="Connect";$("connectBtn").onclick=connectWallet;
   if($("adminBtn"))$("adminBtn").style.display="none";renderWallet();
 }
-function useMine(){if(account){watch=account;$("p_addr").textContent=account.slice(0,7)+"…"+account.slice(-5);refresh();}}
-function watchAddr(){const w=$("watch").value.trim();if(w){watch=w;$("p_addr").textContent=w.slice(0,7)+"…"+w.slice(-5);refresh();}}
+function useMine(){if(account){watch=account;$("p_addr").textContent=short(account);savePrefs();refresh();}}
+function watchAddr(){const w=$("watch").value.trim();if(!/^0x[a-fA-F0-9]{40}$/.test(w)){toast("Enter a valid 0x address","warn");return;}watch=w;$("p_addr").textContent=short(w);savePrefs();refresh();toast("Watching "+short(w));}
 
 const PAIR_ABI=["function getReserves() view returns (uint112,uint112,uint32)"];let pair;
 async function getPrice(){ // ETH per MM from the V2 WETH/MM pair (token0=WETH, token1=MM)
@@ -900,7 +929,9 @@ async function refresh(){
       if(histLoaded){pushLive({price,pool:pmN,supply:supN,burn:CFG.cap-supN,index:idxN});drawChart();}
     }
     if(watch){const b=await mmRead.balanceOf(watch);excluded=await mmRead.isExcluded(watch);liveBal=Number(E.formatUnits(b,18));
-      $("p_badge").textContent=excluded?"EXCLUDED":"INCLUDED · decaying";$("p_badge").className="badge "+(excluded?"exc":"inc");renderPnL(liveBal);}
+      $("p_badge").textContent=excluded?"EXCLUDED":"INCLUDED · decaying";$("p_badge").className="badge "+(excluded?"exc":"inc");
+      const ex=$("p_expl");if(ex){ex.href=EXPLORER+"/address/"+watch;ex.target="_blank";}
+      renderPnL(liveBal);}
     if(feedTick%3===0)getFeed();
     feedTick++;
     refreshFails=0;$("net").classList.add("ok");$("nettxt").textContent="Robinhood · live";
@@ -1011,9 +1042,10 @@ function renderHolders(){
   if(!holderRows.length){$("holderList").innerHTML='<div class="muted">no holders yet</div>';return;}
   $("holderList").innerHTML=holderRows.map((r,i)=>{
     const ind=r.ex?'<span class="st">═ stable</span>':'<span class="dn">↓ live</span>';
-    return `<div class="hrow"><span class="rk">${i+1}</span><span class="ad">${r.a.slice(0,6)}…${r.a.slice(-4)}</span>${r.tag?`<span class="tg ${r.tc}">${r.tag}</span>`:""}<span class="bl ${r.ex?'':'dec'}" id="hb_${i}">${hbal(r.bal,r.ex)}</span>${ind}</div>`;
+    return `<div class="hrow" title="Click to watch this wallet" onclick="watchHolder('${r.a}')"><span class="rk">${i+1}</span><span class="ad">${short(r.a)}</span>${r.tag?`<span class="tg ${r.tc}">${r.tag}</span>`:""}<span class="bl ${r.ex?'':'dec'}" id="hb_${i}">${hbal(r.bal,r.ex)}</span>${ind}</div>`;
   }).join("");
 }
+function watchHolder(a){watch=a;$("p_addr").textContent=short(a);savePrefs();refresh();toast("Watching "+short(a));}
 // Between chain refreshes, non-excluded holders visibly bleed at the real decay rate.
 function tickHolders(){
   if(!holderRows.length||!decayR)return;const now=Date.now();
@@ -1043,8 +1075,8 @@ async function fetchPumpStats(){
     const e2=$("pm_cumpct");if(e2)e2.textContent="+"+pct.toFixed(3)+"%";
   }catch(e){}
 }
-async function pubPump(){if(!signer)return connectWallet();if(!await ensureChain())return;try{const mm=new E.Contract(CFG.mm,A.token.abi,signer);const tx=await mm.pump();await tx.wait();lastSettleWall=Date.now();refresh();fetchPumpStats();}catch(e){alert("pump: "+(e.shortMessage||e.message||e).slice(0,90));}}
-async function pubBuyback(){if(!signer)return connectWallet();if(!await ensureChain())return;try{const mm=new E.Contract(CFG.mm,A.token.abi,signer);const tx=await mm.triggerBuyback();await tx.wait();refresh();}catch(e){alert("buyback: "+(e.shortMessage||e.message||e).slice(0,90));}}
+async function pubPump(){if(!signer)return connectWallet();if(!await ensureChain())return;try{const mm=new E.Contract(CFG.mm,A.token.abi,signer);toast("Pump sent…");const tx=await mm.pump();await tx.wait();lastSettleWall=Date.now();toast("⚙ Pump confirmed — pool burned, price re-synced");refresh();fetchPumpStats();}catch(e){toast("Pump failed: "+(e.shortMessage||e.message||e).slice(0,80),"err");}}
+async function pubBuyback(){if(!signer)return connectWallet();if(!await ensureChain())return;try{const mm=new E.Contract(CFG.mm,A.token.abi,signer);toast("Buyback sent…");const tx=await mm.triggerBuyback();await tx.wait();toast("↻ Buyback confirmed");refresh();}catch(e){toast("Buyback failed: "+(e.shortMessage||e.message||e).slice(0,80),"err");}}
 function buildPools(){const pools=CFG.pools;
   $("poolList").innerHTML=pools.map(p=>`<a class="pchip" href="https://dexscreener.com/robinhood/${p.id}" target="_blank"><span class="nm">${p.name.replace(/ \(V2\)/,"")}</span><span class="tag">${p.tag}</span><span class="go">Swap ↗</span></a>`).join("");}
 
@@ -1066,7 +1098,7 @@ function openSwap(){protoTab("swap");}
 function closeSwap(){protoTab("proto");}
 function renderSwapTokens(){$("sw_tokA").innerHTML=tokChip(swBuy?"ETH":"MM");$("sw_tokB").innerHTML=tokChip(swBuy?"MM":"ETH");}
 function flipSwap(){swBuy=!swBuy;renderSwapTokens();$("sw_in").value="";$("sw_out").textContent="0.0";swQuote=null;updateSwapBalances();quoteSwap();}
-function setSlip(s,el){swSlip=s;document.querySelectorAll(".slip").forEach(x=>x.classList.remove("on"));el.classList.add("on");quoteSwap();}
+function setSlip(s,el){swSlip=s;document.querySelectorAll(".slip").forEach(x=>x.classList.remove("on"));el.classList.add("on");quoteSwap();savePrefs();}
 async function updateSwapBalances(){
   if(!account){$("sw_balA").textContent="";$("sw_balB").textContent="";return;}
   try{const [eth,mmb]=await Promise.all([ro.getBalance(account),mmRead.balanceOf(account)]);
@@ -1163,9 +1195,9 @@ function buildChartTools(){
   const logBtn=`<button class="cbtn ${chartLog?'on':''}" onclick="toggleLog()" title="Logarithmic scale">${chartLog?'LOG':'LIN'}</button>`;
   box.innerHTML=chips+`<span class="crange">${logBtn}${ranges}</span>`;
 }
-function toggleSeries(k){const on=Object.values(SERIES).filter(s=>s.on).length;if(SERIES[k].on&&on<=1)return;SERIES[k].on=!SERIES[k].on;buildChartTools();drawChart();}
-function setRange(n){chartRange=n;buildChartTools();drawChart();}
-function toggleLog(){chartLog=!chartLog;buildChartTools();drawChart();}
+function toggleSeries(k){const on=Object.values(SERIES).filter(s=>s.on).length;if(SERIES[k].on&&on<=1)return;SERIES[k].on=!SERIES[k].on;buildChartTools();drawChart();savePrefs();}
+function setRange(n){chartRange=n;buildChartTools();drawChart();savePrefs();}
+function toggleLog(){chartLog=!chartLog;buildChartTools();drawChart();savePrefs();}
 function sliceN(a){return chartRange>0?a.slice(-chartRange):a;}
 function compactNum(v){const a=Math.abs(v);if(a>=1e9)return (v/1e9).toFixed(2)+"B";if(a>=1e6)return (v/1e6).toFixed(2)+"M";if(a>=1e3)return (v/1e3).toFixed(1)+"k";if(a>=1)return v.toFixed(2);if(a>0)return v.toPrecision(2);return "0";}
 function usdAxis(u){if(u>=1)return "$"+u.toFixed(2);if(u>=0.01)return "$"+u.toFixed(4);if(u<=0)return "$0";return "$"+u.toFixed(9).replace(/0+$/,"");}
