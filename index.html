@@ -214,13 +214,19 @@
   .hrow .bl.dec{color:var(--orange2)}
   /* protocol panel tabs */
   .ptabs{display:flex;gap:6px;margin:0 0 10px;border-bottom:1px solid var(--line);padding-bottom:8px}
-  .ptab{flex:1;font-family:var(--disp);font-weight:800;font-size:11px;letter-spacing:.06em;text-transform:uppercase;padding:6px 8px;border-radius:8px;border:1px solid var(--line2);background:var(--panel2);color:var(--faint);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;transition:.15s}
+  .ptab{flex:1;font-family:var(--disp);font-weight:800;font-size:10px;letter-spacing:.04em;text-transform:uppercase;padding:6px 4px;border-radius:8px;border:1px solid var(--line2);background:var(--panel2);color:var(--faint);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;transition:.15s;white-space:nowrap}
+  .ptab .tg{font-size:11px;line-height:1;color:var(--green);opacity:.85;transition:.15s}
+  .ptab.on .tg{opacity:1;filter:drop-shadow(0 0 4px var(--green))}
+  .ptab .tg-live{animation:pulse 1.5s infinite}
   .ptab.on{background:linear-gradient(180deg,#0d1a11,#0a140d);color:var(--green2);border-color:var(--greenDim)}
   .ptab:hover{border-color:var(--faint)}
   /* analytics dashboard */
   #pv-analytics{display:flex;flex-direction:column;gap:8px;padding-top:2px}
-  .ancard{background:linear-gradient(180deg,var(--panel2),#070707);border:1px solid var(--line);border-left:3px solid var(--green);border-radius:10px;padding:9px 11px}
-  .ancard .ant{font-family:var(--disp);font-weight:800;font-size:11.5px;letter-spacing:.02em;margin-bottom:6px;display:flex;gap:6px;align-items:center}
+  .ancard{background:linear-gradient(180deg,var(--panel2),#060606);border:1px solid var(--line);border-left:3px solid var(--green);border-radius:11px;padding:10px 12px;
+    box-shadow:0 1px 0 rgba(255,255,255,.025) inset,0 8px 22px -18px #000;transition:transform .15s,border-color .15s,box-shadow .2s}
+  .ancard:hover{transform:translateY(-1px);border-color:var(--line2);box-shadow:0 1px 0 rgba(255,255,255,.04) inset,0 12px 28px -18px #000,-1px 0 0 0 currentColor}
+  .ancard .ant{font-family:var(--disp);font-weight:800;font-size:12px;letter-spacing:.02em;margin-bottom:7px;display:flex;gap:6px;align-items:center;padding-bottom:6px;border-bottom:1px solid var(--line)}
+  .ancard .anr:last-child{padding-bottom:0}
   .anr{display:flex;justify-content:space-between;align-items:center;font-size:11.5px;color:var(--soft);padding:2px 0}
   .anr b{font-family:var(--mono);color:var(--ink);font-weight:600;letter-spacing:-.01em}
   .anbar{height:5px;border-radius:4px;background:#0c0c0c;border:1px solid var(--line);overflow:hidden;margin:5px 0}
@@ -423,10 +429,10 @@
   <!-- STATS + SWAP (tabbed) -->
   <div class="cell c-stats">
     <div class="ptabs">
-      <button class="ptab on" id="ptab-proto" onclick="protoTab('proto')">Live</button>
-      <button class="ptab" id="ptab-analytics" onclick="protoTab('analytics')">📊 Stats</button>
-      <button class="ptab" id="ptab-swap" onclick="protoTab('swap')">⇄ Swap</button>
-      <button class="ptab" id="ptab-wallet" onclick="protoTab('wallet')">👛</button>
+      <button class="ptab on" id="ptab-proto" onclick="protoTab('proto')"><span class="tg tg-live">◉</span>Live</button>
+      <button class="ptab" id="ptab-analytics" onclick="protoTab('analytics')"><span class="tg">▦</span>Stats</button>
+      <button class="ptab" id="ptab-swap" onclick="protoTab('swap')"><span class="tg">⇄</span>Swap</button>
+      <button class="ptab" id="ptab-wallet" onclick="protoTab('wallet')"><span class="tg">◈</span>Wallet</button>
     </div>
     <div id="pv-analytics" style="display:none;overflow:auto"></div>
     <div class="slist" id="pv-proto">
@@ -1170,7 +1176,7 @@ function watchHolder(a){watch=a;$("p_addr").textContent=short(a);savePrefs();ref
 function renderAnalytics(){
   const box=$("pv-analytics");if(!box)return;
   const a=AN;if(!a.sup){box.innerHTML='<div class="muted" style="padding:12px">Loading analytics…</div>';return;}
-  const usdv=v=>ethUsd?usdBig(v*ethUsd):fmt(v,0)+" ETH-eq";
+  const val=v=>ethUsd?usdBig(v):fmt(v,3)+" ETH"; // a.mcap/a.liq already in USD (or ETH if no price)
   const dFrac=1-Math.pow(1-decayR,31536000);            // ~0.5/yr
   const decayYr=a.inc*dFrac;                            // MM decaying per year
   const pumpYr=a.pool>0?(a.inc*dFrac*mirrorX)/a.pool*100:0;
@@ -1186,7 +1192,7 @@ function renderAnalytics(){
    +card("⚙ Pump engine",row("Capacity","~"+pumpYr.toFixed(0)+"%/yr",pumpYr>=0?"var(--green2)":"")+row("Pumped to date",fmt(pumpCumMM||0,2)+" MM")+row("Mirror",mirrorX.toFixed(2)+"×")+bar(a.inc/a.allPool*50,"var(--green)")+row("Decay : pool",(a.allPool>0?(a.inc/a.allPool).toFixed(2):"—")),"#00C805")
    +card("❖ Reflection",row("Index",a.idx.toFixed(6))+row("Volume run-rate",compactNum(volYr)+" MM/yr")+row("Holder APR","+"+reflAPR.toFixed(0)+"%","var(--green2)"),"#38ff7e")
    +card("💰 Holder yield <span class='muted'>value/yr</span>",row("Reflection","+"+reflAPR.toFixed(0)+"%","var(--green2)")+row("Pump lift","+"+pumpYr.toFixed(0)+"%","var(--green2)")+row("Decay","−"+(dFrac*100).toFixed(0)+"%","var(--down)")+row("Net · ex-swap",(netEx>=0?"+":"−")+Math.abs(netEx).toFixed(0)+"%",netEx>=0?"var(--green2)":"var(--down)")+row("Net · all-in",(netAll>=0?"+":"−")+Math.abs(netAll).toFixed(0)+"%",netAll>=0?"var(--green2)":"var(--down)"),"#00C805")
-   +card("📈 Valuation",row("Price",ethUsd?usd(a.pUsd):gwei(a.price).toFixed(4)+" gwei")+row("Market cap",usdv(a.sup))+row("Liquidity (main)",usdv(a.pool*2))+row("Treasury",fmt(a.tre,0)+" MM")+row("Reward pot",fmt(a.pot,2)+" MM"),"#ffa24d");
+   +card("📈 Valuation",row("Price",ethUsd?usd(a.pUsd):gwei(a.price).toFixed(4)+" gwei")+row("Market cap",val(a.mcap))+row("FDV · 1B cap",ethUsd?usdBig(CFG.cap*a.pUsd):fmt(CFG.cap*a.price,3)+" ETH")+row("Liquidity",val(a.liq))+row("Treasury",fmt(a.tre,0)+" MM")+row("Reward pot",fmt(a.pot,2)+" MM"),"#ffa24d");
 }
 // Between chain refreshes, non-excluded holders visibly bleed at the real decay rate.
 function tickHolders(){
