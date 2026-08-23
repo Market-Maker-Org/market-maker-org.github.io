@@ -30,7 +30,14 @@
   .brand{font-family:var(--disp);font-weight:900;font-size:18px;letter-spacing:-.02em;display:flex;align-items:center;gap:9px}
   .logo{width:24px;height:24px;border-radius:6px;border:1px solid var(--green);display:grid;place-items:center}
   .logo svg{width:16px;height:16px}
-  .brand b{color:var(--green)} .brand .rh{color:var(--faint);font-family:var(--mono);font-size:10px;letter-spacing:.1em;margin-left:2px}
+  .brand b{color:var(--green)}
+  .rh-wrap{display:inline-flex;align-items:center;gap:4px;margin-left:6px;padding-left:8px;border-left:1px solid var(--line2)}
+  .feather{width:15px;height:15px;filter:drop-shadow(0 0 4px rgba(0,200,5,.6));animation:feath 3.5s ease-in-out infinite}
+  @keyframes feath{0%,100%{transform:rotate(-4deg)}50%{transform:rotate(4deg)}}
+  .rh2{font-family:var(--mono);font-size:10px;letter-spacing:.16em;font-weight:700;
+    background:linear-gradient(90deg,#00C805 0%,#8dffb0 25%,#ffffff 50%,#8dffb0 75%,#00C805 100%);background-size:220% auto;
+    -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent;animation:shimmer 3.2s linear infinite}
+  @keyframes shimmer{to{background-position:-220% center}}
   .spacer{flex:1}
   .chip{font-family:var(--mono);font-size:11px;color:var(--soft);border:1px solid var(--line2);border-radius:100px;padding:5px 10px;display:flex;gap:6px;align-items:center}
   .chip .d{width:7px;height:7px;border-radius:50%;background:var(--orange)}.chip.ok .d{background:var(--green);box-shadow:0 0 8px var(--green)}
@@ -184,16 +191,26 @@
   .pchip .go{margin-left:auto;color:var(--green2);font-family:var(--mono);font-size:10.5px}
   .pchip:hover{border-color:var(--line2)}
   .hrow .bl.dec{color:var(--orange2)}
-  /* swap modal */
+  /* protocol panel tabs */
+  .ptabs{display:flex;gap:6px;margin:0 0 10px;border-bottom:1px solid var(--line);padding-bottom:8px}
+  .ptab{flex:1;font-family:var(--disp);font-weight:800;font-size:11px;letter-spacing:.06em;text-transform:uppercase;padding:6px 8px;border-radius:8px;border:1px solid var(--line2);background:var(--panel2);color:var(--faint);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;transition:.15s}
+  .ptab.on{background:linear-gradient(180deg,#0d1a11,#0a140d);color:var(--green2);border-color:var(--greenDim)}
+  .ptab:hover{border-color:var(--faint)}
+  /* swap */
   .modal-in.swap2{max-width:440px}
   .swapbox{display:flex;flex-direction:column;gap:2px;margin-top:8px}
+  .swapbox.compact{margin-top:2px}
+  .swapbox.compact .swrow{padding:10px 11px;border-radius:11px}
+  .swapbox.compact input,.swapbox.compact .rcv{font-size:19px}
+  .swapbox.compact .tokchip{font-size:12.5px;padding:4px 9px 4px 5px}
+  .swapbox.compact .tokchip svg,.swapbox.compact .tokchip img{width:19px;height:19px}
   .swrow{background:var(--panel2);border:1px solid var(--line);border-radius:13px;padding:12px 13px}
   .swrow .top{display:flex;justify-content:space-between;font-size:10.5px;color:var(--faint);text-transform:uppercase;letter-spacing:.06em}
   .swrow .mid{display:flex;align-items:center;gap:10px;margin-top:6px}
   .swrow input{flex:1;background:transparent;border:0;outline:none;color:var(--ink);font-family:var(--mono);font-size:24px;font-weight:700;width:100%;min-width:0}
   .swrow .rcv{flex:1;font-family:var(--mono);font-size:24px;font-weight:700;color:var(--ink);overflow:hidden;text-overflow:ellipsis}
   .tokchip{display:flex;align-items:center;gap:7px;background:#060908;border:1px solid var(--line2);border-radius:100px;padding:5px 11px 5px 6px;font-family:var(--disp);font-weight:800;font-size:14px;white-space:nowrap}
-  .tokchip svg{width:22px;height:22px;border-radius:50%}
+  .tokchip svg,.tokchip img{width:22px;height:22px;border-radius:50%;object-fit:cover}
   .swflip{align-self:center;margin:-9px 0;z-index:2;width:34px;height:34px;border-radius:10px;background:var(--panel);border:1px solid var(--line2);color:var(--green2);cursor:pointer;display:grid;place-items:center;font-size:15px;transition:.15s}
   .swflip:hover{border-color:var(--green);transform:rotate(180deg)}
   .swinfo{margin-top:10px;font-size:11.5px;color:var(--soft);display:flex;flex-direction:column;gap:5px}
@@ -246,11 +263,10 @@
 </head>
 <body>
 <header>
-  <div class="brand"><img src="mm.png" class="mmlogo" style="width:26px;height:26px" alt="MM">Market <b>Maker</b><span class="rh">· ROBINHOOD</span></div>
+  <div class="brand"><img src="mm.png" class="mmlogo" style="width:26px;height:26px" alt="MM">Market <b>Maker</b><span class="rh-wrap"><svg class="feather" viewBox="0 0 32 32" aria-hidden="true"><path d="M27 4.5c-9.4.6-17 6.8-20.4 17.2-.5 1.5 1 2.8 2.4 2 1-.6 1.4-1.8 1.8-2.9C13.6 14.4 19 9.4 27 8.2c.7-.1 1.1-.8.9-1.5-.2-.6-.8-.9-1.4-.8.7-.2 1.1-.9.9-1.5-.2-.6-.8-1-1.4-.9z" fill="#00C805"/><path d="M8.5 25.5l3.2-6.4" stroke="#00C805" stroke-width="1.7" stroke-linecap="round"/></svg><span class="rh2">ROBINHOOD</span></span></div>
   <div class="spacer"></div>
   <span class="chip" id="net"><span class="d"></span><span id="nettxt">connecting…</span></span>
   <button class="hbtn" onclick="openLearn()">How it works</button>
-  <button class="hbtn" onclick="openSwap()">⇄ Swap</button>
   <button class="hbtn green" id="connectBtn" onclick="connectWallet()">Connect</button>
   <span class="chip" id="acct" style="display:none"></span>
   <button class="hbtn" id="adminBtn" style="display:none" onclick="window.open('admin.html','_blank')">Admin</button>
@@ -277,21 +293,49 @@
     <canvas id="c_price"></canvas>
   </div>
 
-  <!-- STATS -->
+  <!-- STATS + SWAP (tabbed) -->
   <div class="cell c-stats">
-    <h3>Protocol · live</h3>
-    <div class="slist">
-      <div class="srow"><span class="l">Total supply</span><span class="v" id="d_supply">—</span></div>
+    <div class="ptabs">
+      <button class="ptab on" id="ptab-proto" onclick="protoTab('proto')">Protocol · live</button>
+      <button class="ptab" id="ptab-swap" onclick="protoTab('swap')"><img src="mm.png" class="mmtag" alt="">⇄ Swap</button>
+    </div>
+    <div class="slist" id="pv-proto">
+      <div class="srow"><span class="l"><img src="mm.png" class="mmtag" alt="">Total supply</span><span class="v" id="d_supply">—</span></div>
       <div class="srow"><span class="l">Circulating · decaying</span><span class="v" id="d_circ">—</span></div>
       <div class="srow"><span class="l">Burned 🔥</span><span class="v" id="d_burn">—</span></div>
-      <div class="srow"><span class="l">Treasury (MM)</span><span class="v" id="d_tre">—</span></div>
+      <div class="srow"><span class="l"><img src="mm.png" class="mmtag" alt="">Treasury (MM)</span><span class="v" id="d_tre">—</span></div>
       <div class="srow"><span class="l">Reward pot</span><span class="v" id="d_pot">—</span></div>
       <div class="srow"><span class="l">Pump debt ⚙</span><span class="v" id="d_pumpdebt">—</span></div>
       <div class="srow"><span class="l">Decay</span><span class="v" id="d_decay">—</span></div>
       <div class="srow"><span class="l">Reflection index</span><span class="v" id="d_idx">—</span></div>
-      <div class="srow"><span class="l">Pump pool MM 💧</span><span class="v" id="d_pool">—</span></div>
-      <div class="srow"><span class="l">All-pool MM <span id="d_allpoolD" class="pooldelta"></span></span><span class="v" id="d_allpool">—</span></div>
+      <div class="srow"><span class="l"><img src="mm.png" class="mmtag" alt="">Pump pool MM 💧</span><span class="v" id="d_pool">—</span></div>
+      <div class="srow"><span class="l"><img src="mm.png" class="mmtag" alt="">All-pool MM <span id="d_allpoolD" class="pooldelta"></span></span><span class="v" id="d_allpool">—</span></div>
       <div class="srow"><span class="l">Decay : pool → pump</span><span class="v" id="d_ratio">—</span></div>
+    </div>
+    <div id="pv-swap" style="display:none;overflow:auto">
+      <div class="swapbox compact">
+        <div class="swrow">
+          <div class="top"><span>You pay</span><span id="sw_balA"></span></div>
+          <div class="mid"><input id="sw_in" type="text" inputmode="decimal" placeholder="0.0" oninput="quoteSwap()" autocomplete="off"><span class="tokchip" id="sw_tokA"></span></div>
+        </div>
+        <button class="swflip" onclick="flipSwap()" title="Flip">⇅</button>
+        <div class="swrow">
+          <div class="top"><span>You receive <span class="muted">est.</span></span><span id="sw_balB"></span></div>
+          <div class="mid"><div class="rcv" id="sw_out">0.0</div><span class="tokchip" id="sw_tokB"></span></div>
+        </div>
+      </div>
+      <div class="slips"><span class="muted" style="font-size:10.5px">Slippage</span>
+        <span class="slip" onclick="setSlip(1,this)">1%</span><span class="slip on" onclick="setSlip(5,this)">5%</span><span class="slip" onclick="setSlip(10,this)">10%</span>
+      </div>
+      <div class="swinfo">
+        <div class="r"><span>Rate</span><span class="v" id="sw_rate">—</span></div>
+        <div class="r"><span>Price impact</span><span class="v" id="sw_impact">—</span></div>
+        <div class="r"><span>Min received</span><span class="v" id="sw_min">—</span></div>
+        <div class="r"><span>Network</span><span class="v" id="sw_tax">—</span></div>
+      </div>
+      <button class="swexec" id="sw_exec" onclick="doSwap()">Connect wallet</button>
+      <div class="swnote" id="sw_note"></div>
+      <div class="swnote" style="text-align:center;opacity:.7">Routed by LI.FI · best-price aggregator</div>
     </div>
   </div>
 
@@ -511,47 +555,6 @@
 </div></div>
 
 <!-- SWAP MODAL -->
-<div class="modal" id="swap"><div class="modal-in swap2">
-  <span class="mclose" onclick="closeSwap()">✕</span>
-  <h2>Swap</h2>
-  <p class="muted" style="margin:0 0 4px">Uniswap-V2 MM/ETH pair · live quote from on-chain reserves.</p>
-  <div class="swapbox">
-    <div class="swrow">
-      <div class="top"><span>You pay</span><span id="sw_balA"></span></div>
-      <div class="mid">
-        <input id="sw_in" type="text" inputmode="decimal" placeholder="0.0" oninput="quoteSwap()" autocomplete="off">
-        <span class="tokchip" id="sw_tokA"></span>
-      </div>
-    </div>
-    <button class="swflip" onclick="flipSwap()" title="Flip direction">⇅</button>
-    <div class="swrow">
-      <div class="top"><span>You receive <span class="muted">(est.)</span></span><span id="sw_balB"></span></div>
-      <div class="mid">
-        <div class="rcv" id="sw_out">0.0</div>
-        <span class="tokchip" id="sw_tokB"></span>
-      </div>
-    </div>
-  </div>
-  <div class="slips"><span class="muted" style="font-size:11px">Max slippage</span>
-    <span class="slip" data-s="0.5" onclick="setSlip(0.5,this)">0.5%</span>
-    <span class="slip on" data-s="1" onclick="setSlip(1,this)">1%</span>
-    <span class="slip" data-s="3" onclick="setSlip(3,this)">3%</span>
-  </div>
-  <div class="swinfo">
-    <div class="r"><span>Rate</span><span class="v" id="sw_rate">—</span></div>
-    <div class="r"><span>Price impact</span><span class="v" id="sw_impact">—</span></div>
-    <div class="r"><span>Min received</span><span class="v" id="sw_min">—</span></div>
-    <div class="r"><span>Token tax (this leg)</span><span class="v" id="sw_tax">—</span></div>
-  </div>
-  <button class="swexec" id="sw_exec" onclick="doSwap()">Connect wallet</button>
-  <details class="swrouter">
-    <summary>Advanced · V2 router address (for 1-click in-app swap)</summary>
-    <input class="mm" id="sw_router" placeholder="0x… router (fee-on-transfer compatible)" oninput="saveRouter()">
-    <div class="swnote">Robinhood's DEX uses a modified router, so no router is preset. Paste a fee-on-transfer-compatible V2 router to enable atomic, slippage-protected in-app swaps (funds are safe — the router reverts if output &lt; min received). Without one, Swap opens the pair on the DEX.</div>
-  </details>
-  <div class="swnote" id="sw_note"></div>
-</div></div>
-
 <script>
 // Local dev has the server.js proxy (/rpc,/holders,/ethusd). Static hosting
 // (GitHub Pages) has no proxy → hit the public endpoints directly (CORS-enabled).
@@ -610,12 +613,22 @@ async function boot(){
   setInterval(refresh,5000);setInterval(fetchSlow,30000);setInterval(tickLive,120);setInterval(fetchEthUsd,60000);setInterval(getHolders,30000);setInterval(tickHolders,250);setInterval(tickDebt,150);setInterval(fetchPumpStats,60000);
 }
 async function connectWallet(){
-  if(!window.ethereum){alert("No wallet found — dashboard is read-only.");return;}
-  const bp=new E.BrowserProvider(window.ethereum);await bp.send("eth_requestAccounts",[]);signer=await bp.getSigner();account=await signer.getAddress();
-  $("acct").style.display="";$("acct").textContent=account.slice(0,7)+"…"+account.slice(-5);$("connectBtn").textContent="Connected ✓";
-  try{const o=await mmRead.owner();if(o.toLowerCase()===account.toLowerCase())$("adminBtn").style.display="";}catch(e){}
-  useMine();
+  // Prefer Reown AppKit (wallets + email + Google/X socials) if it loaded.
+  if(window.mmOpenConnect){try{window.mmOpenConnect();return;}catch(e){}}
+  if(!window.ethereum){alert("No wallet found — install a wallet or use the Connect popup.");return;}
+  const bp=new E.BrowserProvider(window.ethereum);await bp.send("eth_requestAccounts",[]);
+  await finishConnect(await bp.getSigner());
 }
+async function finishConnect(sgnr){
+  try{signer=sgnr;account=await signer.getAddress();
+    $("acct").style.display="";$("acct").textContent=account.slice(0,7)+"…"+account.slice(-5);$("connectBtn").textContent="Connected ✓";
+    try{const o=await mmRead.owner();if(o.toLowerCase()===account.toLowerCase())$("adminBtn").style.display="";}catch(e){}
+    useMine();updateSwapBalances();if($("pv-swap")&&getComputedStyle($("pv-swap")).display!=="none")quoteSwap();
+  }catch(e){}
+}
+// Bridge for the Reown module: hands us an EIP-1193 provider once connected.
+window.mmOnConnect=async(prov)=>{try{const bp=new E.BrowserProvider(prov);await finishConnect(await bp.getSigner());}catch(e){}};
+window.mmOnDisconnect=()=>{signer=null;account=null;$("acct").style.display="none";$("connectBtn").textContent="Connect";};
 function useMine(){if(account){watch=account;$("p_addr").textContent=account.slice(0,7)+"…"+account.slice(-5);refresh();}}
 function watchAddr(){const w=$("watch").value.trim();if(w){watch=w;$("p_addr").textContent=w.slice(0,7)+"…"+w.slice(-5);refresh();}}
 
@@ -870,73 +883,75 @@ async function pubBuyback(){if(!signer)return connectWallet();try{const mm=new E
 function buildPools(){const pools=CFG.pools;
   $("poolList").innerHTML=pools.map(p=>`<a class="pchip" href="https://dexscreener.com/robinhood/${p.id}" target="_blank"><span class="nm">${p.name.replace(/ \(V2\)/,"")}</span><span class="tag">${p.tag}</span><span class="go">Swap ↗</span></a>`).join("");}
 
-// ===== Swap =====
-const WETH="0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73";
+// ===== Swap (LI.FI aggregator — routes around the modified DEX router, atomic + safe) =====
+const LIFI="https://li.quest/v1",NATIVE="0x0000000000000000000000000000000000000000";
 const LOGO_ETH='<svg viewBox="0 0 24 24"><rect width="24" height="24" rx="12" fill="#0a0f16"/><path d="M12 3.2 L12 9.9 L17.6 12.3 Z" fill="#8ab4ff"/><path d="M12 3.2 L6.4 12.3 L12 9.9 Z" fill="#dbe6ff"/><path d="M12 13.3 L12 20.8 L17.7 13.5 Z" fill="#8ab4ff"/><path d="M12 20.8 L12 13.3 L6.4 13.5 Z" fill="#dbe6ff"/></svg>';
 const LOGO_MM='<img src="mm.png" alt="MM" style="width:22px;height:22px;border-radius:50%;object-fit:cover">';
-let swBuy=true,swSlip=1,swRouter="";
-const ROUTER_ABI=["function swapExactETHForTokensSupportingFeeOnTransferTokens(uint256 amountOutMin,address[] path,address to,uint256 deadline) payable","function swapExactTokensForETHSupportingFeeOnTransferTokens(uint256 amountIn,uint256 amountOutMin,address[] path,address to,uint256 deadline)"];
 const ERC20_ABI2=["function allowance(address,address) view returns(uint256)","function approve(address,uint256) returns(bool)"];
+let swBuy=true,swSlip=5,swQuote=null,_swSeq=0;
 const tokChip=s=>(s==="ETH"?LOGO_ETH+" ETH":LOGO_MM+" MM");
-function openSwap(){swRouter=(localStorage.getItem("mm_router")||"").trim();$("sw_router").value=swRouter;renderSwapTokens();$("swap").classList.add("on");updateSwapBalances();quoteSwap();}
-function closeSwap(){$("swap").classList.remove("on");}
+function swTokens(){return swBuy?{from:NATIVE,to:CFG.mm}:{from:CFG.mm,to:NATIVE};}
+function protoTab(which){
+  const isS=which==="swap";
+  $("pv-proto").style.display=isS?"none":"";
+  $("pv-swap").style.display=isS?"":"none";
+  $("ptab-proto").classList.toggle("on",!isS);$("ptab-swap").classList.toggle("on",isS);
+  if(isS){renderSwapTokens();updateSwapBalances();quoteSwap();}
+}
+function openSwap(){protoTab("swap");}
+function closeSwap(){protoTab("proto");}
 function renderSwapTokens(){$("sw_tokA").innerHTML=tokChip(swBuy?"ETH":"MM");$("sw_tokB").innerHTML=tokChip(swBuy?"MM":"ETH");}
-function flipSwap(){swBuy=!swBuy;renderSwapTokens();$("sw_in").value="";$("sw_out").textContent="0.0";updateSwapBalances();quoteSwap();}
+function flipSwap(){swBuy=!swBuy;renderSwapTokens();$("sw_in").value="";$("sw_out").textContent="0.0";swQuote=null;updateSwapBalances();quoteSwap();}
 function setSlip(s,el){swSlip=s;document.querySelectorAll(".slip").forEach(x=>x.classList.remove("on"));el.classList.add("on");quoteSwap();}
-function saveRouter(){swRouter=$("sw_router").value.trim();localStorage.setItem("mm_router",swRouter);quoteSwap();}
 async function updateSwapBalances(){
   if(!account){$("sw_balA").textContent="";$("sw_balB").textContent="";return;}
   try{const [eth,mmb]=await Promise.all([ro.getBalance(account),mmRead.balanceOf(account)]);
     const e=Number(E.formatUnits(eth,18)),m=Number(E.formatUnits(mmb,18));
     $("sw_balA").textContent="bal "+fmt(swBuy?e:m,swBuy?5:2);$("sw_balB").textContent="bal "+fmt(swBuy?m:e,swBuy?2:5);}catch(e){}
 }
-async function quoteSwap(){
-  const inv=parseFloat(($("sw_in").value||"").replace(",","."))||0;
-  if(!pair)pair=new E.Contract(CFG.ethPair,PAIR_ABI,ro);
-  let rW,rM;try{const r=await pair.getReserves();rW=Number(E.formatUnits(r[0],18));rM=Number(E.formatUnits(r[1],18));}catch(e){return;}
-  const gao=(a,ri,rO)=>{const aw=a*0.997;return aw*rO/(ri+aw);};
-  const taxFrac=((burnBps+reflBps+recentBps+treBps)||400)/10000;
-  const outSym=swBuy?"MM":"ETH";let out=0,spot=0;
-  if(swBuy){spot=rM/rW;out=inv>0?gao(inv,rW,rM):0;}          // ETH->MM
-  else{spot=rW/rM;out=inv>0?gao(inv*(1-taxFrac),rM,rW):0;}    // MM->ETH (MM taxed to pool)
-  const dp=swBuy?2:8;
-  $("sw_out").textContent=out>0?out.toLocaleString("en-US",{maximumFractionDigits:dp}):"0.0";
-  $("sw_rate").textContent=inv>0?`1 ${swBuy?"ETH":"MM"} ≈ ${(out/inv).toLocaleString("en-US",{maximumFractionDigits:dp})} ${outSym}`:"—";
-  const exec=inv>0?out/inv:0,impact=spot>0&&exec>0?Math.max(0,(1-exec/spot))*100:0;
-  $("sw_impact").textContent=inv>0?impact.toFixed(2)+"%":"—";$("sw_impact").className="v"+(impact>5?" warn":"");
-  const minOut=out*(1-swSlip/100);
-  $("sw_min").textContent=inv>0?minOut.toLocaleString("en-US",{maximumFractionDigits:dp})+" "+outSym:"—";
-  $("sw_tax").textContent=swBuy?"0% · buy leg":(taxFrac*100).toFixed(1)+"% · sell leg";
-  const btn=$("sw_exec"),hasR=/^0x[a-fA-F0-9]{40}$/.test(swRouter);
+function setSwBtn(inv,noRoute){const btn=$("sw_exec");if(!btn)return;
   if(!signer){btn.textContent="Connect wallet";btn.className="swexec alt";}
-  else if(hasR){btn.textContent=inv>0?`Swap ${swBuy?"ETH → MM":"MM → ETH"}`:"Enter an amount";btn.className="swexec";}
-  else{btn.textContent="Open swap on DEX ↗";btn.className="swexec alt";}
+  else if(inv<=0){btn.textContent="Enter an amount";btn.className="swexec alt";}
+  else if(noRoute||!swQuote){btn.textContent="No route · open DEX ↗";btn.className="swexec alt";}
+  else{btn.textContent=`Swap ${swBuy?"ETH → MM":"MM → ETH"}`;btn.className="swexec";}}
+async function quoteSwap(){
+  const raw=($("sw_in").value||"").replace(",",".");const inv=parseFloat(raw)||0;
+  const outSym=swBuy?"MM":"ETH",dp=swBuy?2:8;
+  if(inv<=0){$("sw_out").textContent="0.0";["sw_rate","sw_impact","sw_min","sw_tax"].forEach(i=>$(i).textContent="—");swQuote=null;setSwBtn(0);return;}
+  $("sw_out").textContent="…";$("sw_rate").textContent="finding best route…";
+  const my=++_swSeq;
+  try{
+    const amt=E.parseUnits(raw,18).toString(),t=swTokens(),addr=account||watch||CFG.defaultWatch;
+    const url=`${LIFI}/quote?fromChain=4663&toChain=4663&fromToken=${t.from}&toToken=${t.to}&fromAmount=${amt}&fromAddress=${addr}&slippage=${swSlip/100}&integrator=marketmaker`;
+    const r=await fetch(url);if(my!==_swSeq)return;
+    if(!r.ok)throw new Error("no route");
+    const q=await r.json();if(my!==_swSeq)return;swQuote=q;
+    const outN=Number(E.formatUnits(q.estimate.toAmount,q.action.toToken.decimals));
+    const minN=Number(E.formatUnits(q.estimate.toAmountMin,q.action.toToken.decimals));
+    $("sw_out").textContent=outN.toLocaleString("en-US",{maximumFractionDigits:dp});
+    $("sw_rate").textContent=`1 ${swBuy?"ETH":"MM"} ≈ ${(outN/inv).toLocaleString("en-US",{maximumFractionDigits:dp})} ${outSym} · via ${q.toolDetails&&q.toolDetails.name||q.tool}`;
+    $("sw_min").textContent=minN.toLocaleString("en-US",{maximumFractionDigits:dp})+" "+outSym;
+    const fu=parseFloat(q.estimate.fromAmountUSD||0),tu=parseFloat(q.estimate.toAmountUSD||0);
+    const imp=fu>0&&tu>0?Math.max(0,(1-tu/fu)*100):0;$("sw_impact").textContent=imp.toFixed(2)+"%";$("sw_impact").className="v"+(imp>6?" warn":"");
+    const gc=q.estimate.gasCosts&&q.estimate.gasCosts[0];$("sw_tax").textContent=gc?("~$"+Number(gc.amountUSD||0).toFixed(3)+" gas"):"routed";
+    $("sw_note").textContent="";setSwBtn(inv);
+  }catch(e){if(my!==_swSeq)return;swQuote=null;$("sw_out").textContent="—";$("sw_rate").textContent="no aggregator route right now";
+    $("sw_note").textContent="Open the pair on the DEX to swap manually.";setSwBtn(inv,true);}
 }
 async function doSwap(){
   if(!signer)return connectWallet();
-  const hasR=/^0x[a-fA-F0-9]{40}$/.test(swRouter);
-  if(!hasR){window.open("https://dexscreener.com/robinhood/"+CFG.ethPair,"_blank");return;}
-  const raw=($("sw_in").value||"").replace(",",".");const inv=parseFloat(raw)||0;if(inv<=0)return;
-  const btn=$("sw_exec");btn.disabled=true;$("sw_note").textContent="";
+  if(!swQuote){window.open("https://dexscreener.com/robinhood/"+CFG.ethPair,"_blank");return;}
+  const btn=$("sw_exec");btn.disabled=true;
   try{
-    const router=new E.Contract(swRouter,ROUTER_ABI,signer),dl=Math.floor(Date.now()/1000)+600;
-    const r=await pair.getReserves();const rW=r[0],rM=r[1];
-    const gaoBI=(a,ri,rO)=>{const aw=a*997n;return aw*rO/(ri*1000n+aw);};
-    const slipN=BigInt(Math.floor((1-swSlip/100)*1000));
-    const inWei=E.parseUnits(raw,18);
-    if(swBuy){
-      const minOut=gaoBI(inWei,rW,rM)*slipN/1000n;
-      const tx=await router.swapExactETHForTokensSupportingFeeOnTransferTokens(minOut,[WETH,CFG.mm],account,dl,{value:inWei});
-      $("sw_note").textContent="⏳ swapping…";await tx.wait();
-    }else{
-      const mm=new E.Contract(CFG.mm,ERC20_ABI2,signer);
-      if((await mm.allowance(account,swRouter))<inWei){$("sw_note").textContent="⏳ approving…";await (await mm.approve(swRouter,inWei)).wait();}
-      const taxBps=BigInt(Math.floor(burnBps+reflBps+recentBps+treBps)||400);
-      const minOut=gaoBI(inWei*(10000n-taxBps)/10000n,rM,rW)*slipN/1000n;
-      $("sw_note").textContent="⏳ swapping…";
-      const tx=await router.swapExactTokensForETHSupportingFeeOnTransferTokens(inWei,minOut,[CFG.mm,WETH],account,dl);await tx.wait();
+    if(!swBuy){ // approve MM to LI.FI's spender
+      const spender=swQuote.estimate.approvalAddress,need=BigInt(swQuote.action.fromAmount);
+      if(spender){const mm=new E.Contract(CFG.mm,ERC20_ABI2,signer);
+        if((await mm.allowance(account,spender))<need){$("sw_note").textContent="⏳ approving MM…";await (await mm.approve(spender,need)).wait();}}
     }
-    $("sw_note").textContent="✓ Swap complete.";$("sw_in").value="";quoteSwap();updateSwapBalances();refresh();
+    const tr=swQuote.transactionRequest;$("sw_note").textContent="⏳ swapping…";
+    const tx=await signer.sendTransaction({to:tr.to,data:tr.data,value:tr.value||"0x0",...(tr.gasLimit?{gasLimit:tr.gasLimit}:{}),...(tr.gasPrice?{gasPrice:tr.gasPrice}:{})});
+    await tx.wait();
+    $("sw_note").textContent="✓ Swap complete.";$("sw_in").value="";swQuote=null;quoteSwap();updateSwapBalances();refresh();
   }catch(e){$("sw_note").textContent="Swap failed: "+((e.shortMessage||e.message||e)+"").slice(0,130);}
   btn.disabled=false;
 }
@@ -948,7 +963,6 @@ function learnTab(id,btn){
 function openLearn(){$("learn").classList.add("on");}
 function closeLearn(){$("learn").classList.remove("on");}
 $("learn").addEventListener("click",e=>{if(e.target.id==="learn")closeLearn();});
-$("swap").addEventListener("click",e=>{if(e.target.id==="swap")closeSwap();});
 // ===== ecosystem flow overlay: animated data lines between panels =====
 function edgePt(el,term,side){const r=el.getBoundingClientRect(),t=term.getBoundingClientRect();
   const x=r.left-t.left,y=r.top-t.top;
@@ -986,39 +1000,102 @@ function buildChartTools(){
 function toggleSeries(k){const on=Object.values(SERIES).filter(s=>s.on).length;if(SERIES[k].on&&on<=1)return;SERIES[k].on=!SERIES[k].on;buildChartTools();drawChart();}
 function setRange(n){chartRange=n;buildChartTools();drawChart();}
 function sliceN(a){return chartRange>0?a.slice(-chartRange):a;}
+function compactNum(v){const a=Math.abs(v);if(a>=1e9)return (v/1e9).toFixed(2)+"B";if(a>=1e6)return (v/1e6).toFixed(2)+"M";if(a>=1e3)return (v/1e3).toFixed(1)+"k";if(a>=1)return v.toFixed(2);if(a>0)return v.toPrecision(2);return "0";}
+function axisFmt(k,v){return k==="price"?gwei(v).toFixed(2)+"g":k==="index"?v.toFixed(4):compactNum(v);}
+let _chart=null,_hoverI=null;
 function drawChart(){
   const c=$("c_price"),ctx=c.getContext("2d");const dpr=devicePixelRatio||1,W=c.clientWidth,H=c.clientHeight;if(!W||!H)return;
   c.width=W*dpr;c.height=H*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,W,H);
-  const active=Object.entries(SERIES).filter(([k,s])=>s.on&&s.data.length>1);
-  const PADT=14,PADB=14;
-  ctx.strokeStyle="rgba(255,255,255,.045)";ctx.lineWidth=1;
-  for(let g=0;g<=4;g++){const y=PADT+g*(H-PADT-PADB)/4;ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
-  if(!active.length){ctx.fillStyle="#5f6b64";ctx.font="12px 'IBM Plex Mono',monospace";ctx.textAlign="center";ctx.fillText("loading history…",W/2,H/2);return;}
-  const maxLen=Math.max(...active.map(([k,s])=>sliceN(s.data).length));
-  const X=i=>maxLen<2?W-3:i/(maxLen-1)*(W-6)+3;
-  active.forEach(([k,s],ai)=>{
-    const d=sliceN(s.data);const mn=Math.min(...d),mx=Math.max(...d),rg=(mx-mn)||Math.abs(mx)||1;
-    const Y=v=>H-PADB-((v-mn)/rg)*(H-PADT-PADB);
-    const off=maxLen-d.length; // right-align shorter series
-    // primary (first active) gets a gradient fill
+  const all=Object.entries(SERIES).filter(([k,s])=>s.on&&s.data.length>1);
+  const lines=all.filter(([k])=>k!=="vol"),volOn=SERIES.vol.on&&SERIES.vol.data.length>1;
+  const PADT=12,PADR=54,PADL=4,volH=volOn?Math.round(H*0.20):0,plotB=H-6-volH;
+  ctx.strokeStyle="rgba(255,255,255,.05)";ctx.lineWidth=1;
+  for(let g=0;g<=4;g++){const y=PADT+g*(plotB-PADT)/4;ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W-PADR,y);ctx.stroke();}
+  if(!lines.length&&!volOn){ctx.fillStyle="#5f6b64";ctx.font="12px 'IBM Plex Mono',monospace";ctx.textAlign="center";ctx.fillText("loading history…",W/2,H/2);return;}
+  const maxLen=Math.max(...all.map(([k,s])=>sliceN(s.data).length));
+  const X=i=>maxLen<2?(W-PADR-2):PADL+i/(maxLen-1)*(W-PADR-PADL-2);
+  // volume bars (bottom band)
+  if(volOn){const d=sliceN(SERIES.vol.data),mx=Math.max(...d,1e-9),off=maxLen-d.length,bw=Math.max(1,(W-PADR-PADL)/maxLen*0.6);
+    d.forEach((v,i)=>{const x=X(off+i),bh=(v/mx)*(volH-4);if(bh>0.3){ctx.fillStyle=v>0?"rgba(0,200,5,.4)":"rgba(154,168,161,.25)";ctx.fillRect(x-bw/2,H-4-bh,bw,bh);}});
+    ctx.fillStyle="#5f6b64";ctx.font="9px 'IBM Plex Mono'";ctx.textAlign="left";ctx.fillText("volume",3,H-volH+9);}
+  // line series (top band)
+  const meta=[];
+  lines.forEach(([k,s],ai)=>{
+    const d=sliceN(s.data),mn=Math.min(...d),mx=Math.max(...d),rg=(mx-mn)||Math.abs(mx)||1;
+    const Y=v=>plotB-((v-mn)/rg)*(plotB-PADT),off=maxLen-d.length;
+    meta.push({k,s,d,off,Y,mn,mx});
     if(ai===0){ctx.beginPath();ctx.moveTo(X(off),Y(d[0]));for(let i=1;i<d.length;i++)ctx.lineTo(X(off+i),Y(d[i]));
-      ctx.lineTo(X(maxLen-1),H);ctx.lineTo(X(off),H);ctx.closePath();
-      const gr=ctx.createLinearGradient(0,0,0,H);gr.addColorStop(0,s.color+"2e");gr.addColorStop(1,s.color+"00");ctx.fillStyle=gr;ctx.fill();}
+      ctx.lineTo(X(maxLen-1),plotB);ctx.lineTo(X(off),plotB);ctx.closePath();
+      const gr=ctx.createLinearGradient(0,PADT,0,plotB);gr.addColorStop(0,s.color+"38");gr.addColorStop(1,s.color+"00");ctx.fillStyle=gr;ctx.fill();}
     ctx.beginPath();ctx.moveTo(X(off),Y(d[0]));for(let i=1;i<d.length;i++)ctx.lineTo(X(off+i),Y(d[i]));
-    ctx.strokeStyle=s.color;ctx.lineWidth=ai===0?2:1.5;ctx.globalAlpha=ai===0?1:.9;ctx.stroke();ctx.globalAlpha=1;
-    ctx.fillStyle=s.color;ctx.beginPath();ctx.arc(X(maxLen-1),Y(d[d.length-1]),3,0,7);ctx.fill();
+    ctx.strokeStyle=s.color;ctx.lineWidth=ai===0?2:1.4;ctx.globalAlpha=ai===0?1:.85;
+    if(ai===0){ctx.shadowColor=s.color;ctx.shadowBlur=9;}ctx.stroke();ctx.shadowBlur=0;ctx.globalAlpha=1;
+    const lx=X(maxLen-1),ly=Y(d[d.length-1]);ctx.fillStyle=s.color;ctx.beginPath();ctx.arc(lx,ly,3,0,7);ctx.fill();
+    if(ai===0){ // Y-axis labels + last-value tag for primary
+      ctx.font="9.5px 'IBM Plex Mono'";ctx.textAlign="left";ctx.fillStyle="#7c8a83";
+      for(let g=0;g<=4;g++){const val=mx-(mx-mn)*g/4,y=PADT+g*(plotB-PADT)/4;ctx.fillText(axisFmt(k,val),W-PADR+4,y+3);}
+      ctx.fillStyle=s.color;ctx.fillRect(W-PADR+1,Math.max(PADT,Math.min(plotB-14,ly-7)),PADR-2,14);
+      ctx.fillStyle="#001a06";ctx.font="bold 9.5px 'IBM Plex Mono'";ctx.fillText(axisFmt(k,d[d.length-1]),W-PADR+4,Math.max(PADT+3,Math.min(plotB-4,ly+3)));}
   });
-  updateLegend(active);
+  // crosshair
+  if(_hoverI!=null&&meta.length){const hi=Math.max(0,Math.min(maxLen-1,_hoverI)),hx=X(hi);
+    ctx.strokeStyle="rgba(255,255,255,.25)";ctx.setLineDash([3,4]);ctx.beginPath();ctx.moveTo(hx,PADT);ctx.lineTo(hx,plotB);ctx.stroke();ctx.setLineDash([]);
+    meta.forEach(m=>{const idx=hi-m.off;if(idx>=0&&idx<m.d.length){ctx.fillStyle=m.s.color;ctx.beginPath();ctx.arc(hx,m.Y(m.d[idx]),3.2,0,7);ctx.fill();}});}
+  _chart={W,PADR,PADL,maxLen,X};
+  updateLegend(all,_hoverI==null?null:Math.max(0,Math.min(maxLen-1,_hoverI)),maxLen);
 }
-function updateLegend(active){
+function updateLegend(all,hi,maxLen){
   const lg=$("clegend");if(!lg)return;
-  lg.innerHTML=active.map(([k,s])=>{const d=sliceN(s.data);const last=d[d.length-1],first=d[0];
-    const chg=first?((last/first-1)*100):0;const arw=chg>=0?"▲":"▼";
-    return `<span class="li"><span class="sw" style="background:${s.color}"></span>${s.label} <b>${s.fmtV(last)}</b> <span style="color:${chg>=0?'var(--green2)':'var(--down)'}">${arw}${Math.abs(chg).toFixed(2)}%</span></span>`;}).join("");
+  lg.innerHTML=all.map(([k,s])=>{const d=sliceN(s.data);
+    let val,idx;
+    if(hi!=null){const off=maxLen-d.length;idx=hi-off;val=(idx>=0&&idx<d.length)?d[idx]:d[d.length-1];}else val=d[d.length-1];
+    const first=d[0],chg=first?((val/first-1)*100):0,arw=chg>=0?"▲":"▼";
+    return `<span class="li"><span class="sw" style="background:${s.color}"></span>${s.label} <b>${s.fmtV(val)}</b> <span style="color:${chg>=0?'var(--green2)':'var(--down)'}">${arw}${Math.abs(chg).toFixed(2)}%</span></span>`;}).join("");
 }
 function drawPrice(){drawChart();}
-window.addEventListener("resize",drawChart);
+window.addEventListener("resize",()=>{clearTimeout(_flowT);_flowT=setTimeout(buildFlows,200);drawChart();});
+(function(){const c=$("c_price");if(!c)return;
+  c.addEventListener("mousemove",e=>{if(!_chart)return;const r=c.getBoundingClientRect(),x=e.clientX-r.left;
+    _hoverI=Math.round((x-_chart.PADL)/(_chart.W-_chart.PADR-_chart.PADL-2)*(_chart.maxLen-1));drawChart();});
+  c.addEventListener("mouseleave",()=>{_hoverI=null;drawChart();});})();
 boot();
+</script>
+
+<!-- Reown AppKit: full wallet connect (injected + WalletConnect + email + Google/X socials). -->
+<!-- Loaded as an isolated module; on any failure the app keeps the injected-wallet fallback. -->
+<script type="module">
+try{
+  const { createAppKit } = await import('https://esm.sh/@reown/appkit@1.7.8?bundle-deps');
+  const { EthersAdapter } = await import('https://esm.sh/@reown/appkit-adapter-ethers@1.7.8?deps=@reown/appkit@1.7.8&bundle-deps');
+  const robinhood={ id:4663, name:'Robinhood Chain', caipNetworkId:'eip155:4663', chainNamespace:'eip155',
+    nativeCurrency:{name:'Ether',symbol:'ETH',decimals:18},
+    rpcUrls:{default:{http:['https://rpc.mainnet.chain.robinhood.com']}},
+    blockExplorers:{default:{name:'Blockscout',url:'https://robinhoodchain.blockscout.com'}} };
+  const appKit=createAppKit({
+    adapters:[new EthersAdapter()],
+    networks:[robinhood], defaultNetwork:robinhood,
+    projectId:'0299d75f727f4ded571ce094407cf023',
+    metadata:{ name:'Market Maker', description:'Live elastic-supply MM terminal on Robinhood Chain', url:location.origin, icons:[location.origin+'/mm.png'] },
+    features:{ analytics:false, email:true, socials:['google','x','github','discord','apple','farcaster'], emailShowWallets:true },
+    themeMode:'dark',
+    themeVariables:{ '--w3m-accent':'#00C805','--w3m-color-mix':'#00C805','--w3m-color-mix-strength':8,'--w3m-border-radius-master':'2px','--w3m-font-family':"'IBM Plex Sans',system-ui,sans-serif" }
+  });
+  const forceDark=()=>{try{appKit.setThemeMode&&appKit.setThemeMode('dark');}catch(e){}
+    try{appKit.setThemeVariables&&appKit.setThemeVariables({'--w3m-accent':'#00C805','--w3m-border-radius-master':'2px','--w3m-font-family':"'IBM Plex Sans',system-ui,sans-serif"});}catch(e){}};
+  forceDark();
+  window.mmOpenConnect=()=>{appKit.open();setTimeout(forceDark,120);};
+  let last=null;
+  appKit.subscribeAccount(async(acc)=>{
+    if(acc&&acc.isConnected&&acc.address&&acc.address!==last){
+      last=acc.address;
+      let prov=null; try{prov=await appKit.getProvider('eip155');}catch(e){}
+      if(!prov&&appKit.getWalletProvider){try{prov=appKit.getWalletProvider();}catch(e){}}
+      if(prov&&window.mmOnConnect)window.mmOnConnect(prov);
+    }else if(acc&&!acc.isConnected&&last){ last=null; window.mmOnDisconnect&&window.mmOnDisconnect(); }
+  });
+  window.mmReownReady=true;
+  console.log('Reown AppKit ready');
+}catch(e){ console.warn('Reown AppKit unavailable — injected-wallet fallback active:', e&&e.message); }
 </script>
 </body>
 </html>
