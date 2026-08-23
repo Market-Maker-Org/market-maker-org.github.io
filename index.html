@@ -124,14 +124,16 @@
   .lnb.on{background:var(--green);color:#00220a;border-color:transparent}.lnb:hover{border-color:var(--faint)}
   .lsec{display:none;animation:fadein .35s ease}.lsec.on{display:block}
   @keyframes fadein{from{opacity:0;transform:translateY(6px)}to{opacity:1}}
-  .lsec h3{font-family:var(--disp);font-size:17px;color:var(--ink);margin:2px 0 4px;letter-spacing:-.01em;text-transform:none}
+  .lsec h3{font-family:var(--disp);font-size:17px;color:var(--ink);margin:2px 0 4px;letter-spacing:-.01em;text-transform:none;display:flex;align-items:center;gap:9px}
+  .lsec h3::before{content:"";width:3px;height:18px;background:var(--green);border-radius:2px;box-shadow:0 0 7px var(--green)}
   .lsec h3::before{display:none}
   .lsec>p{color:var(--soft);font-size:13px;margin:0 0 12px;max-width:640px}
-  .ldiag{background:linear-gradient(180deg,#070b09,#040605);border:1px solid var(--line);border-radius:14px;padding:14px;margin:10px 0}
-  .lformula{font-family:var(--mono);font-size:13px;background:#060908;border:1px solid var(--line2);border-radius:10px;padding:11px 13px;margin:10px 0;color:var(--green2);overflow-x:auto}
+  .ldiag{background:radial-gradient(120% 120% at 50% 0%,#0a0a0a,#040404);border:1px solid var(--line);border-radius:14px;padding:14px;margin:10px 0;box-shadow:0 1px 0 rgba(255,255,255,.03) inset}
+  .lformula{font-family:var(--mono);font-size:13px;background:linear-gradient(180deg,#0b0d0c,#060606);border:1px solid var(--line2);border-left:2px solid var(--green);border-radius:10px;padding:11px 13px;margin:10px 0;color:var(--green2);overflow-x:auto}
   .lformula .c{color:var(--faint)}.lformula b{color:var(--orange2);font-weight:600}
   .lkey{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:9px;margin-top:10px}
-  .lkey .k{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px}
+  .lkey .k{background:linear-gradient(180deg,var(--panel2),#070707);border:1px solid var(--line);border-radius:11px;padding:11px;transition:transform .15s,border-color .15s}
+  .lkey .k:hover{transform:translateY(-1px);border-color:var(--line2)}
   .lkey .k .t{font-family:var(--disp);font-weight:700;font-size:12.5px;display:flex;align-items:center;gap:7px}
   .lkey .k .d{color:var(--faint);font-size:11px;margin-top:3px}
   .flow{stroke-dasharray:5 7;animation:dash 1s linear infinite}
