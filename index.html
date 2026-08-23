@@ -217,6 +217,14 @@
   .ptab{flex:1;font-family:var(--disp);font-weight:800;font-size:11px;letter-spacing:.06em;text-transform:uppercase;padding:6px 8px;border-radius:8px;border:1px solid var(--line2);background:var(--panel2);color:var(--faint);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;transition:.15s}
   .ptab.on{background:linear-gradient(180deg,#0d1a11,#0a140d);color:var(--green2);border-color:var(--greenDim)}
   .ptab:hover{border-color:var(--faint)}
+  /* analytics dashboard */
+  #pv-analytics{display:flex;flex-direction:column;gap:8px;padding-top:2px}
+  .ancard{background:linear-gradient(180deg,var(--panel2),#070707);border:1px solid var(--line);border-left:3px solid var(--green);border-radius:10px;padding:9px 11px}
+  .ancard .ant{font-family:var(--disp);font-weight:800;font-size:11.5px;letter-spacing:.02em;margin-bottom:6px;display:flex;gap:6px;align-items:center}
+  .anr{display:flex;justify-content:space-between;align-items:center;font-size:11.5px;color:var(--soft);padding:2px 0}
+  .anr b{font-family:var(--mono);color:var(--ink);font-weight:600;letter-spacing:-.01em}
+  .anbar{height:5px;border-radius:4px;background:#0c0c0c;border:1px solid var(--line);overflow:hidden;margin:5px 0}
+  .anbar>div{height:100%;border-radius:4px;transition:width .6s ease}
   /* swap */
   .modal-in.swap2{max-width:440px}
   .swapbox{display:flex;flex-direction:column;gap:2px;margin-top:8px}
@@ -415,10 +423,12 @@
   <!-- STATS + SWAP (tabbed) -->
   <div class="cell c-stats">
     <div class="ptabs">
-      <button class="ptab on" id="ptab-proto" onclick="protoTab('proto')">Protocol</button>
+      <button class="ptab on" id="ptab-proto" onclick="protoTab('proto')">Live</button>
+      <button class="ptab" id="ptab-analytics" onclick="protoTab('analytics')">📊 Stats</button>
       <button class="ptab" id="ptab-swap" onclick="protoTab('swap')">⇄ Swap</button>
-      <button class="ptab" id="ptab-wallet" onclick="protoTab('wallet')">👛 Wallet</button>
+      <button class="ptab" id="ptab-wallet" onclick="protoTab('wallet')">👛</button>
     </div>
+    <div id="pv-analytics" style="display:none;overflow:auto"></div>
     <div class="slist" id="pv-proto">
       <div class="srow"><span class="l"><img src="mm.png" class="mmtag" alt="">Total supply</span><span class="v" id="d_supply">—</span></div>
       <div class="srow" title="Supply that actually decays — excludes pools, treasury, owner & hook"><span class="l">Circulating · decaying</span><span class="v" id="d_circ">—</span></div>
@@ -736,7 +746,7 @@ const SERIES={
 let chartRange=0; // last N points; 0 = all (full history)
 let chartLog=true; // logarithmic Y (per-series normalized)
 let volYr=0,incSupply=0,reflBps=0,burnBps=0,recentBps=0,treBps=0,mirrorX=1,poolMMg=0,debtBase=0,debtBaseT=0,allPool0=0,refreshFails=0;
-let gMirrorBps=10000,gBbOn=false,gPPool=null;
+let gMirrorBps=10000,gBbOn=false,gPPool=null,AN={};
 let lastSettleWall=Date.now(),pumpCumPrev=-1; // pending pump accrues from last realized burn
 const fmt=(x,d=2)=>Number(typeof x==="bigint"?E.formatUnits(x,18):x).toLocaleString("en-US",{maximumFractionDigits:d});
 // retry helper — the public RPC occasionally drops a batched request (500/BAD_DATA)
@@ -1011,9 +1021,12 @@ async function refresh(){
       $("d_mcap").textContent=ethUsd?usdBig(pUsd*supN):fmt(price*supN,3)+" ETH";
       $("d_depth").textContent=ethUsd?usdBig(pUsd*pmN*2):fmt(price*pmN*2,4)+" ETH";
       priceHist.push(price);if(priceHist.length>400)priceHist.shift();
+      // snapshot for the Analytics dashboard
+      AN={price,pUsd,sup:supN,burned:CFG.cap-supN,inc:incSupply,pool:pmN,allPool:allPoolN,tre:Number(E.formatUnits(tre,18)),pot:Number(E.formatUnits(pot,18)),idx:idxN,mcap:ethUsd?pUsd*supN:price*supN,liq:ethUsd?pUsd*pmN*2:price*pmN*2};
       // append a live sample to every series so the chart keeps moving
       if(histLoaded){pushLive({price,pool:pmN,supply:supN,burn:CFG.cap-supN,index:idxN});drawChart();}
     }
+    if($("pv-analytics")&&getComputedStyle($("pv-analytics")).display!=="none")renderAnalytics();
     if(watch){const b=await mmRead.balanceOf(watch);excluded=await mmRead.isExcluded(watch);liveBal=Number(E.formatUnits(b,18));
       $("p_badge").textContent=excluded?"EXCLUDED":"INCLUDED · decaying";$("p_badge").className="badge "+(excluded?"exc":"inc");
       const ex=$("p_expl");if(ex){ex.href=EXPLORER+"/address/"+watch;ex.target="_blank";}
@@ -1153,6 +1166,28 @@ function renderHolders(){
   }).join("");
 }
 function watchHolder(a){watch=a;$("p_addr").textContent=short(a);savePrefs();refresh();toast("Watching "+short(a));}
+// ===== Analytics: whole-system summary dashboard =====
+function renderAnalytics(){
+  const box=$("pv-analytics");if(!box)return;
+  const a=AN;if(!a.sup){box.innerHTML='<div class="muted" style="padding:12px">Loading analytics…</div>';return;}
+  const usdv=v=>ethUsd?usdBig(v*ethUsd):fmt(v,0)+" ETH-eq";
+  const dFrac=1-Math.pow(1-decayR,31536000);            // ~0.5/yr
+  const decayYr=a.inc*dFrac;                            // MM decaying per year
+  const pumpYr=a.pool>0?(a.inc*dFrac*mirrorX)/a.pool*100:0;
+  const reflAPR=a.inc>0?(volYr*(reflBps/10000)/a.inc)*100:0;
+  const netEx=pumpYr-dFrac*100, netAll=pumpYr+reflAPR-dFrac*100;
+  const burnedPct=a.burned/CFG.cap*100;
+  const bar=(pct,col)=>`<div class="anbar"><div style="width:${Math.max(0,Math.min(100,pct)).toFixed(1)}%;background:${col}"></div></div>`;
+  const card=(t,rows,accent)=>`<div class="ancard" style="border-left-color:${accent}"><div class="ant">${t}</div>${rows}</div>`;
+  const row=(l,v,c)=>`<div class="anr"><span>${l}</span><b${c?` style="color:${c}"`:""}>${v}</b></div>`;
+  box.innerHTML=
+    card("🔥 Deflation",row("Burned to date",fmt(a.burned,0)+" MM")+row("of 1B cap",burnedPct.toFixed(3)+"%")+bar(burnedPct*20,"var(--orange)")+row("Total supply",fmt(a.sup,0)),"#ff7a18")
+   +card("⌁ Decay engine",row("Rate","~"+(dFrac*100).toFixed(0)+"%/yr")+row("Decaying supply",fmt(a.inc,0)+" MM")+row("Erodes / year",fmt(decayYr,0)+" MM")+row("Excluded (stable)",fmt(a.sup-a.inc,0)+" MM"),"#ff5a2c")
+   +card("⚙ Pump engine",row("Capacity","~"+pumpYr.toFixed(0)+"%/yr",pumpYr>=0?"var(--green2)":"")+row("Pumped to date",fmt(pumpCumMM||0,2)+" MM")+row("Mirror",mirrorX.toFixed(2)+"×")+bar(a.inc/a.allPool*50,"var(--green)")+row("Decay : pool",(a.allPool>0?(a.inc/a.allPool).toFixed(2):"—")),"#00C805")
+   +card("❖ Reflection",row("Index",a.idx.toFixed(6))+row("Volume run-rate",compactNum(volYr)+" MM/yr")+row("Holder APR","+"+reflAPR.toFixed(0)+"%","var(--green2)"),"#38ff7e")
+   +card("💰 Holder yield <span class='muted'>value/yr</span>",row("Reflection","+"+reflAPR.toFixed(0)+"%","var(--green2)")+row("Pump lift","+"+pumpYr.toFixed(0)+"%","var(--green2)")+row("Decay","−"+(dFrac*100).toFixed(0)+"%","var(--down)")+row("Net · ex-swap",(netEx>=0?"+":"−")+Math.abs(netEx).toFixed(0)+"%",netEx>=0?"var(--green2)":"var(--down)")+row("Net · all-in",(netAll>=0?"+":"−")+Math.abs(netAll).toFixed(0)+"%",netAll>=0?"var(--green2)":"var(--down)"),"#00C805")
+   +card("📈 Valuation",row("Price",ethUsd?usd(a.pUsd):gwei(a.price).toFixed(4)+" gwei")+row("Market cap",usdv(a.sup))+row("Liquidity (main)",usdv(a.pool*2))+row("Treasury",fmt(a.tre,0)+" MM")+row("Reward pot",fmt(a.pot,2)+" MM"),"#ffa24d");
+}
 // Between chain refreshes, non-excluded holders visibly bleed at the real decay rate.
 function tickHolders(){
   if(!holderRows.length||!decayR)return;const now=Date.now();
@@ -1196,10 +1231,11 @@ let swBuy=true,swSlip=5,swQuote=null,_swSeq=0;
 const tokChip=s=>(s==="ETH"?LOGO_ETH+" ETH":LOGO_MM+" MM");
 function swTokens(){return swBuy?{from:NATIVE,to:CFG.mm}:{from:CFG.mm,to:NATIVE};}
 function protoTab(which){
-  const views={proto:"pv-proto",swap:"pv-swap",wallet:"pv-wallet"};
+  const views={proto:"pv-proto",analytics:"pv-analytics",swap:"pv-swap",wallet:"pv-wallet"};
   Object.entries(views).forEach(([k,id])=>{const el=$(id),tb=$("ptab-"+k);if(el)el.style.display=(k===which)?"":"none";if(tb)tb.classList.toggle("on",k===which);});
   if(which==="swap"){renderSwapTokens();updateSwapBalances();quoteSwap();}
   if(which==="wallet")renderWallet();
+  if(which==="analytics")renderAnalytics();
 }
 function openSwap(){protoTab("swap");}
 function closeSwap(){protoTab("proto");}
