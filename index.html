@@ -15,6 +15,11 @@
 <style>
   :root{
     --w3m-accent:#00C805; --w3m-border-radius-master:2px; --w3m-font-family:'IBM Plex Sans',system-ui,sans-serif;
+    /* Force AppKit/WUI to plain-hex dark tokens (color-mix() rendered light in some engines) */
+    --wui-color-modal-bg:#0a0f0c; --wui-color-modal-bg-base:#0a0f0c;
+    --wui-color-bg-100:#0e1411; --wui-color-bg-125:#131a16; --wui-color-bg-150:#18201b; --wui-color-bg-175:#1e2721; --wui-color-bg-200:#232e27;
+    --wui-color-fg-100:#f4f7f5; --wui-color-fg-125:#d7ded9; --wui-color-fg-150:#9aa8a1; --wui-color-fg-175:#7c8a83; --wui-color-fg-200:#5f6b64;
+    --wui-color-accent-100:#00C805; --w3m-color-mix:#0a0f0c; --w3m-color-mix-strength:0;
     --bg:#000000; --panel:#0a0e0c; --panel2:#0f1512; --ink:#f4f7f5; --soft:#9aa8a1; --faint:#5f6b64; --line:#182019; --line2:#232e27;
     --green:#00C805; --green2:#38ff7e; --greenDim:#0a2e14; --orange:#ff7a18; --orange2:#ffa24d; --white:#ffffff;
     --up:#00C805; --down:#ff5a2c;
@@ -1258,12 +1263,17 @@ try{
     themeMode:'dark',
     themeVariables:{ '--w3m-accent':'#00C805','--w3m-color-mix':'#00C805','--w3m-color-mix-strength':8,'--w3m-border-radius-master':'2px','--w3m-font-family':"'IBM Plex Sans',system-ui,sans-serif" }
   });
+  const DARKCSS=":host{--wui-color-modal-bg:#0a0f0c!important;--wui-color-modal-bg-base:#0a0f0c!important;--wui-color-bg-100:#0e1411!important;--wui-color-bg-125:#131a16!important;--wui-color-bg-150:#18201b!important;--wui-color-bg-175:#1e2721!important;--wui-color-bg-200:#232e27!important;--wui-color-fg-100:#f4f7f5!important;--wui-color-fg-125:#d7ded9!important;--wui-color-fg-150:#9aa8a1!important;--wui-color-fg-200:#5f6b64!important;--wui-color-accent-100:#00C805!important}";
+  function injectDark(root,d){try{if(!root||d>8)return;if(root.querySelector&&!root.querySelector(':scope>style[data-mm]')){const s=document.createElement('style');s.setAttribute('data-mm','1');s.textContent=DARKCSS;root.appendChild(s);}
+    if(root.querySelectorAll)for(const el of root.querySelectorAll('*'))if(el.shadowRoot)injectDark(el.shadowRoot,d+1);}catch(e){}}
   const forceDark=()=>{try{appKit.setThemeMode&&appKit.setThemeMode('dark');}catch(e){}
-    try{appKit.setThemeVariables&&appKit.setThemeVariables({'--w3m-accent':'#00C805','--w3m-border-radius-master':'2px','--w3m-font-family':"'IBM Plex Sans',system-ui,sans-serif"});}catch(e){}};
+    try{appKit.setThemeVariables&&appKit.setThemeVariables({'--w3m-accent':'#00C805','--w3m-border-radius-master':'2px','--w3m-font-family':"'IBM Plex Sans',system-ui,sans-serif"});}catch(e){}
+    const m=document.querySelector('w3m-modal');if(m&&m.shadowRoot)injectDark(m.shadowRoot,0);};
   forceDark();
-  window.mmOpenConnect=()=>{appKit.open();setTimeout(forceDark,120);};
-  window.mmOpenAccount=()=>{appKit.open({view:'Account'});setTimeout(forceDark,120);}; // deposit/withdraw/export/onramp/disconnect (native)
-  window.mmOpenOnRamp=()=>{try{appKit.open({view:'OnRampProviders'});}catch(e){appKit.open({view:'Account'});}setTimeout(forceDark,120);};
+  const darkBurst=()=>[80,250,600,1200].forEach(t=>setTimeout(forceDark,t));
+  window.mmOpenConnect=()=>{appKit.open();darkBurst();};
+  window.mmOpenAccount=()=>{appKit.open({view:'Account'});darkBurst();}; // deposit/withdraw/export/onramp/disconnect (native)
+  window.mmOpenOnRamp=()=>{try{appKit.open({view:'OnRampProviders'});}catch(e){appKit.open({view:'Account'});}darkBurst();};
   window.mmDisconnect=async()=>{try{await appKit.disconnect();}catch(e){}};
   let last=null;
   appKit.subscribeAccount(async(acc)=>{
