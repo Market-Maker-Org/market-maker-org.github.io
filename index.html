@@ -314,6 +314,21 @@
   ::selection{background:rgba(0,200,5,.3);color:#fff}
   .brand{transition:filter .2s}.brand:hover{filter:brightness(1.1)}
   #connectBtn{min-width:92px}
+  /* ===== premium polish ===== */
+  header{box-shadow:0 1px 0 rgba(0,200,5,.07),0 10px 30px -24px #000}
+  .brand b{text-shadow:0 0 14px rgba(0,200,5,.4)}
+  .cell h3::before{box-shadow:0 0 7px var(--green)}
+  .cell:hover{border-color:var(--line2);box-shadow:0 1px 0 rgba(255,255,255,.035) inset,0 0 0 1px rgba(0,200,5,.05),0 12px 34px -20px #000}
+  .price{letter-spacing:-.03em}
+  .plabel{opacity:.85}
+  .pmini .v{letter-spacing:-.01em}
+  .hbtn.green{position:relative;overflow:hidden}
+  .hbtn.green::after{content:"";position:absolute;inset:0;background:linear-gradient(120deg,transparent 30%,rgba(255,255,255,.25) 50%,transparent 70%);transform:translateX(-120%);transition:none}
+  .hbtn.green:hover::after{animation:sheen .7s ease}
+  @keyframes sheen{to{transform:translateX(120%)}}
+  .srow .v{letter-spacing:-.01em}
+  .livedot{box-shadow:0 0 10px var(--green)}
+  .ptab.on{box-shadow:0 0 0 1px rgba(0,200,5,.12),0 6px 16px -10px rgba(0,200,5,.4)}
   /* toasts */
   #toasts{position:fixed;right:14px;bottom:14px;z-index:200;display:flex;flex-direction:column;gap:8px;max-width:min(340px,92vw)}
   .toast{background:linear-gradient(180deg,#101512,#0a0d0b);border:1px solid var(--line2);border-left:3px solid var(--green);border-radius:10px;
@@ -767,7 +782,8 @@ async function connectWallet(){
 }
 let walProfile=null;
 async function finishConnect(sgnr,profile){
-  try{signer=sgnr;account=await signer.getAddress();walProfile=profile||null;
+  try{signer=sgnr;account=await signer.getAddress();walProfile=profile||walProfile||null;window.mmConnected=true;
+    toast("Wallet connected · "+short(account));
     const chip=$("acct");chip.style.display="";chip.style.cursor="pointer";chip.onclick=()=>protoTab('wallet');
     $("connectBtn").textContent="Wallet ▾";$("connectBtn").onclick=()=>protoTab('wallet');
     let cid=0;try{cid=Number((await signer.provider.getNetwork()).chainId);}catch(e){}
@@ -779,7 +795,7 @@ async function finishConnect(sgnr,profile){
 }
 // Bridge for the Reown module: hands us an EIP-1193 provider once connected.
 window.mmOnConnect=async(prov,profile)=>{try{walletEip=prov;const bp=new E.BrowserProvider(prov);await finishConnect(await bp.getSigner(),profile);}catch(e){}};
-window.mmOnDisconnect=()=>{signer=null;account=null;walProfile=null;$("acct").style.display="none";$("connectBtn").textContent="Connect";$("connectBtn").onclick=connectWallet;if($("adminBtn"))$("adminBtn").style.display="none";renderWallet();};
+window.mmOnDisconnect=()=>{signer=null;account=null;walProfile=null;window.mmConnected=false;$("acct").style.display="none";$("connectBtn").textContent="Connect";$("connectBtn").onclick=connectWallet;if($("adminBtn"))$("adminBtn").style.display="none";renderWallet();toast("Wallet disconnected");};
 let walBalETH=0,walBalMM=0;
 function renderWallet(){
   const emp=$("wal_empty"),bod=$("wal_body");if(!emp||!bod)return;
@@ -814,9 +830,9 @@ async function sendAsset(){
 }
 async function disconnectWallet(){
   if(window.mmDisconnect)await window.mmDisconnect();
-  signer=null;account=null;walProfile=null;
+  signer=null;account=null;walProfile=null;window.mmConnected=false;
   $("acct").style.display="none";$("connectBtn").textContent="Connect";$("connectBtn").onclick=connectWallet;
-  if($("adminBtn"))$("adminBtn").style.display="none";renderWallet();
+  if($("adminBtn"))$("adminBtn").style.display="none";renderWallet();toast("Wallet disconnected");
 }
 function useMine(){if(account){watch=account;$("p_addr").textContent=short(account);savePrefs();refresh();}}
 function watchAddr(){const w=$("watch").value.trim();if(!/^0x[a-fA-F0-9]{40}$/.test(w)){toast("Enter a valid 0x address","warn");return;}watch=w;$("p_addr").textContent=short(w);savePrefs();refresh();toast("Watching "+short(w));}
@@ -1315,15 +1331,33 @@ try{
   window.mmOpenOnRamp=()=>{try{appKit.open({view:'OnRampProviders'});}catch(e){appKit.open({view:'Account'});}darkBurst();};
   window.mmDisconnect=async()=>{try{await appKit.disconnect();}catch(e){}};
   let last=null;
-  appKit.subscribeAccount(async(acc)=>{
-    if(acc&&acc.isConnected&&acc.address&&acc.address!==last){
-      last=acc.address;
-      let prov=null; try{prov=await appKit.getProvider('eip155');}catch(e){}
-      if(!prov&&appKit.getWalletProvider){try{prov=appKit.getWalletProvider();}catch(e){}}
-      let profile=null;try{const w=appKit.getWalletInfo&&appKit.getWalletInfo();profile={name:acc.profileName||w&&w.name,avatar:acc.profileImage||w&&w.icon};}catch(e){}
-      if(prov&&window.mmOnConnect)window.mmOnConnect(prov,profile);
-    }else if(acc&&!acc.isConnected&&last){ last=null; window.mmOnDisconnect&&window.mmOnDisconnect(); }
+  // Embedded (email/Google/X) wallets expose their provider a beat after isConnected
+  // flips — poll several accessors until one yields an EIP-1193 provider.
+  async function grabProvider(tries){
+    for(let i=0;i<(tries||14);i++){
+      let p=null;
+      try{p=appKit.getWalletProvider&&appKit.getWalletProvider();}catch(e){}
+      if(!p){try{p=await appKit.getProvider('eip155');}catch(e){}}
+      if(!p){try{p=await appKit.getProvider();}catch(e){}}
+      if(p&&typeof p.request==="function")return p;
+      await new Promise(r=>setTimeout(r,250));
+    }
+    return null;
+  }
+  function profileOf(acc){try{const w=appKit.getWalletInfo&&appKit.getWalletInfo();return {name:acc&&acc.profileName||w&&w.name,avatar:acc&&acc.profileImage||w&&w.icon};}catch(e){return null;}}
+  async function onConn(acc){
+    if(acc.address===last)return;last=acc.address;
+    const prov=await grabProvider();
+    if(prov&&window.mmOnConnect)window.mmOnConnect(prov,profileOf(acc));
+    else console.warn('AppKit connected but no provider surfaced');
+  }
+  appKit.subscribeAccount(acc=>{
+    if(acc&&acc.isConnected&&acc.address)onConn(acc);
+    else if(acc&&!acc.isConnected&&last){last=null;window.mmOnDisconnect&&window.mmOnDisconnect();}
   });
+  // extra safety net: also react when the provider itself becomes available
+  try{appKit.subscribeProviders&&appKit.subscribeProviders(s=>{const p=s&&(s.eip155||s['eip155']);
+    if(p&&typeof p.request==="function"&&last&&!window.mmConnected&&window.mmOnConnect)window.mmOnConnect(p,null);});}catch(e){}
   window.mmReownReady=true;
   console.log('Reown AppKit ready');
 }catch(e){ console.warn('Reown AppKit unavailable — injected-wallet fallback active:', e&&e.message); }
