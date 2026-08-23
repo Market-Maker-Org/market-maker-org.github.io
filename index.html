@@ -758,7 +758,7 @@ const SERIES={
 let chartRange=0; // last N points; 0 = all (full history)
 let chartLog=true; // logarithmic Y (per-series normalized)
 let volYr=0,incSupply=0,reflBps=0,burnBps=0,recentBps=0,treBps=0,mirrorX=1,poolMMg=0,debtBase=0,debtBaseT=0,allPool0=0,refreshFails=0;
-let gMirrorBps=10000,gBbOn=false,gPPool=null,AN={};
+let gMirrorBps=10000,gBbOn=false,gPPool=null,AN={},TS=[];
 let lastSettleWall=Date.now(),pumpCumPrev=-1; // pending pump accrues from last realized burn
 const fmt=(x,d=2)=>Number(typeof x==="bigint"?E.formatUnits(x,18):x).toLocaleString("en-US",{maximumFractionDigits:d});
 // retry helper — the public RPC occasionally drops a batched request (500/BAD_DATA)
@@ -975,7 +975,8 @@ async function buildHistory(attempt=0){
     if(priceHist.length){price0=priceHist[0];histLoaded=true;}
     // annualized MM volume from the window (for reflection-yield math)
     try{const b0=await ro.getBlock(mnB),b1=await ro.getBlock(mxB);const el=(b1.timestamp-b0.timestamp)||1;
-      const totVol=swaps.reduce((a,s)=>a+s.vol,0);volYr=totVol*(31536000/el);}catch(e){}
+      const totVol=swaps.reduce((a,s)=>a+s.vol,0);volYr=totVol*(31536000/el);
+      const B=SERIES.price.data.length;TS=[];for(let k=0;k<B;k++)TS.push(b0.timestamp+((k+0.5)/B)*(b1.timestamp-b0.timestamp));}catch(e){}
     revealChart();
     // if RPC contention starved the fetch, retry a couple times
     if(SERIES.price.data.every(v=>!v)&&attempt<3)setTimeout(()=>buildHistory(attempt+1),1600);
@@ -1054,7 +1055,7 @@ function tickLive(){if(!watch||excluded||liveBal<=0)return;liveBal*=Math.pow(1-d
   $("p_bal").textContent=liveBal.toLocaleString("en-US",{minimumFractionDigits:4,maximumFractionDigits:4});$("p_tick").textContent="↓ decaying live";}
 function projFor(bal){const r=[["1h",3600],["1d",86400],["1w",604800],["1mo",2592000],["1y",31536000]];
   $("p_proj").innerHTML=r.map(([l,s])=>{const v=bal*Math.pow(1-decayR,s);return `<tr><td class="muted">${l}</td><td>${fmt(v,2)} <span class="muted">(${((v/bal-1)*100).toFixed(1)}%)</span></td></tr>`;}).join("");}
-function pushLive(o){for(const k in o){if(SERIES[k]){SERIES[k].data.push(o[k]);if(SERIES[k].data.length>720)SERIES[k].data.shift();}}}
+function pushLive(o){for(const k in o){if(SERIES[k]){SERIES[k].data.push(o[k]);if(SERIES[k].data.length>720)SERIES[k].data.shift();}}TS.push(Math.floor(Date.now()/1000));if(TS.length>720)TS.shift();}
 function fmtSigned(v,d=2){return (v>=0?"+":"−")+fmt(Math.abs(v),d);}
 // Holder economics: reflection (gain) vs decay (loss) → net. Not just loss.
 function renderPnL(bal){
@@ -1420,6 +1421,14 @@ function drawChart(){
      ctx.fillStyle=m.s.color;ctx.globalAlpha=.15;ctx.fillRect(W-PADR+3,y-6,Math.min(PADR-5,tw+6),12);ctx.globalAlpha=1;
      ctx.fillStyle=m.s.color;ctx.textAlign="left";ctx.fillText(t,W-PADR+6,y+2.5);
    });}
+  // x-axis time labels (relative), with dark backing chips for legibility
+  if(TS.length>1){const ts=sliceN(TS),now=Math.floor(Date.now()/1000),off=maxLen-ts.length;
+    ctx.font="8.5px 'IBM Plex Mono'";
+    [0,0.34,0.67,1].forEach((p,pi,arr)=>{const i=Math.round(p*(ts.length-1));if(i<0||i>=ts.length)return;
+      const lbl=pi===arr.length-1?"now":ago(now-ts[i]);const tw=ctx.measureText(lbl).width;
+      let x=X(off+i);x=Math.max(PADL+tw/2+2,Math.min(W-PADR-tw/2-2,x));
+      ctx.fillStyle="rgba(3,5,4,.75)";ctx.fillRect(x-tw/2-3,H-11,tw+6,11);
+      ctx.fillStyle="#7c8a83";ctx.textAlign="center";ctx.fillText(lbl,x,H-2.5);});}
   // crosshair
   if(_hoverI!=null&&meta.length){const hi=Math.max(0,Math.min(maxLen-1,_hoverI)),hx=X(hi);
     ctx.strokeStyle="rgba(255,255,255,.25)";ctx.setLineDash([3,4]);ctx.beginPath();ctx.moveTo(hx,PADT);ctx.lineTo(hx,plotB);ctx.stroke();ctx.setLineDash([]);
