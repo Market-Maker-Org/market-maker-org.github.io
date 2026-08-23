@@ -919,7 +919,8 @@ async function buildHistory(attempt=0){
 // Rarely-changing protocol config — fetched every 30s, not every 5s (RPC-light).
 async function fetchSlow(){
   try{
-    const [dR,fb,fr,frc,ft,mirror,bbOn,pPool,bbThresh,bbRouters,ethBal]=await rr(()=>Promise.all([mmRead.decayRatePerSecond(),mmRead.burnFeeBps(),mmRead.reflectFeeBps(),mmRead.recentFeeBps(),mmRead.treasuryFeeBps(),mmRead.pumpMirrorBps(),mmRead.buybackEnabled(),mmRead.pumpPool(),mmRead.buybackThreshold(),mmRead.buybackRoutersLength(),ro.getBalance(CFG.mm)]));
+    const [dR,fb,fr,frc,ft,mirror,bbOn,pPool,bbThresh,bbRouters]=await mmMulti([["decayRatePerSecond"],["burnFeeBps"],["reflectFeeBps"],["recentFeeBps"],["treasuryFeeBps"],["pumpMirrorBps"],["buybackEnabled"],["pumpPool"],["buybackThreshold"],["buybackRoutersLength"]]);
+    const ethBal=await rr(()=>ro.getBalance(CFG.mm));
     decayR=Number(dR)/1e18;burnBps=Number(fb);reflBps=Number(fr);recentBps=Number(frc);treBps=Number(ft);mirrorX=Number(mirror)/10000;gMirrorBps=Number(mirror);gBbOn=bbOn;gPPool=pPool;
     const yr=(1-Math.pow(1-decayR,31536000))*100;
     $("d_decay").innerHTML=yr.toFixed(1)+" <small style='color:var(--faint)'>%/yr</small>";
@@ -937,8 +938,8 @@ async function fetchSlow(){
 }
 async function refresh(){
   try{
-    const [sup,tre,pot,idx,exc,poolMM,pDebt,pThrob,pPack]=await rr(()=>Promise.all([mmRead.totalSupply(),mmRead.treasuryBalance(),mmRead.holderRewardPot(),
-      mmRead.currentIndex(),mmRead.excludedSupply(),mmRead.balanceOf(CFG.ethPair),mmRead.pumpDebt(),mmRead.balanceOf(CFG.pools[1].id),mmRead.balanceOf(CFG.pools[2].id)]));
+    const [sup,tre,pot,idx,exc,poolMM,pDebt,pThrob,pPack]=await mmMulti([["totalSupply"],["treasuryBalance"],["holderRewardPot"],
+      ["currentIndex"],["excludedSupply"],["balanceOf",CFG.ethPair],["pumpDebt"],["balanceOf",CFG.pools[1].id],["balanceOf",CFG.pools[2].id]]);
     updatePumpPanel(pDebt,poolMM,gMirrorBps,gPPool);
     const yr=(1-Math.pow(1-decayR,31536000))*100;
     const sv=(id,v)=>{const el=$(id);if(el&&el.textContent!==v){el.textContent=v;el.classList.add("flash");setTimeout(()=>el.classList.remove("flash"),450);}};
@@ -1056,6 +1057,13 @@ const MULTICALL="0xcA11bde05977b3631167028862bE2a173976CA11";
 const MC_ABI=["function aggregate3((address target,bool allowFailure,bytes callData)[] calls) view returns ((bool success,bytes returnData)[])"];
 let multicall;const mif=new E.Interface(["function balanceOf(address) view returns(uint256)","function isExcluded(address) view returns(bool)"]);
 async function mcall(calls){if(!multicall)multicall=new E.Contract(MULTICALL,MC_ABI,ro);return rr(()=>multicall.aggregate3(calls));}
+// batched read of many MM view calls in ONE atomic eth_call (robust vs partial batch drops)
+const RD=new E.Interface(["function totalSupply() view returns(uint256)","function treasuryBalance() view returns(uint256)","function holderRewardPot() view returns(uint256)","function currentIndex() view returns(uint256)","function excludedSupply() view returns(uint256)","function balanceOf(address) view returns(uint256)","function pumpDebt() view returns(uint256)","function decayRatePerSecond() view returns(uint256)","function burnFeeBps() view returns(uint256)","function reflectFeeBps() view returns(uint256)","function recentFeeBps() view returns(uint256)","function treasuryFeeBps() view returns(uint256)","function pumpMirrorBps() view returns(uint256)","function buybackEnabled() view returns(bool)","function pumpPool() view returns(address)","function buybackThreshold() view returns(uint256)","function buybackRoutersLength() view returns(uint256)"]);
+async function mmMulti(spec){ // spec: [[method,...args],...] on CFG.mm; last optional {eth:addr} handled by caller
+  const calls=spec.map(([m,...args])=>({target:CFG.mm,allowFailure:false,callData:RD.encodeFunctionData(m,args)}));
+  const res=await mcall(calls);
+  return spec.map((s,i)=>RD.decodeFunctionResult(s[0],res[i].returnData)[0]);
+}
 async function getHolders(){
   try{
     const r=await fetch(LOCAL?"/holders":BS+"/api/v2/tokens/"+CFG.mm+"/holders");const j=await r.json();
