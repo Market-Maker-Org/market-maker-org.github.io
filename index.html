@@ -60,6 +60,8 @@
   .cell:hover{border-color:var(--line2)}
   .cell h3{font-family:var(--disp);font-size:11px;margin:0 0 9px;letter-spacing:.13em;text-transform:uppercase;color:var(--faint);display:flex;align-items:center;gap:7px}
   .cell h3::before{content:"";width:12px;height:2px;background:var(--green);border-radius:2px}
+  .cell h3:has(.h3g)::before{display:none}
+  .h3g{color:var(--green);font-size:12.5px;line-height:1;filter:drop-shadow(0 0 5px rgba(0,200,5,.45));display:inline-grid;place-items:center;min-width:15px}
   .c-chart{grid-column:1/4;grid-row:1} .c-stats{grid-column:4;grid-row:1}
   .c-feed{grid-column:1;grid-row:2} .c-pos{grid-column:2;grid-row:2} .c-pools{grid-column:3;grid-row:2} .c-holders{grid-column:4;grid-row:2}
   /* holders */
@@ -505,13 +507,13 @@
 
   <!-- FEED -->
   <div class="cell c-feed">
-    <h3>Live activity <span class="livedot"></span></h3>
+    <h3><span class="h3g">↔</span>Live activity <span class="livedot"></span></h3>
     <div class="feed" id="feed"><div class="muted">listening…</div></div>
   </div>
 
   <!-- POSITION -->
   <div class="cell c-pos">
-    <h3>Your position</h3>
+    <h3><span class="h3g">◈</span>Your position</h3>
     <div class="bigbal"><span id="p_bal">—</span><span class="u"><img src="mm.png" class="mmtag" alt="">MM</span></div>
     <div class="tick" id="p_tick"></div>
     <div style="margin-top:5px"><span class="badge" id="p_badge">—</span> <span class="muted cpy" id="p_addr" title="Copy address" onclick="cp(watch,'Wallet')"></span> <a class="cpy" id="p_expl" title="View on explorer" style="font-size:11px">↗</a></div>
@@ -523,7 +525,7 @@
 
   <!-- PUMP ENGINE -->
   <div class="cell c-pools">
-    <h3>Pump engine <span class="pm-state off" id="pm_state">reading…</span></h3>
+    <h3><span class="h3g">⚙</span>Pump engine <span class="pm-state off" id="pm_state">reading…</span></h3>
     <!-- live decay→pump flow -->
     <div class="fwline">
       <div class="fwnode dec"><div class="fl">holder decay</div><div class="fv mono" id="fw_dr">—</div></div>
@@ -553,7 +555,7 @@
 
   <!-- HOLDERS -->
   <div class="cell c-holders">
-    <h3>Top holders</h3>
+    <h3><span class="h3g">≡</span>Top holders</h3>
     <div id="holderList" style="overflow:auto"><div class="muted">scanning holders…</div></div>
   </div>
 </div>
