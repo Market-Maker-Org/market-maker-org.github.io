@@ -225,6 +225,20 @@
   .swexec{margin-top:12px;width:100%;padding:13px;border-radius:12px;border:0;font-family:var(--disp);font-weight:800;font-size:15px;cursor:pointer;background:linear-gradient(180deg,var(--green),#00a504);color:#00220a}
   .swexec.alt{background:var(--panel2);color:var(--ink);border:1px solid var(--line2)}
   .swexec:disabled{opacity:.5;cursor:not-allowed}
+  /* wallet tab */
+  .wal-empty{padding:14px 4px;text-align:center}
+  .wal-card{background:var(--panel2);border:1px solid var(--line);border-radius:11px;padding:11px;margin-bottom:8px}
+  .wal-card .l{font-size:10px;color:var(--faint);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;display:flex;align-items:center;gap:5px}
+  .wal-row{display:flex;gap:6px;align-items:center}
+  .wal-card .mono{font-size:11.5px;word-break:break-all;flex:1;color:var(--ink)}
+  .wal-card input.mm{margin-top:0}
+  .walsel{width:auto;flex:0 0 auto;padding:7px 8px}
+  .wal-bals{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
+  .wal-b{background:#060908;border:1px solid var(--line);border-radius:10px;padding:9px}
+  .wal-b .l{font-size:10px;color:var(--faint);display:flex;align-items:center;gap:5px}
+  .wal-b .v{font-size:15px;font-weight:700;margin-top:2px}
+  #wal_profile{display:inline-flex;align-items:center;gap:5px;color:var(--green2);text-transform:none;letter-spacing:0}
+  #wal_profile img{width:16px;height:16px;border-radius:50%}
   .swrouter{margin-top:10px}
   .swrouter summary{font-size:11px;color:var(--faint);cursor:pointer}
   .swnote{font-size:10.5px;color:var(--faint);margin-top:9px;line-height:1.5}
@@ -299,8 +313,9 @@
   <!-- STATS + SWAP (tabbed) -->
   <div class="cell c-stats">
     <div class="ptabs">
-      <button class="ptab on" id="ptab-proto" onclick="protoTab('proto')">Protocol · live</button>
-      <button class="ptab" id="ptab-swap" onclick="protoTab('swap')"><img src="mm.png" class="mmtag" alt="">⇄ Swap</button>
+      <button class="ptab on" id="ptab-proto" onclick="protoTab('proto')">Protocol</button>
+      <button class="ptab" id="ptab-swap" onclick="protoTab('swap')">⇄ Swap</button>
+      <button class="ptab" id="ptab-wallet" onclick="protoTab('wallet')">👛 Wallet</button>
     </div>
     <div class="slist" id="pv-proto">
       <div class="srow"><span class="l"><img src="mm.png" class="mmtag" alt="">Total supply</span><span class="v" id="d_supply">—</span></div>
@@ -339,6 +354,29 @@
       <button class="swexec" id="sw_exec" onclick="doSwap()">Connect wallet</button>
       <div class="swnote" id="sw_note"></div>
       <div class="swnote" style="text-align:center;opacity:.7">Routed by LI.FI · best-price aggregator</div>
+    </div>
+    <div id="pv-wallet" style="display:none;overflow:auto">
+      <div class="wal-empty" id="wal_empty"><button class="swexec" onclick="connectWallet()">Connect wallet</button>
+        <div class="swnote" style="text-align:center">Wallet, email, Google or X — then deposit, withdraw & export here.</div></div>
+      <div id="wal_body" style="display:none">
+        <div class="wal-card">
+          <div class="l"><span id="wal_profile"></span> Your address <span class="muted">· deposit here</span></div>
+          <div class="wal-row"><span class="mono" id="wal_addr">—</span><button class="wbtn" onclick="copyAddr()">Copy</button></div>
+        </div>
+        <div class="wal-bals">
+          <div class="wal-b"><div class="l"><img src="mm.png" class="mmtag" alt="">MM</div><div class="v mono" id="wal_mm">—</div></div>
+          <div class="wal-b"><div class="l">ETH</div><div class="v mono" id="wal_eth">—</div></div>
+        </div>
+        <div class="wal-card">
+          <div class="l">Withdraw / Send</div>
+          <input class="mm" id="wal_to" placeholder="0x… recipient" autocomplete="off">
+          <div class="wal-row" style="margin-top:6px"><input class="mm" id="wal_amt" placeholder="amount" inputmode="decimal" autocomplete="off">
+            <select class="mm walsel" id="wal_tok"><option value="MM">MM</option><option value="ETH">ETH</option></select></div>
+          <button class="swexec" onclick="sendAsset()" style="margin-top:8px">Send</button>
+          <div class="swnote" id="wal_note"></div>
+        </div>
+        <div class="win"><button class="wbtn" onclick="window.mmOpenAccount?window.mmOpenAccount():alert('Export/on-ramp needs a social or email login (Reown).')">Export key · On-ramp</button><button class="wbtn" onclick="disconnectWallet()">Disconnect</button></div>
+      </div>
     </div>
   </div>
 
@@ -582,12 +620,13 @@ const icon=k=>{const o=IC[k]||IC.transfer;return `<span class="ico" style="color
 // ---- multi-series chart model (real on-chain data) ----
 const SERIES={
   price :{label:"Price",   color:"#00C805",on:true, data:[],fmtV:v=>ethUsd?usd(v*ethUsd):gwei(v).toFixed(4)+"g"},
-  pool  :{label:"Liquidity",color:"#38ff7e",on:false,data:[],fmtV:v=>fmt(v,0)+" MM"},
-  supply:{label:"Supply",  color:"#e8f0ea",on:false,data:[],fmtV:v=>fmt(v,0)},
-  burn  :{label:"Deflation",color:"#ff7a18",on:false,data:[],fmtV:v=>fmt(v,0)+" 🔥"},
-  index :{label:"Reflection",color:"#ffa24d",on:false,data:[],fmtV:v=>v.toFixed(6)},
+  pool  :{label:"Liquidity",color:"#38ff7e",on:true, data:[],fmtV:v=>fmt(v,0)+" MM"},
+  supply:{label:"Supply",  color:"#e8f0ea",on:true, data:[],fmtV:v=>fmt(v,0)},
+  burn  :{label:"Deflation",color:"#ff7a18",on:true, data:[],fmtV:v=>fmt(v,0)+" 🔥"},
+  index :{label:"Reflection",color:"#ffa24d",on:true, data:[],fmtV:v=>v.toFixed(6)},
   vol   :{label:"Volume",  color:"#9aa8a1",on:true, data:[],fmtV:v=>fmt(v,0)+" MM"}};
-let chartRange=200; // last N points; 0 = all
+let chartRange=0; // last N points; 0 = all (full history)
+let chartLog=true; // logarithmic Y (per-series normalized)
 let volYr=0,incSupply=0,reflBps=0,burnBps=0,recentBps=0,treBps=0,mirrorX=1,poolMMg=0,debtBase=0,debtBaseT=0,allPool0=0,refreshFails=0;
 let gMirrorBps=10000,gBbOn=false,gPPool=null;
 let lastSettleWall=Date.now(),pumpCumPrev=-1; // pending pump accrues from last realized burn
@@ -645,19 +684,50 @@ async function connectWallet(){
   const bp=new E.BrowserProvider(walletEip);await bp.send("eth_requestAccounts",[]);
   await finishConnect(await bp.getSigner());
 }
-async function finishConnect(sgnr){
-  try{signer=sgnr;account=await signer.getAddress();
-    $("acct").style.display="";$("connectBtn").textContent="Connected ✓";
+let walProfile=null;
+async function finishConnect(sgnr,profile){
+  try{signer=sgnr;account=await signer.getAddress();walProfile=profile||null;
+    const chip=$("acct");chip.style.display="";chip.style.cursor="pointer";chip.onclick=()=>protoTab('wallet');
+    $("connectBtn").textContent="Wallet ▾";$("connectBtn").onclick=()=>protoTab('wallet');
     let cid=0;try{cid=Number((await signer.provider.getNetwork()).chainId);}catch(e){}
     paintChain(cid);
     if(cid!==4663)ensureChain(); // proactively switch to Robinhood on connect
     try{const o=await mmRead.owner();if(o.toLowerCase()===account.toLowerCase())$("adminBtn").style.display="";}catch(e){}
-    useMine();updateSwapBalances();if($("pv-swap")&&getComputedStyle($("pv-swap")).display!=="none")quoteSwap();
+    useMine();updateSwapBalances();renderWallet();if($("pv-swap")&&getComputedStyle($("pv-swap")).display!=="none")quoteSwap();
   }catch(e){}
 }
 // Bridge for the Reown module: hands us an EIP-1193 provider once connected.
-window.mmOnConnect=async(prov)=>{try{walletEip=prov;const bp=new E.BrowserProvider(prov);await finishConnect(await bp.getSigner());}catch(e){}};
-window.mmOnDisconnect=()=>{signer=null;account=null;$("acct").style.display="none";$("connectBtn").textContent="Connect";};
+window.mmOnConnect=async(prov,profile)=>{try{walletEip=prov;const bp=new E.BrowserProvider(prov);await finishConnect(await bp.getSigner(),profile);}catch(e){}};
+window.mmOnDisconnect=()=>{signer=null;account=null;walProfile=null;$("acct").style.display="none";$("connectBtn").textContent="Connect";$("connectBtn").onclick=connectWallet;if($("adminBtn"))$("adminBtn").style.display="none";renderWallet();};
+function renderWallet(){
+  const emp=$("wal_empty"),bod=$("wal_body");if(!emp||!bod)return;
+  if(!account){emp.style.display="";bod.style.display="none";return;}
+  emp.style.display="none";bod.style.display="";
+  $("wal_addr").textContent=account;
+  const pf=$("wal_profile");if(pf)pf.innerHTML=(walProfile&&(walProfile.name||walProfile.avatar))?((walProfile.avatar?`<img src="${walProfile.avatar}" alt="">`:"")+(walProfile.name||"")):"";
+  Promise.all([ro.getBalance(account),mmRead.balanceOf(account)]).then(([e,m])=>{
+    if($("wal_eth"))$("wal_eth").textContent=fmt(Number(E.formatUnits(e,18)),5);
+    if($("wal_mm"))$("wal_mm").textContent=fmt(Number(E.formatUnits(m,18)),2);}).catch(()=>{});
+}
+function copyAddr(){if(account&&navigator.clipboard){navigator.clipboard.writeText(account);const n=$("wal_note");if(n){n.textContent="✓ address copied";setTimeout(()=>{if($("wal_note"))$("wal_note").textContent="";},1500);}}}
+async function sendAsset(){
+  if(!signer)return connectWallet();if(!await ensureChain())return;
+  const to=$("wal_to").value.trim(),amt=($("wal_amt").value||"").replace(",","."),tok=$("wal_tok").value,n=parseFloat(amt);
+  if(!/^0x[a-fA-F0-9]{40}$/.test(to)){$("wal_note").textContent="Enter a valid 0x recipient";return;}
+  if(!(n>0)){$("wal_note").textContent="Enter an amount";return;}
+  $("wal_note").textContent="⏳ sending…";
+  try{
+    if(tok==="ETH"){await (await signer.sendTransaction({to,value:E.parseUnits(amt,18)})).wait();}
+    else{const mm=new E.Contract(CFG.mm,A.token.abi,signer);await (await mm.transfer(to,E.parseUnits(amt,18))).wait();}
+    $("wal_note").textContent="✓ sent";$("wal_amt").value="";renderWallet();updateSwapBalances();
+  }catch(e){$("wal_note").textContent="Failed: "+((e.shortMessage||e.message||e)+"").slice(0,90);}
+}
+async function disconnectWallet(){
+  if(window.mmDisconnect)await window.mmDisconnect();
+  signer=null;account=null;walProfile=null;
+  $("acct").style.display="none";$("connectBtn").textContent="Connect";$("connectBtn").onclick=connectWallet;
+  if($("adminBtn"))$("adminBtn").style.display="none";renderWallet();
+}
 function useMine(){if(account){watch=account;$("p_addr").textContent=account.slice(0,7)+"…"+account.slice(-5);refresh();}}
 function watchAddr(){const w=$("watch").value.trim();if(w){watch=w;$("p_addr").textContent=w.slice(0,7)+"…"+w.slice(-5);refresh();}}
 
@@ -673,7 +743,7 @@ const DECAY_TOPIC=E.id("Decay(uint256,uint256,uint256,uint256,uint256)");
 // liquidity, volume) and the token's Decay events (reflection index, deflation).
 async function buildHistory(attempt=0){
   try{
-    const cur=await ro.getBlockNumber();const c=E.AbiCoder.defaultAbiCoder();const CH=45000,N=4;
+    const cur=await ro.getBlockNumber();const c=E.AbiCoder.defaultAbiCoder();const CH=45000,N=9;
     const sync=[],swaps=[],decays=[];
     // SEQUENTIAL fetches — the /rpc proxy returns empty arrays under concurrent getLogs load.
     for(let i=N-1;i>=0;i--){const to=cur-i*CH,from=Math.max(0,to-CH+1);if(to<=0)continue;
@@ -928,11 +998,10 @@ let swBuy=true,swSlip=5,swQuote=null,_swSeq=0;
 const tokChip=s=>(s==="ETH"?LOGO_ETH+" ETH":LOGO_MM+" MM");
 function swTokens(){return swBuy?{from:NATIVE,to:CFG.mm}:{from:CFG.mm,to:NATIVE};}
 function protoTab(which){
-  const isS=which==="swap";
-  $("pv-proto").style.display=isS?"none":"";
-  $("pv-swap").style.display=isS?"":"none";
-  $("ptab-proto").classList.toggle("on",!isS);$("ptab-swap").classList.toggle("on",isS);
-  if(isS){renderSwapTokens();updateSwapBalances();quoteSwap();}
+  const views={proto:"pv-proto",swap:"pv-swap",wallet:"pv-wallet"};
+  Object.entries(views).forEach(([k,id])=>{const el=$(id),tb=$("ptab-"+k);if(el)el.style.display=(k===which)?"":"none";if(tb)tb.classList.toggle("on",k===which);});
+  if(which==="swap"){renderSwapTokens();updateSwapBalances();quoteSwap();}
+  if(which==="wallet")renderWallet();
 }
 function openSwap(){protoTab("swap");}
 function closeSwap(){protoTab("proto");}
@@ -1032,13 +1101,16 @@ function buildChartTools(){
     `<button class="cbtn ${s.on?'on':''}" data-k="${k}" style="color:${s.color}" onclick="toggleSeries('${k}')"><span class="dot"></span>${s.label}</button>`).join("");
   const ranges=[["50",50],["200",200],["All",0]].map(([l,n])=>
     `<button class="cbtn ${chartRange==n?'on':''}" data-r="${n}" onclick="setRange(${n})">${l}</button>`).join("");
-  box.innerHTML=chips+`<span class="crange">${ranges}</span>`;
+  const logBtn=`<button class="cbtn ${chartLog?'on':''}" onclick="toggleLog()" title="Logarithmic scale">${chartLog?'LOG':'LIN'}</button>`;
+  box.innerHTML=chips+`<span class="crange">${logBtn}${ranges}</span>`;
 }
 function toggleSeries(k){const on=Object.values(SERIES).filter(s=>s.on).length;if(SERIES[k].on&&on<=1)return;SERIES[k].on=!SERIES[k].on;buildChartTools();drawChart();}
 function setRange(n){chartRange=n;buildChartTools();drawChart();}
+function toggleLog(){chartLog=!chartLog;buildChartTools();drawChart();}
 function sliceN(a){return chartRange>0?a.slice(-chartRange):a;}
 function compactNum(v){const a=Math.abs(v);if(a>=1e9)return (v/1e9).toFixed(2)+"B";if(a>=1e6)return (v/1e6).toFixed(2)+"M";if(a>=1e3)return (v/1e3).toFixed(1)+"k";if(a>=1)return v.toFixed(2);if(a>0)return v.toPrecision(2);return "0";}
-function axisFmt(k,v){return k==="price"?gwei(v).toFixed(2)+"g":k==="index"?v.toFixed(4):compactNum(v);}
+function usdAxis(u){if(u>=1)return "$"+u.toFixed(2);if(u>=0.01)return "$"+u.toFixed(4);if(u<=0)return "$0";return "$"+u.toFixed(9).replace(/0+$/,"");}
+function axisFmt(k,v){return k==="price"?(ethUsd?usdAxis(v*ethUsd):gwei(v).toFixed(2)+"g"):k==="index"?v.toFixed(4):compactNum(v);}
 let _chart=null,_hoverI=null;
 function drawChart(){
   const c=$("c_price"),ctx=c.getContext("2d");const dpr=devicePixelRatio||1,W=c.clientWidth,H=c.clientHeight;if(!W||!H)return;
@@ -1058,9 +1130,12 @@ function drawChart(){
   // line series (top band)
   const meta=[];
   lines.forEach(([k,s],ai)=>{
-    const d=sliceN(s.data),mn=Math.min(...d),mx=Math.max(...d),rg=(mx-mn)||Math.abs(mx)||1;
-    const Y=v=>plotB-((v-mn)/rg)*(plotB-PADT),off=maxLen-d.length;
-    meta.push({k,s,d,off,Y,mn,mx});
+    const d=sliceN(s.data),mn=Math.min(...d),mx=Math.max(...d);
+    const useLog=chartLog&&mn>0&&mx/mn>1.0000001;   // log needs strictly-positive, non-flat data
+    const tf=v=>useLog?Math.log(v>0?v:1e-30):v;
+    const lmn=tf(mn),lmx=tf(mx),lrg=(lmx-lmn)||Math.abs(lmx)||1;
+    const Y=v=>plotB-((tf(v)-lmn)/lrg)*(plotB-PADT),off=maxLen-d.length;
+    meta.push({k,s,d,off,Y,mn,mx,useLog,lmn,lmx});
     if(ai===0){ctx.beginPath();ctx.moveTo(X(off),Y(d[0]));for(let i=1;i<d.length;i++)ctx.lineTo(X(off+i),Y(d[i]));
       ctx.lineTo(X(maxLen-1),plotB);ctx.lineTo(X(off),plotB);ctx.closePath();
       const gr=ctx.createLinearGradient(0,PADT,0,plotB);gr.addColorStop(0,s.color+"38");gr.addColorStop(1,s.color+"00");ctx.fillStyle=gr;ctx.fill();}
@@ -1070,7 +1145,7 @@ function drawChart(){
     const lx=X(maxLen-1),ly=Y(d[d.length-1]);ctx.fillStyle=s.color;ctx.beginPath();ctx.arc(lx,ly,3,0,7);ctx.fill();
     if(ai===0){ // Y-axis labels + last-value tag for primary
       ctx.font="9.5px 'IBM Plex Mono'";ctx.textAlign="left";ctx.fillStyle="#7c8a83";
-      for(let g=0;g<=4;g++){const val=mx-(mx-mn)*g/4,y=PADT+g*(plotB-PADT)/4;ctx.fillText(axisFmt(k,val),W-PADR+4,y+3);}
+      for(let g=0;g<=4;g++){const val=useLog?Math.exp(lmx-(lmx-lmn)*g/4):mx-(mx-mn)*g/4,y=PADT+g*(plotB-PADT)/4;ctx.fillText(axisFmt(k,val),W-PADR+4,y+3);}
       ctx.fillStyle=s.color;ctx.fillRect(W-PADR+1,Math.max(PADT,Math.min(plotB-14,ly-7)),PADR-2,14);
       ctx.fillStyle="#001a06";ctx.font="bold 9.5px 'IBM Plex Mono'";ctx.fillText(axisFmt(k,d[d.length-1]),W-PADR+4,Math.max(PADT+3,Math.min(plotB-4,ly+3)));}
   });
@@ -1121,13 +1196,16 @@ try{
     try{appKit.setThemeVariables&&appKit.setThemeVariables({'--w3m-accent':'#00C805','--w3m-border-radius-master':'2px','--w3m-font-family':"'IBM Plex Sans',system-ui,sans-serif"});}catch(e){}};
   forceDark();
   window.mmOpenConnect=()=>{appKit.open();setTimeout(forceDark,120);};
+  window.mmOpenAccount=()=>{appKit.open({view:'Account'});setTimeout(forceDark,120);}; // deposit/withdraw/export/onramp/disconnect (native)
+  window.mmDisconnect=async()=>{try{await appKit.disconnect();}catch(e){}};
   let last=null;
   appKit.subscribeAccount(async(acc)=>{
     if(acc&&acc.isConnected&&acc.address&&acc.address!==last){
       last=acc.address;
       let prov=null; try{prov=await appKit.getProvider('eip155');}catch(e){}
       if(!prov&&appKit.getWalletProvider){try{prov=appKit.getWalletProvider();}catch(e){}}
-      if(prov&&window.mmOnConnect)window.mmOnConnect(prov);
+      let profile=null;try{const w=appKit.getWalletInfo&&appKit.getWalletInfo();profile={name:acc.profileName||w&&w.name,avatar:acc.profileImage||w&&w.icon};}catch(e){}
+      if(prov&&window.mmOnConnect)window.mmOnConnect(prov,profile);
     }else if(acc&&!acc.isConnected&&last){ last=null; window.mmOnDisconnect&&window.mmOnDisconnect(); }
   });
   window.mmReownReady=true;
