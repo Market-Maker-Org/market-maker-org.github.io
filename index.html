@@ -1186,10 +1186,48 @@ function pushLive(o){
 }
 function fmtSigned(v,d=2){return (v>=0?"+":"−")+fmt(Math.abs(v),d);}
 // Holder economics: reflection (gain) vs decay (loss) → net. Not just loss.
+// Realized-to-date P/L for the watched position, valued in $ (and ETH off-feed).
+// Reference = start of the loaded chart history, assuming the CURRENT units were held
+// throughout (a "held-since" estimate — no per-wallet cost basis on-chain). Decomposed
+// into the same three protocol forces + net ex-swap / net all-in, with a profit verdict.
+function pnlToDate(bal){
+  const curPrice=priceHist.length?priceHist[priceHist.length-1]:price0;
+  if(!price0||!curPrice||!TS.length)return ""; // history not ready yet
+  const startT=TS[0]*1000, days=Math.max(0,(Date.now()-startT)/86400000);
+  const dstr=new Date(startT).toLocaleDateString("en-GB",{day:"2-digit",month:"short"});
+  const priceRet=curPrice/price0-1, sg=v=>v>=0?"+":"−";
+  const eF=v=>{const a=Math.abs(v);return a===0?"0":a>=0.001?v.toFixed(4):v.toExponential(2);};
+  const dv=eth=>ethUsd?usd(Math.abs(eth)*ethUsd):eF(Math.abs(eth))+" ETH"; // $ if feed, else ETH
+  const cls=v=>v>=0?"pos":"neg";
+  if(excluded){ // raw balance: no decay/reflection → value moves only with price
+    const pnl=bal*(curPrice-price0);
+    const verdict=pnl>=0?'<b class="up">Kârda ▲</b>':'<b class="down">Zararda ▼</b>';
+    return `<div class="row net"><span class="l">Bugüne dek · fiyat ${verdict}</span><span class="v ${cls(pnl)}" style="font-size:14px">${sg(pnl)}${dv(pnl)} <span class="muted">${sg(priceRet)}${Math.abs(priceRet*100).toFixed(1)}%</span></span></div>
+     <div class="row"><span class="l muted" style="font-size:9.5px">excluded · ${dstr}'ten beri tutulsaydı, sadece fiyat etkisi</span></div>`;
+  }
+  const idxD=SERIES.index.data, idxNow=idxD.length?idxD[idxD.length-1]:1, idxStart=idxD.length?idxD[0]:1;
+  const indexRatio=idxStart>0?idxNow/idxStart:1, elapsed=(Date.now()-startT)/1000;
+  const decayFrac=1-Math.pow(1-decayR,elapsed);                 // gross decay over the window
+  const reflFrac=Math.max(0,indexRatio/Math.max(1e-9,1-decayFrac)-1); // implied gross reflection
+  const startBal=indexRatio>0?bal/indexRatio:bal;              // current units → MM at window start
+  const decayMM=startBal*decayFrac, reflMM=startBal*(1-decayFrac)*reflFrac;
+  const priceEff=startBal*(curPrice-price0);                   // price move on entry qty
+  const qtyEff=(bal-startBal)*curPrice;                        // net qty change @ current price
+  const decayEff=-decayMM*curPrice, reflEff=qtyEff-decayEff;   // reflEff = remainder (keeps additive)
+  const netEx=priceEff+decayEff, netAll=priceEff+qtyEff;       // ex-swap vs all-in totals
+  const verdict=netAll>=0?'<b class="up">Kârda ▲</b>':'<b class="down">Zararda ▼</b>';
+  const row=(lbl,ic,val,extra)=>`<div class="row"><span class="l">${icon(ic)} ${lbl}</span><span class="v ${cls(val)}">${sg(val)}${dv(val)}${extra?` <span class="muted">${extra}</span>`:""}</span></div>`;
+  return `<div class="row" style="border-top:1px dashed var(--line2);margin-top:4px;padding-top:6px"><span class="l" style="font-weight:600">Bugüne dek <span class="muted">· ${dstr}'ten</span></span><span class="v muted" style="font-size:10px">${days.toFixed(0)}g tutuldu</span></div>
+   ${row("Pump/fiyat","pump",priceEff,sg(priceRet)+Math.abs(priceRet*100).toFixed(1)+"%")}
+   ${row("Reflection","reflect",reflEff,"+"+fmt(reflMM,0)+" MM")}
+   ${row("Decay","decay",decayEff,"−"+fmt(decayMM,0)+" MM")}
+   <div class="row net"><span class="l">Net · ex-swap</span><span class="v ${cls(netEx)}">${sg(netEx)}${dv(netEx)}</span></div>
+   <div class="row"><span class="l">Net · all-in ${verdict}</span><span class="v ${cls(netAll)}" style="font-size:14px">${sg(netAll)}${dv(netAll)}</span></div>`;
+}
 function renderPnL(bal){
   const box=$("pnl");if(!box)return;
   if(excluded){box.innerHTML=`<div class="row"><span class="l">${icon('treasury')} Status</span><span class="v">Excluded · stable</span></div>
-    <div class="row"><span class="l muted">No decay · no reflection</span><span class="v" style="color:var(--faint)">flat ═</span></div>`;return;}
+    <div class="row"><span class="l muted">No decay · no reflection</span><span class="v" style="color:var(--faint)">flat ═</span></div>`+pnlToDate(bal);return;}
   // value terms (%/yr): balance shrinks (decay), balance grows (reflection MM),
   // each MM worth more (pump burns LP supply). ex-swap net = pump lift − decay.
   const dFrac=1-Math.pow(1-decayR,31536000);            // ~0.5
@@ -1204,7 +1242,8 @@ function renderPnL(bal){
   const cls=v=>v>=0?'pos':'neg',sg=v=>(v>=0?'+':'−')+Math.abs(v).toFixed(0)+'%';
   const amt=n=>fmt(Math.abs(n),0)+" MM";
   const decayMM=bal*dFrac,reflMM=bal*reflPct/100,netExMM=bal*netEx/100,netAllMM=bal*netAll/100; // YOUR MM amounts — differ per wallet
-  box.innerHTML=`
+  box.innerHTML=pnlToDate(bal)+`
+   <div class="row" style="border-top:1px dashed var(--line2);margin-top:4px;padding-top:6px"><span class="l muted" style="font-size:9.5px">Beklenen · ileriye dönük /yıl</span></div>
    <div class="row"><span class="l">${icon('decay')} Decay <span class="muted">/yr</span></span><span class="v neg">−${decayPct.toFixed(0)}% <span class="muted">·−${amt(decayMM)}</span></span></div>
    <div class="row"><span class="l">${icon('pump')} Pump lift <span class="muted">/yr</span></span><span class="v pos">+${pumpPct.toFixed(0)}%</span></div>
    <div class="row"><span class="l">${icon('reflect')} Reflection <span class="muted">/yr</span></span><span class="v pos">+${reflPct.toFixed(0)}% <span class="muted">·+${amt(reflMM)}</span></span></div>
