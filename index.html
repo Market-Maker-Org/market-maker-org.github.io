@@ -1016,6 +1016,22 @@ async function getPrice(){ // ETH per MM from the V2 WETH/MM pair (token0=WETH, 
 const SYNC_TOPIC=E.id("Sync(uint112,uint112)");
 const V2SWAP_TOPIC=E.id("Swap(address,uint256,uint256,uint256,uint256,address)");
 const DECAY_TOPIC=E.id("Decay(uint256,uint256,uint256,uint256,uint256)");
+// Blockscout getLogs — ONE request returns the FULL topic history (no chunking, no
+// public-RPC throttling), identical local/prod. Authoritative: reserves → price matches
+// the live pair exactly. Returns [] on any failure so callers fall back to the RPC walk.
+async function bsLogs(addr,topic){
+  // Blockscout caps getLogs at 1000 rows/response (ascending). Page by advancing fromBlock
+  // past the last row until a short page arrives — so high-frequency Decay logs come back whole.
+  try{let out=[],from=0;
+    for(let i=0;i<25;i++){
+      const u=BS+"/api?module=logs&action=getLogs&fromBlock="+from+"&toBlock=latest&address="+addr+"&topic0="+topic;
+      const r=await fetch(u);const j=await r.json();const res=Array.isArray(j&&j.result)?j.result:[];
+      if(!res.length)break;out=out.concat(res);
+      if(res.length<1000)break;from=parseInt(res[res.length-1].blockNumber,16)+1; // next page (skip boundary block)
+    }
+    return out;
+  }catch(e){return [];}
+}
 // Build a real historical multi-series dataset from the V2 WETH/MM pair (price,
 // liquidity, volume) and the token's Decay events (reflection index, deflation).
 async function buildHistory(attempt=0){
@@ -1071,6 +1087,16 @@ async function buildHistory(attempt=0){
       committed?drawChart():revealChart(); // animate only the first paint
       committed=true;return true;
     };
+    // FAST PATH — pull the entire history from Blockscout in 3 requests (Sync/Swap/Decay).
+    // One shot, no throttling, works the same on GitHub Pages as locally. If it yields any
+    // Sync points we're done; otherwise fall through to the sequential RPC walk below.
+    try{
+      const [sl,wl,dl]=await Promise.all([bsLogs(CFG.ethPair,SYNC_TOPIC),bsLogs(CFG.ethPair,V2SWAP_TOPIC),bsLogs(CFG.mm,DECAY_TOPIC)]);
+      sl.forEach(l=>{const d=c.decode(["uint112","uint112"],l.data);const w=Number(E.formatUnits(d[0],18)),m=Number(E.formatUnits(d[1],18));if(m>0)sync.push({b:parseInt(l.blockNumber,16),price:w/m,pool:m});});
+      wl.forEach(l=>{const d=c.decode(["uint256","uint256","uint256","uint256"],l.data);swaps.push({b:parseInt(l.blockNumber,16),vol:Number(E.formatUnits(d[1],18))+Number(E.formatUnits(d[3],18))});});
+      dl.forEach(l=>{const d=c.decode(["uint256","uint256","uint256","uint256","uint256"],l.data);decays.push({b:parseInt(l.blockNumber,16),burn:Number(E.formatUnits(d[1],18)),idx:Number(E.formatUnits(d[4],18))});});
+      if(sync.length){seen=true;commit(true);return;} // full history from Blockscout — skip the RPC walk
+    }catch(e){/* Blockscout unreachable → RPC fallback */}
     // SEQUENTIAL, walking backward from head — the /rpc proxy returns empty arrays under
     // concurrent getLogs load. Keep going until the token's history truly runs out (or the cap).
     for(let ci=0;ci<MAX;ci++){
@@ -1160,6 +1186,7 @@ async function refresh(){
     if(watch){const b=await mmRead.balanceOf(watch);excluded=await mmRead.isExcluded(watch);liveBal=Number(E.formatUnits(b,18));
       $("p_badge").textContent=excluded?"EXCLUDED":"INCLUDED · decaying";$("p_badge").className="badge "+(excluded?"exc":"inc");
       const ex=$("p_expl");if(ex){ex.href=EXPLORER+"/address/"+watch;ex.target="_blank";}
+      ensureEntry(watch); // fire-and-forget: real entry point, no await → never blocks refresh
       renderPnL(liveBal);}
     if(account&&$("pv-wallet")&&getComputedStyle($("pv-wallet")).display!=="none")renderWallet(); // keep wallet balances live
     if(feedTick%3===0)getFeed();
@@ -1190,35 +1217,65 @@ function fmtSigned(v,d=2){return (v>=0?"+":"−")+fmt(Math.abs(v),d);}
 // Reference = start of the loaded chart history, assuming the CURRENT units were held
 // throughout (a "held-since" estimate — no per-wallet cost basis on-chain). Decomposed
 // into the same three protocol forces + net ex-swap / net all-in, with a profit verdict.
+// Per-wallet real entry point (first MM receive), fetched ONCE from Blockscout's
+// etherscan-compatible API (sort=asc + offset → the oldest transfer in a SINGLE request).
+// Async + cached + never touches the RPC, so it can't block or rate-limit the refresh loop.
+// undefined = untried · "pending" = in-flight · false = failed/none · {t,price,idx} = found.
+const entryCache={};
+async function ensureEntry(w){
+  if(!w)return;const k=w.toLowerCase();
+  if(entryCache[k]!==undefined)return;              // tried already (pending/done/failed)
+  entryCache[k]="pending";
+  try{
+    const url=BS+"/api?module=account&action=tokentx&address="+w+"&contractaddress="+CFG.mm+"&sort=asc&page=1&offset=30";
+    const r=await fetch(url);const j=await r.json();
+    const list=Array.isArray(j&&j.result)?j.result:[];
+    const first=list.find(x=>x.to&&x.to.toLowerCase()===k); // first RECEIVE = entry
+    if(!first){entryCache[k]=false;}
+    else{
+      const t=Number(first.timeStamp)*1000;
+      let price=null,idx=null;                       // entry-time price/index from loaded SYNC history
+      if(TS.length&&t>=TS[0]*1000){let bi=0;for(let i=0;i<TS.length;i++){if(TS[i]*1000<=t)bi=i;else break;}
+        price=SERIES.price.data[bi];idx=SERIES.index.data[bi];}
+      entryCache[k]={t,price,idx};
+    }
+  }catch(e){entryCache[k]=false;}
+  if(watch&&watch.toLowerCase()===k)renderPnL(liveBal||0); // repaint with the real entry
+}
 function pnlToDate(bal){
   const curPrice=priceHist.length?priceHist[priceHist.length-1]:price0;
   if(!price0||!curPrice||!TS.length)return ""; // history not ready yet
-  const startT=TS[0]*1000, days=Math.max(0,(Date.now()-startT)/86400000);
-  const dstr=new Date(startT).toLocaleDateString("en-GB",{day:"2-digit",month:"short"});
-  const priceRet=curPrice/price0-1, sg=v=>v>=0?"+":"−";
+  // Reference = REAL entry if we found one inside the priced window, else start of loaded history.
+  const ent=watch?entryCache[watch.toLowerCase()]:null;
+  const real=!!(ent&&ent!=="pending"&&ent.price&&ent.idx);
+  const refT=real?ent.t:TS[0]*1000, refPrice=real?ent.price:price0, refIdx=real?ent.idx:(SERIES.index.data[0]||1);
+  const days=Math.max(0,(Date.now()-refT)/86400000);
+  const dstr=new Date(refT).toLocaleDateString("en-GB",{day:"2-digit",month:"short"});
+  const tag=real?"real entry":"≈ history start";
+  const priceRet=curPrice/refPrice-1, sg=v=>v>=0?"+":"−";
   const eF=v=>{const a=Math.abs(v);return a===0?"0":a>=0.001?v.toFixed(4):v.toExponential(2);};
   const dv=eth=>ethUsd?usd(Math.abs(eth)*ethUsd):eF(Math.abs(eth))+" ETH"; // $ if feed, else ETH
   const cls=v=>v>=0?"pos":"neg";
   if(excluded){ // raw balance: no decay/reflection → value moves only with price
-    const pnl=bal*(curPrice-price0);
-    const verdict=pnl>=0?'<b class="up">Kârda ▲</b>':'<b class="down">Zararda ▼</b>';
-    return `<div class="row net"><span class="l">Bugüne dek · fiyat ${verdict}</span><span class="v ${cls(pnl)}" style="font-size:14px">${sg(pnl)}${dv(pnl)} <span class="muted">${sg(priceRet)}${Math.abs(priceRet*100).toFixed(1)}%</span></span></div>
-     <div class="row"><span class="l muted" style="font-size:9.5px">excluded · ${dstr}'ten beri tutulsaydı, sadece fiyat etkisi</span></div>`;
+    const pnl=bal*(curPrice-refPrice);
+    const verdict=pnl>=0?'<b class="up">In profit ▲</b>':'<b class="down">At a loss ▼</b>';
+    return `<div class="row net"><span class="l">To date · price ${verdict}</span><span class="v ${cls(pnl)}" style="font-size:14px">${sg(pnl)}${dv(pnl)} <span class="muted">${sg(priceRet)}${Math.abs(priceRet*100).toFixed(1)}%</span></span></div>
+     <div class="row"><span class="l muted" style="font-size:9.5px">excluded · since ${dstr} (${tag}) · price effect only</span></div>`;
   }
-  const idxD=SERIES.index.data, idxNow=idxD.length?idxD[idxD.length-1]:1, idxStart=idxD.length?idxD[0]:1;
-  const indexRatio=idxStart>0?idxNow/idxStart:1, elapsed=(Date.now()-startT)/1000;
+  const idxD=SERIES.index.data, idxNow=idxD.length?idxD[idxD.length-1]:1;
+  const indexRatio=refIdx>0?idxNow/refIdx:1, elapsed=(Date.now()-refT)/1000;
   const decayFrac=1-Math.pow(1-decayR,elapsed);                 // gross decay over the window
   const reflFrac=Math.max(0,indexRatio/Math.max(1e-9,1-decayFrac)-1); // implied gross reflection
-  const startBal=indexRatio>0?bal/indexRatio:bal;              // current units → MM at window start
+  const startBal=indexRatio>0?bal/indexRatio:bal;              // current units → MM at reference
   const decayMM=startBal*decayFrac, reflMM=startBal*(1-decayFrac)*reflFrac;
-  const priceEff=startBal*(curPrice-price0);                   // price move on entry qty
+  const priceEff=startBal*(curPrice-refPrice);                 // price move on entry qty
   const qtyEff=(bal-startBal)*curPrice;                        // net qty change @ current price
   const decayEff=-decayMM*curPrice, reflEff=qtyEff-decayEff;   // reflEff = remainder (keeps additive)
   const netEx=priceEff+decayEff, netAll=priceEff+qtyEff;       // ex-swap vs all-in totals
-  const verdict=netAll>=0?'<b class="up">Kârda ▲</b>':'<b class="down">Zararda ▼</b>';
+  const verdict=netAll>=0?'<b class="up">In profit ▲</b>':'<b class="down">At a loss ▼</b>';
   const row=(lbl,ic,val,extra)=>`<div class="row"><span class="l">${icon(ic)} ${lbl}</span><span class="v ${cls(val)}">${sg(val)}${dv(val)}${extra?` <span class="muted">${extra}</span>`:""}</span></div>`;
-  return `<div class="row" style="border-top:1px dashed var(--line2);margin-top:4px;padding-top:6px"><span class="l" style="font-weight:600">Bugüne dek <span class="muted">· ${dstr}'ten</span></span><span class="v muted" style="font-size:10px">${days.toFixed(0)}g tutuldu</span></div>
-   ${row("Pump/fiyat","pump",priceEff,sg(priceRet)+Math.abs(priceRet*100).toFixed(1)+"%")}
+  return `<div class="row" style="border-top:1px dashed var(--line2);margin-top:4px;padding-top:6px"><span class="l" style="font-weight:600">To date <span class="muted">· since ${dstr}</span></span><span class="v muted" style="font-size:10px">${days.toFixed(days<1?1:0)}d · ${tag}</span></div>
+   ${row("Pump/price","pump",priceEff,sg(priceRet)+Math.abs(priceRet*100).toFixed(1)+"%")}
    ${row("Reflection","reflect",reflEff,"+"+fmt(reflMM,0)+" MM")}
    ${row("Decay","decay",decayEff,"−"+fmt(decayMM,0)+" MM")}
    <div class="row net"><span class="l">Net · ex-swap</span><span class="v ${cls(netEx)}">${sg(netEx)}${dv(netEx)}</span></div>
@@ -1236,14 +1293,14 @@ function renderPnL(bal){
   const reflPct=incSupply>0?(volYr*rf/incSupply)*100:0; // your MM grows (swap-fee, vol-based)
   const pumpBurnYr=incSupply*dFrac*mirrorX;             // MM burned from LP/yr (mirror of all decay)
   const pumpPct=poolMMg>0?(pumpBurnYr/poolMMg)*100:0;   // price lift from LP burn
-  const netEx=pumpPct-decayPct;                         // SWAP-HARİÇ net: decay vs pump lift
+  const netEx=pumpPct-decayPct;                         // EX-SWAP net: decay vs pump lift
   const netAll=pumpPct+reflPct-decayPct;                // all-in value net
   const pill=v=>`<span class="netpill ${v>=0?'pos':'neg'}">${v>=0?'net +':'net −'}</span>`;
   const cls=v=>v>=0?'pos':'neg',sg=v=>(v>=0?'+':'−')+Math.abs(v).toFixed(0)+'%';
   const amt=n=>fmt(Math.abs(n),0)+" MM";
   const decayMM=bal*dFrac,reflMM=bal*reflPct/100,netExMM=bal*netEx/100,netAllMM=bal*netAll/100; // YOUR MM amounts — differ per wallet
   box.innerHTML=pnlToDate(bal)+`
-   <div class="row" style="border-top:1px dashed var(--line2);margin-top:4px;padding-top:6px"><span class="l muted" style="font-size:9.5px">Beklenen · ileriye dönük /yıl</span></div>
+   <div class="row" style="border-top:1px dashed var(--line2);margin-top:4px;padding-top:6px"><span class="l muted" style="font-size:9.5px">Expected · forward-looking /yr</span></div>
    <div class="row"><span class="l">${icon('decay')} Decay <span class="muted">/yr</span></span><span class="v neg">−${decayPct.toFixed(0)}% <span class="muted">·−${amt(decayMM)}</span></span></div>
    <div class="row"><span class="l">${icon('pump')} Pump lift <span class="muted">/yr</span></span><span class="v pos">+${pumpPct.toFixed(0)}%</span></div>
    <div class="row"><span class="l">${icon('reflect')} Reflection <span class="muted">/yr</span></span><span class="v pos">+${reflPct.toFixed(0)}% <span class="muted">·+${amt(reflMM)}</span></span></div>
@@ -1280,24 +1337,26 @@ function tickDebt(){
 const TT=E.id("Transfer(address,address,uint256)"),tif=new E.Interface(["event Transfer(address indexed from,address indexed to,uint256 value)"]);
 // Reliable feed + real last-settle anchor from Blockscout transfers (has timestamps).
 async function getFeed(){try{
-  const r=await fetch(BS+"/api/v2/tokens/"+CFG.mm+"/transfers");const j=await r.json();
-  if(!j.items||!j.items.length)return;
+  // etherscan-style tokentx is CORS-open (the v2 /transfers endpoint is NOT) → works on
+  // GitHub Pages exactly as locally. Newest first; same event classification as before.
+  const r=await fetch(BS+"/api?module=account&action=tokentx&contractaddress="+CFG.mm+"&sort=desc&page=1&offset=40");
+  const j=await r.json();const items=Array.isArray(j&&j.result)?j.result:[];
+  if(!items.length)return;
   const now=Date.now();
-  // newest transfer's REAL timestamp = last on-chain _settleDecay → anchor pending pump
-  const nt=j.items[0]&&j.items[0].timestamp?new Date(j.items[0].timestamp).getTime():0;
+  const nt=Number(items[0].timeStamp)*1000||0; // newest transfer's REAL ts → anchor pending pump
   anchorSettle(nt);
-  const pm=CFG.pm.toLowerCase(),hk=CFG.hook.toLowerCase(),mm=CFG.mm.toLowerCase(),Z="0x0000000000000000000000000000000000000000";
+  const hk=CFG.hook.toLowerCase(),mm=CFG.mm.toLowerCase(),Z="0x0000000000000000000000000000000000000000";
   const pools=new Set([CFG.ethPair,CFG.pools[1].id,CFG.pools[2].id,CFG.pm].map(a=>a.toLowerCase()));
-  const evs=j.items.filter(it=>it.total&&BigInt(it.total.value)>=10n**15n).slice(0,14);
-  $("feed").innerHTML=evs.map(it=>{const f=(it.from&&it.from.hash||"").toLowerCase(),t=(it.to&&it.to.hash||"").toLowerCase(),v=Number(E.formatUnits(BigInt(it.total.value),18));
+  const evs=items.filter(it=>{try{return BigInt(it.value)>=10n**15n;}catch(e){return false;}}).slice(0,14);
+  $("feed").innerHTML=evs.map(it=>{const f=(it.from||"").toLowerCase(),t=(it.to||"").toLowerCase(),v=Number(E.formatUnits(BigInt(it.value),18));
     let k="transfer",cls="",lb="transfer";
     if(t===Z){k="burn";cls="burnE";lb="burn";}
     else if(f===Z&&t===mm){k="decay";cls="refl";lb="decay → treasury/pot";}
     else if(pools.has(f)){k="buy";cls="buy";lb="buy";}
     else if(pools.has(t)){k="sell";cls="sell";lb="sell";}
     else if(t===mm||t===hk){k="treasury";cls="refl";lb="fee → treasury";}
-    const tago=it.timestamp?ago((now-new Date(it.timestamp).getTime())/1000):"";
-    return `<a class="ev ${cls}" href="${EXPLORER}/tx/${it.transaction_hash}" target="_blank" title="View tx on explorer">${icon(k)}<span>${lb}</span><span class="evago">${tago}</span><span class="mono">${fmt(v,2)}</span></a>`;}).join("")||'<div class="muted">no recent activity</div>';
+    const tago=it.timeStamp?ago((now-Number(it.timeStamp)*1000)/1000):"";
+    return `<a class="ev ${cls}" href="${EXPLORER}/tx/${it.hash}" target="_blank" title="View tx on explorer">${icon(k)}<span>${lb}</span><span class="evago">${tago}</span><span class="mono">${fmt(v,2)}</span></a>`;}).join("")||'<div class="muted">no recent activity</div>';
 }catch(e){}}
 
 const KNOWN={};
