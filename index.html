@@ -152,6 +152,41 @@
   .flow{stroke-dasharray:5 7;animation:dash 1s linear infinite}
   .pdot{animation:none}
   .glowpulse{animation:gp 2.2s ease-in-out infinite}@keyframes gp{50%{opacity:.4}}
+  /* ---- payoff calculator ---- */
+  .calcwrap{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:8px}
+  @media(max-width:720px){.calcwrap{grid-template-columns:1fr}}
+  .calccard{background:radial-gradient(120% 120% at 50% 0%,#0a0a0a,#040404);border:1px solid var(--line);border-radius:14px;padding:15px}
+  .calcseed{display:flex;flex-wrap:wrap;gap:6px;margin:2px 0 4px}
+  .seedchip{font-family:var(--mono);font-size:10.5px;color:var(--soft);background:var(--panel2);border:1px solid var(--line);border-radius:100px;padding:3px 9px}
+  .seedchip b{color:var(--green2);font-weight:600}
+  .ctl{margin:13px 0}
+  .ctl .lh{display:flex;justify-content:space-between;align-items:baseline;font-size:12px;color:var(--soft);margin-bottom:8px}
+  .ctl .lh b{font-family:var(--mono);font-size:15px;color:var(--ink);font-weight:600}
+  input[type=range].neon{-webkit-appearance:none;appearance:none;width:100%;height:5px;border-radius:5px;background:linear-gradient(90deg,var(--green2) var(--fill,50%),#1a1a1a var(--fill,50%));outline:none;cursor:pointer}
+  input[type=range].neon::-webkit-slider-thumb{-webkit-appearance:none;width:17px;height:17px;border-radius:50%;background:var(--green2);border:2px solid #04120a;box-shadow:0 0 9px var(--green2),0 0 18px rgba(56,255,126,.5);cursor:pointer}
+  input[type=range].neon::-moz-range-thumb{width:15px;height:15px;border-radius:50%;background:var(--green2);border:2px solid #04120a;box-shadow:0 0 9px var(--green2);cursor:pointer}
+  .hero{text-align:center;padding:16px 0 4px;border-top:1px dashed var(--line);margin-top:6px}
+  .hero .big{font-family:var(--disp);font-weight:800;font-size:29px;letter-spacing:-.02em;line-height:1.05}
+  .hero .big .up{color:var(--green2)}.hero .big .down{color:var(--down)}
+  .hero .sub{font-family:var(--mono);font-size:12px;margin-top:6px}
+  .brk .r{display:grid;grid-template-columns:1fr auto;gap:9px;align-items:center;padding:8px 0;border-top:1px dashed var(--line)}
+  .brk .r:first-child{border-top:none}
+  .brk .r .nm{font-size:12.5px;color:var(--ink)}.brk .r .nm small{color:var(--faint);font-size:10px;display:block;margin-top:1px}
+  .brk .r .amt{font-family:var(--mono);font-size:13px;font-weight:600;text-align:right}
+  .brk .r .amt small{color:var(--faint);font-weight:400;font-size:10px;display:block}
+  .brk .r.net{border-top:1px solid var(--line2);margin-top:3px}
+  .cpos{color:var(--green2)}.cneg{color:var(--down)}
+  .calcnote{font-size:11px;color:var(--faint);margin-top:12px;line-height:1.55}.calcnote b{color:var(--soft);font-weight:600}
+  .dsts{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:8px}
+  @media(max-width:640px){.dsts{grid-template-columns:1fr 1fr}}
+  .dst{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:9px;text-align:center}
+  .dst .p{font-family:var(--disp);font-weight:700;font-size:12.5px}
+  .dst .a{font-family:var(--mono);font-size:11px;color:var(--soft);margin-top:3px}
+  .dst .w{font-size:9px;color:var(--faint);margin-top:2px;line-height:1.3}
+  .twobuy{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px}
+  .twobuy .b{background:linear-gradient(180deg,var(--panel2),#070707);border:1px solid var(--line);border-radius:11px;padding:13px;text-align:center}
+  .twobuy .b .h{font-family:var(--disp);font-weight:700;font-size:13px}
+  .twobuy .b .o{font-family:var(--mono);font-size:19px;font-weight:700;margin-top:5px}
   /* custom scrollbars — never white */
   *{scrollbar-width:thin;scrollbar-color:#1c2a22 transparent}
   ::-webkit-scrollbar{width:8px;height:8px}
@@ -607,6 +642,7 @@
     <button class="lnb" onclick="learnTab('s-refl',this)">Swap tax · reflection</button>
     <button class="lnb" onclick="learnTab('s-pump',this)">Decay-mirror pump</button>
     <button class="lnb" onclick="learnTab('s-pnl',this)">Holder economics</button>
+    <button class="lnb" onclick="learnTab('s-calc',this)">Calculator</button>
     <button class="lnb" onclick="learnTab('s-excl',this)">Exclusions &amp; LP</button>
     <button class="lnb" onclick="learnTab('s-safe',this)">Safety</button>
   </div>
@@ -782,7 +818,56 @@
     </div>
   </div>
 
-  <!-- 6 · SAFETY -->
+  <!-- 6 · PAYOFF CALCULATOR -->
+  <div class="lsec" id="s-calc">
+    <h3>Payoff calculator — what your buy becomes</h3>
+    <p>Seeded live from the chain right now — price, decay, the 4% swap tax and the current trading run-rate. Drag the sliders: every force (entry tax, decay, reflection, pump) recomputes, and your decayed MM is traced to exactly where it goes. Nothing to fill in.</p>
+    <div class="calcseed" id="calcSeed"></div>
+    <div class="calcwrap">
+      <div class="calccard">
+        <div class="ctl"><div class="lh"><span>You buy</span><b id="calcBuyV">$100</b></div>
+          <input type="range" class="neon" id="calcBuy" min="10" max="10000" step="10" value="100" oninput="calcEconomy()"></div>
+        <div class="ctl"><div class="lh"><span>Hold for</span><b id="calcYearsV">1 year</b></div>
+          <input type="range" class="neon" id="calcYears" min="1" max="24" step="1" value="12" oninput="calcEconomy()"></div>
+        <div class="ctl"><div class="lh"><span>Trading activity <small style="color:var(--faint)">vs now</small></span><b id="calcActV">100%</b></div>
+          <input type="range" class="neon" id="calcAct" min="0" max="200" step="5" value="100" oninput="calcEconomy()"></div>
+        <div class="hero"><div class="big" id="calcHero">—</div><div class="sub" id="calcHeroSub"></div></div>
+      </div>
+      <div class="calccard">
+        <div class="brk" id="calcBrk"></div>
+        <div class="calcnote" id="calcNote"></div>
+      </div>
+    </div>
+
+    <div class="ldiag">
+      <div style="font-family:var(--disp);font-weight:700;font-size:13px;margin-bottom:2px">Where your decayed MM goes <span class="muted" id="calcDecayMM" style="font-weight:400;font-size:11px"></span></div>
+      <svg viewBox="0 0 520 160" style="width:100%;max-height:180px">
+        <defs><filter id="ng" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="2.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+        <rect x="10" y="56" width="104" height="46" rx="11" fill="rgba(255,122,24,.1)" stroke="var(--orange)" filter="url(#ng)"/>
+        <text x="62" y="77" text-anchor="middle" fill="var(--orange)" font-family="Archivo" font-weight="800" font-size="12">YOUR</text>
+        <text x="62" y="93" text-anchor="middle" fill="var(--orange)" font-family="Archivo" font-weight="800" font-size="12">DECAY</text>
+        <path id="cf1" d="M114,70 C185,70 210,26 300,26" stroke="var(--orange)" stroke-width="1.4" fill="none" opacity=".45" class="flow"/>
+        <path id="cf2" d="M114,78 C185,78 210,74 300,74" stroke="var(--orange2)" stroke-width="1.4" fill="none" opacity=".45" class="flow"/>
+        <path id="cf3" d="M114,86 C185,86 210,120 300,120" stroke="var(--green2)" stroke-width="1.4" fill="none" opacity=".45" class="flow"/>
+        <path id="cf4" d="M114,96 C200,146 262,150 300,150" stroke="var(--green)" stroke-width="1.4" fill="none" opacity=".45" class="flow"/>
+        <circle r="3" fill="var(--orange)" filter="url(#ng)"><animateMotion dur="1.6s" repeatCount="indefinite"><mpath href="#cf1"/></animateMotion></circle>
+        <circle r="3" fill="var(--orange2)" filter="url(#ng)"><animateMotion dur="1.9s" repeatCount="indefinite"><mpath href="#cf2"/></animateMotion></circle>
+        <circle r="3" fill="var(--green2)" filter="url(#ng)"><animateMotion dur="1.4s" repeatCount="indefinite"><mpath href="#cf3"/></animateMotion></circle>
+        <circle r="3" fill="var(--green)" filter="url(#ng)"><animateMotion dur="1.2s" repeatCount="indefinite"><mpath href="#cf4"/></animateMotion></circle>
+        <text x="312" y="30" fill="var(--orange)" font-family="IBM Plex Mono" font-size="10.5">🔥 50% burned → supply ↓</text>
+        <text x="312" y="78" fill="var(--orange2)" font-family="IBM Plex Mono" font-size="10.5">🏦 20% → treasury</text>
+        <text x="312" y="124" fill="var(--green2)" font-family="IBM Plex Mono" font-size="10.5">✦ 30% → recent traders</text>
+        <text x="312" y="154" fill="var(--green)" font-family="IBM Plex Mono" font-size="10.5">⚙ mirror → pump → price ↑</text>
+      </svg>
+      <div class="dsts" id="calcDsts"></div>
+    </div>
+
+    <div style="font-family:var(--disp);font-weight:700;font-size:13px;margin:16px 0 2px">$100 vs $1,000 buyer — same rate, scaled outcome</div>
+    <div class="twobuy" id="calcTwo"></div>
+    <p class="muted" style="font-size:11px;margin-top:9px;max-width:640px">Every rate — decay %, reflection %, pump % — is <b style="color:var(--green2)">per-unit</b>, identical for everyone. A bigger buy just scales the same outcome; and its own swap pays the 4% tax that feeds reflection + the pump for <i>all</i> holders. So the $100 holder's gain is partly funded by whoever buys after them.</p>
+  </div>
+
+  <!-- 7 · SAFETY -->
   <div class="lsec" id="s-safe">
     <h3>Safety &amp; invariants</h3>
     <div class="icards">
@@ -1206,6 +1291,7 @@ async function refresh(){
     if(account&&$("pv-wallet")&&getComputedStyle($("pv-wallet")).display!=="none")renderWallet(); // keep wallet balances live
     if(feedTick%4===0)getFeed(); // Live Activity every ~20s (was 15s) — lighter on Blockscout, same data
     feedTick++;
+    if($("learn")&&$("learn").classList.contains("on"))calcEconomy(); // keep the payoff calculator on live rates while it's open
     refreshFails=0;$("net").classList.add("ok");$("nettxt").textContent="Robinhood · live";
     ro.getBlockNumber().then(b=>{const el=$("netblk");if(el)el.textContent="#"+b.toLocaleString("en-US");}).catch(()=>{});
   }catch(e){refreshFails++;if(refreshFails>=2){$("net").classList.remove("ok");$("nettxt").textContent="reconnecting…";}}
@@ -1214,6 +1300,70 @@ function tickLive(){if(!watch||excluded||liveBal<=0)return;liveBal*=Math.pow(1-d
   $("p_bal").textContent=liveBal.toLocaleString("en-US",{minimumFractionDigits:4,maximumFractionDigits:4});$("p_tick").textContent="↓ decaying live";}
 function projFor(bal){const r=[["1h",3600],["1d",86400],["1w",604800],["1mo",2592000],["1y",31536000]];
   $("p_proj").innerHTML=r.map(([l,s])=>{const v=bal*Math.pow(1-decayR,s);return `<tr><td class="muted">${l}</td><td>${fmt(v,2)} <span class="muted">(${((v/bal-1)*100).toFixed(1)}%)</span></td></tr>`;}).join("");}
+// Payoff calculator (How-it-works): live-seeded from chain, driven by 3 sliders. Uses the SAME
+// forward model as the position card — decay compounds (time-based), reflection scales with swap
+// volume, pump with the decay it mirrors. Recomputed every refresh so it tracks live rates.
+function calcEconomy(){
+  if(!$("calcBuy"))return;
+  const pUsd=(AN&&AN.pUsd)||(price0*ethUsd)||5.85e-6;                 // MM price in $
+  const dAnnual=decayR?(1-Math.pow(1-decayR,31536000)):0.5;           // annual decay fraction (~0.5)
+  const feeB=(burnBps||150)/1e4,feeR=(reflBps||100)/1e4,feeRec=(recentBps||50)/1e4,feeT=(treBps||100)/1e4;
+  const feeTot=feeB+feeR+feeRec+feeT;                                 // 0.04
+  const inc=incSupply||3.17e6,pool=poolMMg||3.35e5,vol=volYr||0,mir=mirrorX||1;
+  // inputs
+  const buyUSD=+$("calcBuy").value,months=+$("calcYears").value,act=+$("calcAct").value/100,years=months/12;
+  // slider labels + neon fill
+  $("calcBuyV").textContent="$"+buyUSD.toLocaleString("en-US");
+  const yrLbl=months===12?"1 year":months<12?months+" mo":(months/12).toFixed(months%12?1:0)+" yr";
+  $("calcYearsV").textContent=yrLbl;$("calcActV").textContent=Math.round(act*100)+"%";
+  const setf=(id,mn,mx,v)=>{const el=$(id);if(el)el.style.setProperty("--fill",((v-mn)/(mx-mn)*100)+"%");};
+  setf("calcBuy",10,10000,buyUSD);setf("calcYears",1,24,months);setf("calcAct",0,200,act*100);
+  // position + realistic forces
+  const entryTax=buyUSD*feeTot, afterFee=buyUSD-entryTax, mm0=afterFee/pUsd;
+  const decayFrac=1-Math.pow(1-dAnnual,years);                       // decay: time-based, compounds — NOT activity-gated
+  const reflFrac=inc>0?(vol*act)*feeR/inc*years:0;                   // reflection: swap-fee share, scales with activity
+  // pump: decay mirrors into LP burns, but bounded by the pool (≤50%) AND by how alive the market is
+  // (activity gates realization — a quiet chain barely pumps). Price lift is the V2 constant-product move.
+  const pumpDebtMM=inc*decayFrac*mir, burnMM=Math.min(pumpDebtMM,pool*0.5)*act;
+  const priceMult=pool>burnMM?pool/(pool-burnMM):1;
+  const mmAfter=mm0*(1-decayFrac)+mm0*reflFrac;                      // MM after decay + reflection
+  const netVal=mmAfter*pUsd*priceMult, netPnl=netVal-buyUSD, up=netPnl>=0;
+  // $ components — additive: afterFee − decayLoss + reflGain + pumpGain = netVal
+  const decayLoss=mm0*decayFrac*pUsd, reflGain=mm0*reflFrac*pUsd, pumpGain=mmAfter*pUsd*(priceMult-1);
+  const d=v=>"$"+Math.abs(v).toLocaleString("en-US",{maximumFractionDigits:Math.abs(v)<100?2:0});
+  const mm=v=>fmt(Math.abs(v),0)+" MM";
+  // hero
+  $("calcHero").innerHTML="$"+buyUSD.toLocaleString("en-US")+" → <span class='"+(up?"up":"down")+"'>$"+netVal.toLocaleString("en-US",{maximumFractionDigits:netVal<100?2:0})+"</span>";
+  $("calcHeroSub").innerHTML="<span class='"+(up?"cpos":"cneg")+"'>"+(up?"▲ +":"▼ −")+d(netPnl)+" ("+(up?"+":"−")+Math.abs(netPnl/buyUSD*100).toFixed(0)+"%)</span> after "+yrLbl;
+  // breakdown
+  const row=(nm,sub,val,mmv,pos)=>`<div class="r"><span class="nm">${nm}<small>${sub}</small></span><span class="amt ${pos?'cpos':'cneg'}">${pos?'+':'−'}${d(val)}${mmv?`<small>${pos?'+':'−'}${mmv}</small>`:''}</span></div>`;
+  $("calcBrk").innerHTML=
+    row("Entry tax","4% swap tax on the way in",entryTax,"",false)+
+    row("Decay",Math.round(decayFrac*100)+"% over "+yrLbl,decayLoss,mm(mm0*decayFrac),false)+
+    row("Reflection","your share of the 1% swap fee",reflGain,mm(reflGain/pUsd),true)+
+    row("Pump lift","price rises as decay burns LP",pumpGain,"",true)+
+    `<div class="r net"><span class="nm" style="font-weight:600">Net</span><span class="amt ${up?'cpos':'cneg'}" style="font-size:15px">${up?'▲ +':'▼ −'}${d(netPnl)}</span></div>`;
+  // decay destinations (MM)
+  const decayMM=mm0*decayFrac;
+  const dst=(p,w,amtMM,col)=>`<div class="dst"><div class="p" style="color:${col}">${p}</div><div class="a">${fmt(amtMM,0)} MM</div><div class="w">${w}</div></div>`;
+  $("calcDsts").innerHTML=
+    dst("50% Burn","supply ↓ (helps price)",decayMM*0.5,"var(--orange)")+
+    dst("20% Treasury","protocol funding",decayMM*0.2,"var(--orange2)")+
+    dst("30% Reward","to recent traders",decayMM*0.3,"var(--green2)")+
+    dst("Mirror → Pump","burned from LP → price ↑",decayMM*mir,"var(--green)");
+  $("calcDecayMM").textContent="· "+fmt(decayMM,0)+" MM decays over "+yrLbl;
+  // $100 vs $1,000 (per-unit identical → proportional; priceMult is pool-level, shared by both)
+  const scen=a=>{const m=a*(1-feeTot)/pUsd;return (m*(1-decayFrac)+m*reflFrac)*pUsd*priceMult;};
+  const s1=scen(100),s2=scen(1000);
+  $("calcTwo").innerHTML=
+    `<div class="b"><div class="h">$100 buyer</div><div class="o ${s1>=100?'cpos':'cneg'}">→ $${s1.toLocaleString("en-US",{maximumFractionDigits:0})}</div><div class="muted" style="font-size:10px">${(s1/100).toFixed(2)}× in ${yrLbl}</div></div>`+
+    `<div class="b"><div class="h">$1,000 buyer</div><div class="o ${s2>=1000?'cpos':'cneg'}">→ $${s2.toLocaleString("en-US",{maximumFractionDigits:0})}</div><div class="muted" style="font-size:10px">${(s2/1000).toFixed(2)}× — same rate, 10× stake</div></div>`;
+  // seed chips + note (annual display rates at the current activity setting)
+  const reflAnnualPct=inc>0?(vol*act)*feeR/inc*100:0;
+  const burn1=Math.min(inc*dAnnual*mir,pool*0.5)*act, pm1=pool>burn1?pool/(pool-burn1):1, pumpAnnualPct=(pm1-1)*100;
+  $("calcSeed").innerHTML=[["MM price","$"+pUsd.toExponential(2)],["ETH","$"+ethUsd.toLocaleString("en-US",{maximumFractionDigits:0})],["Decay","50%/yr"],["Swap tax","4%"],["Reflection","+"+reflAnnualPct.toFixed(0)+"%/yr"],["Pump","+"+pumpAnnualPct.toFixed(0)+"%/yr"],["Pool","$"+fmt((AN&&AN.liq)||0,0)]].map(([k,v])=>`<span class="seedchip">${k} <b>${v}</b></span>`).join("");
+  $("calcNote").innerHTML="Decay is exact (time-based). Reflection scales with <b>trading activity</b>. Pump is the real V2 price lift as decay burns LP — <b>capped at 50% of the pool</b> (you can't drain it dry). The upside reads high because the pool ($"+fmt((AN&&AN.liq)||0,0)+") and decaying supply are tiny. Slide <b>Trading activity</b> toward 0 — a quiet chain barely pumps or reflects, so decay wins and you <b>lose</b>.";
+}
 // Append a live point ONLY when price or liquidity actually moved — no change, no new point,
 // so the chart never scrolls right on empty ticks. Keeps every series + TS length-aligned.
 function pushLive(o){
@@ -1307,8 +1457,11 @@ function renderPnL(bal){
   const rf=reflBps/10000;                               // 1% reflect fee
   const decayPct=dFrac*100;                             // your MM shrinks
   const reflPct=incSupply>0?(volYr*rf/incSupply)*100:0; // your MM grows (swap-fee, vol-based)
-  const pumpBurnYr=incSupply*dFrac*mirrorX;             // MM burned from LP/yr (mirror of all decay)
-  const pumpPct=poolMMg>0?(pumpBurnYr/poolMMg)*100:0;   // price lift from LP burn
+  // realistic pump: decay mirrors into LP burns, but you can't drain the pool — cap the burn at 50%
+  // of the pool (LPs/arbs offset deeper draws), and price lift is the V2 constant-product move
+  // pool/(pool−burn)−1, NOT the raw burn %. On a tiny pool this is still large but no longer unbounded.
+  const pumpBurnYr=Math.min(incSupply*dFrac*mirrorX,poolMMg*0.5); // MM realistically burnable from LP/yr
+  const pumpPct=poolMMg>pumpBurnYr?(poolMMg/(poolMMg-pumpBurnYr)-1)*100:0; // V2 price lift, capped
   const netEx=pumpPct-decayPct;                         // EX-SWAP net: decay vs pump lift
   const netAll=pumpPct+reflPct-decayPct;                // all-in value net
   const pill=v=>`<span class="netpill ${v>=0?'pos':'neg'}">${v>=0?'net +':'net −'}</span>`;
@@ -1580,6 +1733,7 @@ async function doSwap(){
 function learnTab(id,btn){const el=$(id);if(el)el.scrollIntoView({behavior:"smooth",block:"start"});
   document.querySelectorAll(".lnb").forEach(b=>b.classList.remove("on"));if(btn)btn.classList.add("on");}
 function openLearn(){const w=$("learn");w.classList.add("on");w.scrollTop=0;document.body.style.overflow="hidden";
+  calcEconomy(); // populate the payoff calculator immediately from current live data
   setTimeout(()=>document.querySelectorAll("#l_feebars .fill").forEach(f=>f.style.width=f.dataset.w+"%"),250);}
 function closeLearn(){$("learn").classList.remove("on");document.body.style.overflow="";}
 document.addEventListener("keydown",e=>{if(e.key==="Escape")closeLearn();});
