@@ -187,6 +187,10 @@
   .twobuy .b{background:linear-gradient(180deg,var(--panel2),#070707);border:1px solid var(--line);border-radius:11px;padding:13px;text-align:center}
   .twobuy .b .h{font-family:var(--disp);font-weight:700;font-size:13px}
   .twobuy .b .o{font-family:var(--mono);font-size:19px;font-weight:700;margin-top:5px}
+  .postabs{margin-left:auto;display:inline-flex;gap:4px}
+  .postab{font-family:var(--disp);font-weight:700;font-size:10px;padding:3px 9px;border-radius:100px;border:1px solid var(--line2);background:var(--panel2);color:var(--soft);cursor:pointer;transition:.15s}
+  .postab.on{background:var(--green);color:#00220a;border-color:transparent}
+  #pos-calc .ctl{margin:11px 0}#pos-calc .hero{padding:12px 0 3px}
   /* custom scrollbars — never white */
   *{scrollbar-width:thin;scrollbar-color:#1c2a22 transparent}
   ::-webkit-scrollbar{width:8px;height:8px}
@@ -579,14 +583,32 @@
 
   <!-- POSITION -->
   <div class="cell c-pos">
-    <h3><span class="h3g">◈</span>Your position</h3>
-    <div class="bigbal"><span id="p_bal">—</span><span class="u"><img src="mm.png" class="mmtag" alt="">MM</span></div>
-    <div class="tick" id="p_tick"></div>
-    <div style="margin-top:5px"><span class="badge" id="p_badge">—</span> <span class="muted cpy" id="p_addr" title="Copy address" onclick="cp(watch,'Wallet')"></span> <a class="cpy" id="p_expl" title="View on explorer" style="font-size:11px">↗</a></div>
-    <div class="pnl" id="pnl"></div>
-    <table class="proj" id="p_proj" style="display:none"></table>
-    <input class="mm" id="watch" placeholder="0x… watch another wallet" autocomplete="off" onkeydown="if(event.key==='Enter')watchAddr()">
-    <div class="win"><button class="wbtn" onclick="watchAddr()">Watch</button><button class="wbtn" onclick="useMine()">Use my wallet</button></div>
+    <h3><span class="h3g">◈</span>Your position
+      <span class="postabs">
+        <button class="postab on" id="postab-pos" onclick="posTab('pos')">Position</button>
+        <button class="postab" id="postab-calc" onclick="posTab('calc')">Calculator</button>
+      </span>
+    </h3>
+    <div id="pos-main">
+      <div class="bigbal"><span id="p_bal">—</span><span class="u"><img src="mm.png" class="mmtag" alt="">MM</span></div>
+      <div class="tick" id="p_tick"></div>
+      <div style="margin-top:5px"><span class="badge" id="p_badge">—</span> <span class="muted cpy" id="p_addr" title="Copy address" onclick="cp(watch,'Wallet')"></span> <a class="cpy" id="p_expl" title="View on explorer" style="font-size:11px">↗</a></div>
+      <div class="pnl" id="pnl"></div>
+      <table class="proj" id="p_proj" style="display:none"></table>
+      <input class="mm" id="watch" placeholder="0x… watch another wallet" autocomplete="off" onkeydown="if(event.key==='Enter')watchAddr()">
+      <div class="win"><button class="wbtn" onclick="watchAddr()">Watch</button><button class="wbtn" onclick="useMine()">Use my wallet</button></div>
+    </div>
+    <div id="pos-calc" style="display:none">
+      <div class="ctl"><div class="lh"><span>You buy</span><b id="pcBuyV">$100</b></div>
+        <input type="range" class="neon" id="pcBuy" min="10" max="10000" step="10" value="100" oninput="posCalc()"></div>
+      <div class="ctl"><div class="lh"><span>Hold for</span><b id="pcYearsV">1 year</b></div>
+        <input type="range" class="neon" id="pcYears" min="1" max="24" step="1" value="12" oninput="posCalc()"></div>
+      <div class="ctl"><div class="lh"><span>Trading activity <small style="color:var(--faint)">vs now</small></span><b id="pcActV">100%</b></div>
+        <input type="range" class="neon" id="pcAct" min="0" max="200" step="5" value="100" oninput="posCalc()"></div>
+      <div class="hero"><div class="big" id="pcHero" style="font-size:23px">—</div><div class="sub" id="pcSub"></div></div>
+      <div class="brk" id="pcBrk"></div>
+      <div class="calcnote" id="pcNote"></div>
+    </div>
   </div>
 
   <!-- PUMP ENGINE -->
@@ -1292,6 +1314,7 @@ async function refresh(){
     if(feedTick%4===0)getFeed(); // Live Activity every ~20s (was 15s) — lighter on Blockscout, same data
     feedTick++;
     if($("learn")&&$("learn").classList.contains("on"))calcEconomy(); // keep the payoff calculator on live rates while it's open
+    if($("pos-calc")&&$("pos-calc").style.display!=="none")posCalc();  // same for the compact one in Your Position
     refreshFails=0;$("net").classList.add("ok");$("nettxt").textContent="Robinhood · live";
     ro.getBlockNumber().then(b=>{const el=$("netblk");if(el)el.textContent="#"+b.toLocaleString("en-US");}).catch(()=>{});
   }catch(e){refreshFails++;if(refreshFails>=2){$("net").classList.remove("ok");$("nettxt").textContent="reconnecting…";}}
@@ -1300,69 +1323,71 @@ function tickLive(){if(!watch||excluded||liveBal<=0)return;liveBal*=Math.pow(1-d
   $("p_bal").textContent=liveBal.toLocaleString("en-US",{minimumFractionDigits:4,maximumFractionDigits:4});$("p_tick").textContent="↓ decaying live";}
 function projFor(bal){const r=[["1h",3600],["1d",86400],["1w",604800],["1mo",2592000],["1y",31536000]];
   $("p_proj").innerHTML=r.map(([l,s])=>{const v=bal*Math.pow(1-decayR,s);return `<tr><td class="muted">${l}</td><td>${fmt(v,2)} <span class="muted">(${((v/bal-1)*100).toFixed(1)}%)</span></td></tr>`;}).join("");}
-// Payoff calculator (How-it-works): live-seeded from chain, driven by 3 sliders. Uses the SAME
-// forward model as the position card — decay compounds (time-based), reflection scales with swap
-// volume, pump with the decay it mirrors. Recomputed every refresh so it tracks live rates.
+// Shared payoff model — live-seeded from chain. Decay compounds (time-based); reflection scales with
+// trading activity; pump is the REAL V2 price lift as decay burns LP, capped at 50% of the pool and
+// gated by activity (a quiet chain barely pumps → low activity = net loss). Feeds both the
+// How-it-works calculator and the compact one in the Your-Position panel.
+function payoffModel(buyUSD,months,act){
+  const pUsd=(AN&&AN.pUsd)||(price0*ethUsd)||5.85e-6;
+  const dAnnual=decayR?(1-Math.pow(1-decayR,31536000)):0.5;
+  const feeB=(burnBps||150)/1e4,feeR=(reflBps||100)/1e4,feeRec=(recentBps||50)/1e4,feeT=(treBps||100)/1e4;
+  const feeTot=feeB+feeR+feeRec+feeT,inc=incSupply||3.17e6,pool=poolMMg||3.35e5,vol=volYr||0,mir=mirrorX||1;
+  const years=months/12,entryTax=buyUSD*feeTot,afterFee=buyUSD-entryTax,mm0=afterFee/pUsd;
+  const decayFrac=1-Math.pow(1-dAnnual,years);
+  const reflFrac=inc>0?(vol*act)*feeR/inc*years:0;
+  const burnMM=Math.min(inc*decayFrac*mir,pool*0.5)*act, priceMult=pool>burnMM?pool/(pool-burnMM):1;
+  const mmAfter=mm0*(1-decayFrac)+mm0*reflFrac, netVal=mmAfter*pUsd*priceMult, netPnl=netVal-buyUSD;
+  const burn1=Math.min(inc*dAnnual*mir,pool*0.5)*act, pm1=pool>burn1?pool/(pool-burn1):1;
+  const scen=a=>{const m=a*(1-feeTot)/pUsd;return (m*(1-decayFrac)+m*reflFrac)*pUsd*priceMult;};
+  const yrLbl=months===12?"1 year":months<12?months+" mo":(months/12).toFixed(months%12?1:0)+" yr";
+  return {pUsd,feeTot,mir,years,yrLbl,entryTax,mm0,decayFrac,priceMult,netVal,netPnl,up:netPnl>=0,
+    decayLoss:mm0*decayFrac*pUsd,reflGain:mm0*reflFrac*pUsd,pumpGain:mmAfter*pUsd*(priceMult-1),
+    decayMM:mm0*decayFrac,reflAnnualPct:inc>0?(vol*act)*feeR/inc*100:0,pumpAnnualPct:(pm1-1)*100,
+    liq:(AN&&AN.liq)||0,s1:scen(100),s2:scen(1000)};
+}
+const _cD=v=>"$"+Math.abs(v).toLocaleString("en-US",{maximumFractionDigits:Math.abs(v)<100?2:0});
+const _cMM=v=>fmt(Math.abs(v),0)+" MM";
+function payoffBrk(m){ // the entry-tax/decay/reflection/pump/net rows, shared by both calculators
+  const row=(nm,sub,val,mmv,pos)=>`<div class="r"><span class="nm">${nm}<small>${sub}</small></span><span class="amt ${pos?'cpos':'cneg'}">${pos?'+':'−'}${_cD(val)}${mmv?`<small>${pos?'+':'−'}${mmv}</small>`:''}</span></div>`;
+  return row("Entry tax","4% swap tax on the way in",m.entryTax,"",false)+
+    row("Decay",Math.round(m.decayFrac*100)+"% over "+m.yrLbl,m.decayLoss,_cMM(m.decayMM),false)+
+    row("Reflection","your share of the 1% swap fee",m.reflGain,_cMM(m.reflGain/m.pUsd),true)+
+    row("Pump lift","price rises as decay burns LP",m.pumpGain,"",true)+
+    `<div class="r net"><span class="nm" style="font-weight:600">Net</span><span class="amt ${m.up?'cpos':'cneg'}" style="font-size:15px">${m.up?'▲ +':'▼ −'}${_cD(m.netPnl)}</span></div>`;
+}
+const _setf=(id,mn,mx,v)=>{const el=$(id);if(el)el.style.setProperty("--fill",((v-mn)/(mx-mn)*100)+"%");};
+function _hero(id,sub,buyUSD,m){ // "$X → $Y  ▲/▼ ±$Z (±%)"
+  $(id).innerHTML="$"+buyUSD.toLocaleString("en-US")+" → <span class='"+(m.up?"up":"down")+"'>$"+m.netVal.toLocaleString("en-US",{maximumFractionDigits:m.netVal<100?2:0})+"</span>";
+  $(sub).innerHTML="<span class='"+(m.up?"cpos":"cneg")+"'>"+(m.up?"▲ +":"▼ −")+_cD(m.netPnl)+" ("+(m.up?"+":"−")+Math.abs(m.netPnl/buyUSD*100).toFixed(0)+"%)</span> after "+m.yrLbl;
+}
+// How-it-works calculator (full: flow diagram, destinations, two-buyer, seed chips)
 function calcEconomy(){
   if(!$("calcBuy"))return;
-  const pUsd=(AN&&AN.pUsd)||(price0*ethUsd)||5.85e-6;                 // MM price in $
-  const dAnnual=decayR?(1-Math.pow(1-decayR,31536000)):0.5;           // annual decay fraction (~0.5)
-  const feeB=(burnBps||150)/1e4,feeR=(reflBps||100)/1e4,feeRec=(recentBps||50)/1e4,feeT=(treBps||100)/1e4;
-  const feeTot=feeB+feeR+feeRec+feeT;                                 // 0.04
-  const inc=incSupply||3.17e6,pool=poolMMg||3.35e5,vol=volYr||0,mir=mirrorX||1;
-  // inputs
-  const buyUSD=+$("calcBuy").value,months=+$("calcYears").value,act=+$("calcAct").value/100,years=months/12;
-  // slider labels + neon fill
-  $("calcBuyV").textContent="$"+buyUSD.toLocaleString("en-US");
-  const yrLbl=months===12?"1 year":months<12?months+" mo":(months/12).toFixed(months%12?1:0)+" yr";
-  $("calcYearsV").textContent=yrLbl;$("calcActV").textContent=Math.round(act*100)+"%";
-  const setf=(id,mn,mx,v)=>{const el=$(id);if(el)el.style.setProperty("--fill",((v-mn)/(mx-mn)*100)+"%");};
-  setf("calcBuy",10,10000,buyUSD);setf("calcYears",1,24,months);setf("calcAct",0,200,act*100);
-  // position + realistic forces
-  const entryTax=buyUSD*feeTot, afterFee=buyUSD-entryTax, mm0=afterFee/pUsd;
-  const decayFrac=1-Math.pow(1-dAnnual,years);                       // decay: time-based, compounds — NOT activity-gated
-  const reflFrac=inc>0?(vol*act)*feeR/inc*years:0;                   // reflection: swap-fee share, scales with activity
-  // pump: decay mirrors into LP burns, but bounded by the pool (≤50%) AND by how alive the market is
-  // (activity gates realization — a quiet chain barely pumps). Price lift is the V2 constant-product move.
-  const pumpDebtMM=inc*decayFrac*mir, burnMM=Math.min(pumpDebtMM,pool*0.5)*act;
-  const priceMult=pool>burnMM?pool/(pool-burnMM):1;
-  const mmAfter=mm0*(1-decayFrac)+mm0*reflFrac;                      // MM after decay + reflection
-  const netVal=mmAfter*pUsd*priceMult, netPnl=netVal-buyUSD, up=netPnl>=0;
-  // $ components — additive: afterFee − decayLoss + reflGain + pumpGain = netVal
-  const decayLoss=mm0*decayFrac*pUsd, reflGain=mm0*reflFrac*pUsd, pumpGain=mmAfter*pUsd*(priceMult-1);
-  const d=v=>"$"+Math.abs(v).toLocaleString("en-US",{maximumFractionDigits:Math.abs(v)<100?2:0});
-  const mm=v=>fmt(Math.abs(v),0)+" MM";
-  // hero
-  $("calcHero").innerHTML="$"+buyUSD.toLocaleString("en-US")+" → <span class='"+(up?"up":"down")+"'>$"+netVal.toLocaleString("en-US",{maximumFractionDigits:netVal<100?2:0})+"</span>";
-  $("calcHeroSub").innerHTML="<span class='"+(up?"cpos":"cneg")+"'>"+(up?"▲ +":"▼ −")+d(netPnl)+" ("+(up?"+":"−")+Math.abs(netPnl/buyUSD*100).toFixed(0)+"%)</span> after "+yrLbl;
-  // breakdown
-  const row=(nm,sub,val,mmv,pos)=>`<div class="r"><span class="nm">${nm}<small>${sub}</small></span><span class="amt ${pos?'cpos':'cneg'}">${pos?'+':'−'}${d(val)}${mmv?`<small>${pos?'+':'−'}${mmv}</small>`:''}</span></div>`;
-  $("calcBrk").innerHTML=
-    row("Entry tax","4% swap tax on the way in",entryTax,"",false)+
-    row("Decay",Math.round(decayFrac*100)+"% over "+yrLbl,decayLoss,mm(mm0*decayFrac),false)+
-    row("Reflection","your share of the 1% swap fee",reflGain,mm(reflGain/pUsd),true)+
-    row("Pump lift","price rises as decay burns LP",pumpGain,"",true)+
-    `<div class="r net"><span class="nm" style="font-weight:600">Net</span><span class="amt ${up?'cpos':'cneg'}" style="font-size:15px">${up?'▲ +':'▼ −'}${d(netPnl)}</span></div>`;
-  // decay destinations (MM)
-  const decayMM=mm0*decayFrac;
+  const buyUSD=+$("calcBuy").value,months=+$("calcYears").value,act=+$("calcAct").value/100,m=payoffModel(buyUSD,months,act);
+  $("calcBuyV").textContent="$"+buyUSD.toLocaleString("en-US");$("calcYearsV").textContent=m.yrLbl;$("calcActV").textContent=Math.round(act*100)+"%";
+  _setf("calcBuy",10,10000,buyUSD);_setf("calcYears",1,24,months);_setf("calcAct",0,200,act*100);
+  _hero("calcHero","calcHeroSub",buyUSD,m);$("calcBrk").innerHTML=payoffBrk(m);
   const dst=(p,w,amtMM,col)=>`<div class="dst"><div class="p" style="color:${col}">${p}</div><div class="a">${fmt(amtMM,0)} MM</div><div class="w">${w}</div></div>`;
-  $("calcDsts").innerHTML=
-    dst("50% Burn","supply ↓ (helps price)",decayMM*0.5,"var(--orange)")+
-    dst("20% Treasury","protocol funding",decayMM*0.2,"var(--orange2)")+
-    dst("30% Reward","to recent traders",decayMM*0.3,"var(--green2)")+
-    dst("Mirror → Pump","burned from LP → price ↑",decayMM*mir,"var(--green)");
-  $("calcDecayMM").textContent="· "+fmt(decayMM,0)+" MM decays over "+yrLbl;
-  // $100 vs $1,000 (per-unit identical → proportional; priceMult is pool-level, shared by both)
-  const scen=a=>{const m=a*(1-feeTot)/pUsd;return (m*(1-decayFrac)+m*reflFrac)*pUsd*priceMult;};
-  const s1=scen(100),s2=scen(1000);
-  $("calcTwo").innerHTML=
-    `<div class="b"><div class="h">$100 buyer</div><div class="o ${s1>=100?'cpos':'cneg'}">→ $${s1.toLocaleString("en-US",{maximumFractionDigits:0})}</div><div class="muted" style="font-size:10px">${(s1/100).toFixed(2)}× in ${yrLbl}</div></div>`+
-    `<div class="b"><div class="h">$1,000 buyer</div><div class="o ${s2>=1000?'cpos':'cneg'}">→ $${s2.toLocaleString("en-US",{maximumFractionDigits:0})}</div><div class="muted" style="font-size:10px">${(s2/1000).toFixed(2)}× — same rate, 10× stake</div></div>`;
-  // seed chips + note (annual display rates at the current activity setting)
-  const reflAnnualPct=inc>0?(vol*act)*feeR/inc*100:0;
-  const burn1=Math.min(inc*dAnnual*mir,pool*0.5)*act, pm1=pool>burn1?pool/(pool-burn1):1, pumpAnnualPct=(pm1-1)*100;
-  $("calcSeed").innerHTML=[["MM price","$"+pUsd.toExponential(2)],["ETH","$"+ethUsd.toLocaleString("en-US",{maximumFractionDigits:0})],["Decay","50%/yr"],["Swap tax","4%"],["Reflection","+"+reflAnnualPct.toFixed(0)+"%/yr"],["Pump","+"+pumpAnnualPct.toFixed(0)+"%/yr"],["Pool","$"+fmt((AN&&AN.liq)||0,0)]].map(([k,v])=>`<span class="seedchip">${k} <b>${v}</b></span>`).join("");
-  $("calcNote").innerHTML="Decay is exact (time-based). Reflection scales with <b>trading activity</b>. Pump is the real V2 price lift as decay burns LP — <b>capped at 50% of the pool</b> (you can't drain it dry). The upside reads high because the pool ($"+fmt((AN&&AN.liq)||0,0)+") and decaying supply are tiny. Slide <b>Trading activity</b> toward 0 — a quiet chain barely pumps or reflects, so decay wins and you <b>lose</b>.";
+  $("calcDsts").innerHTML=dst("50% Burn","supply ↓ (helps price)",m.decayMM*0.5,"var(--orange)")+dst("20% Treasury","protocol funding",m.decayMM*0.2,"var(--orange2)")+dst("30% Reward","to recent traders",m.decayMM*0.3,"var(--green2)")+dst("Mirror → Pump","burned from LP → price ↑",m.decayMM*m.mir,"var(--green)");
+  $("calcDecayMM").textContent="· "+fmt(m.decayMM,0)+" MM decays over "+m.yrLbl;
+  $("calcTwo").innerHTML=`<div class="b"><div class="h">$100 buyer</div><div class="o ${m.s1>=100?'cpos':'cneg'}">→ $${m.s1.toLocaleString("en-US",{maximumFractionDigits:0})}</div><div class="muted" style="font-size:10px">${(m.s1/100).toFixed(2)}× in ${m.yrLbl}</div></div>`+`<div class="b"><div class="h">$1,000 buyer</div><div class="o ${m.s2>=1000?'cpos':'cneg'}">→ $${m.s2.toLocaleString("en-US",{maximumFractionDigits:0})}</div><div class="muted" style="font-size:10px">${(m.s2/1000).toFixed(2)}× — same rate, 10× stake</div></div>`;
+  $("calcSeed").innerHTML=[["MM price","$"+m.pUsd.toExponential(2)],["ETH","$"+ethUsd.toLocaleString("en-US",{maximumFractionDigits:0})],["Decay","50%/yr"],["Swap tax","4%"],["Reflection","+"+m.reflAnnualPct.toFixed(0)+"%/yr"],["Pump","+"+m.pumpAnnualPct.toFixed(0)+"%/yr"],["Pool","$"+fmt(m.liq,0)]].map(([k,v])=>`<span class="seedchip">${k} <b>${v}</b></span>`).join("");
+  $("calcNote").innerHTML="Decay is exact (time-based). Reflection scales with <b>trading activity</b>. Pump is the real V2 price lift as decay burns LP — <b>capped at 50% of the pool</b> (you can't drain it dry). The upside reads high because the pool ($"+fmt(m.liq,0)+") and decaying supply are tiny. Slide <b>Trading activity</b> toward 0 — a quiet chain barely pumps or reflects, so decay wins and you <b>lose</b>.";
+}
+// Compact calculator inside the Your-Position panel (tab)
+function posCalc(){
+  if(!$("pcBuy"))return;
+  const buyUSD=+$("pcBuy").value,months=+$("pcYears").value,act=+$("pcAct").value/100,m=payoffModel(buyUSD,months,act);
+  $("pcBuyV").textContent="$"+buyUSD.toLocaleString("en-US");$("pcYearsV").textContent=m.yrLbl;$("pcActV").textContent=Math.round(act*100)+"%";
+  _setf("pcBuy",10,10000,buyUSD);_setf("pcYears",1,24,months);_setf("pcAct",0,200,act*100);
+  _hero("pcHero","pcSub",buyUSD,m);$("pcBrk").innerHTML=payoffBrk(m);
+  $("pcNote").innerHTML="Live rates · pump capped at 50% of the $"+fmt(m.liq,0)+" pool. Full breakdown + flows in <b>How it works → Calculator</b>. Slide <b>Activity</b> to 0 → decay wins, you lose.";
+}
+function posTab(which){
+  const mn=$("pos-main"),cx=$("pos-calc"),tp=$("postab-pos"),tc=$("postab-calc");
+  if(mn)mn.style.display=which==="calc"?"none":"";if(cx)cx.style.display=which==="calc"?"":"none";
+  if(tp)tp.classList.toggle("on",which!=="calc");if(tc)tc.classList.toggle("on",which==="calc");
+  if(which==="calc")posCalc();
 }
 // Append a live point ONLY when price or liquidity actually moved — no change, no new point,
 // so the chart never scrolls right on empty ticks. Keeps every series + TS length-aligned.
