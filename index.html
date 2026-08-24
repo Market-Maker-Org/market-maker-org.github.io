@@ -187,6 +187,9 @@
   .twobuy .b{background:linear-gradient(180deg,var(--panel2),#070707);border:1px solid var(--line);border-radius:11px;padding:13px;text-align:center}
   .twobuy .b .h{font-family:var(--disp);font-weight:700;font-size:13px}
   .twobuy .b .o{font-family:var(--mono);font-size:19px;font-weight:700;margin-top:5px}
+  .covbar{position:relative;height:9px;background:#181818;border-radius:6px;overflow:hidden;margin-top:9px}
+  .covfill{height:100%;border-radius:6px;transition:width .4s ease,background .4s ease}
+  .covmark{position:absolute;top:-3px;left:50%;width:2px;height:15px;background:var(--soft);opacity:.55;border-radius:2px}
   .postabs{margin-left:auto;display:inline-flex;gap:4px}
   .postab{font-family:var(--disp);font-weight:700;font-size:10px;padding:3px 9px;border-radius:100px;border:1px solid var(--line2);background:var(--panel2);color:var(--soft);cursor:pointer;transition:.15s}
   .postab.on{background:var(--green);color:#00220a;border-color:transparent}
@@ -861,6 +864,16 @@
       </div>
     </div>
 
+    <div class="ldiag" style="padding:14px 16px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px">
+        <span style="font-family:var(--disp);font-weight:700;font-size:13px">Does the pump refund your decay?</span>
+        <span id="pcCoversV" style="font-family:var(--mono);font-size:16px;font-weight:700"></span>
+      </div>
+      <div class="covbar"><div class="covfill" id="pcCoversBar"></div><div class="covmark"></div></div>
+      <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--faint);margin-top:3px"><span>0% · decay wins</span><span>100% · break-even</span><span>200%+</span></div>
+      <div class="calcnote" id="pcCoversNote" style="margin-top:9px"></div>
+    </div>
+
     <div class="ldiag">
       <div style="font-family:var(--disp);font-weight:700;font-size:13px;margin-bottom:2px">Where your decayed MM goes <span class="muted" id="calcDecayMM" style="font-weight:400;font-size:11px"></span></div>
       <svg viewBox="0 0 520 160" style="width:100%;max-height:180px">
@@ -1346,6 +1359,7 @@ function payoffModel(buyUSD,months,act){
     decayLoss:mm0*decayFrac*pUsd,reflGain:mm0*reflFrac*pUsd,pumpGain:mmAfter*pUsd*(priceMult-1),
     decayMM:mm0*decayFrac,reflAnnualPct:inc>0?(vol*act)*feeR/inc*100:0,pumpAnnualPct:(pm1-1)*100,
     dTre:decTreBps/1e4,dRew:decRewBps/1e4,dBurn:(1e4-decTreBps-decRewBps)/1e4, // live decay split
+    pool,phRatio:inc>0?pool/inc:0,pumpCovers:mm0*decayFrac*pUsd>0?(mmAfter*pUsd*(priceMult-1))/(mm0*decayFrac*pUsd)*100:0, // pump's % offset of decay
     liq:(AN&&AN.liq)||0,s1:scen(100),s2:scen(1000)};
 }
 const _cD=v=>"$"+Math.abs(v).toLocaleString("en-US",{maximumFractionDigits:Math.abs(v)<100?2:0});
@@ -1370,6 +1384,12 @@ function calcEconomy(){
   $("calcBuyV").textContent="$"+buyUSD.toLocaleString("en-US");$("calcYearsV").textContent=m.yrLbl;$("calcActV").textContent=Math.round(act*100)+"%";
   _setf("calcBuy",10,10000,buyUSD);_setf("calcYears",1,24,months);_setf("calcAct",0,200,act*100);
   _hero("calcHero","calcHeroSub",buyUSD,m);$("calcBrk").innerHTML=payoffBrk(m);
+  // pump-vs-decay coverage gauge (bar maxes at 200%; 100% = break-even, marked at center)
+  // only ~break-even (80–150%) is healthy: under-covers = holders lose, over-covers = pool drains
+  const cov=m.pumpCovers, col=(cov>=80&&cov<=150)?"var(--green2)":(cov>=50||cov>150)?"var(--orange2)":"var(--down)";
+  $("pcCoversV").innerHTML="<span style='color:"+col+"'>covers "+cov.toFixed(0)+"%</span>";
+  $("pcCoversBar").style.width=Math.min(cov,200)/2+"%";$("pcCoversBar").style.background=col;
+  $("pcCoversNote").innerHTML="Pool <b>"+fmt(m.pool,0)+" MM</b> = <b>"+m.phRatio.toFixed(2)+"×</b> the decaying holder float. The pump exactly refunds decay only at pool ≈ holder float × mirror (now ×"+m.mir.toFixed(1)+"). "+(cov>150?"Right now it <b>over-covers</b> — unrealizable, and realizing it drains the thin pool.":cov>=80?"Right now it's near <b>break-even</b> — the healthy zone.":cov>=50?"Right now it covers only <b>part</b> of your decay; the rest is real loss.":"Right now <b>decay wins</b> — pool too small for the pump to keep up.")+" To move it: change LP depth, or raise <b>mirror</b> (max ×3).";
   const dst=(p,w,amtMM,col)=>`<div class="dst"><div class="p" style="color:${col}">${p}</div><div class="a">${fmt(amtMM,0)} MM</div><div class="w">${w}</div></div>`;
   const bp=v=>(v%1?v.toFixed(1):v.toFixed(0));
   $("calcDsts").innerHTML=dst(bp(m.dBurn*100)+"% Burn","supply ↓ (helps price)",m.decayMM*m.dBurn,"var(--orange)")+dst(bp(m.dTre*100)+"% Treasury","protocol funding",m.decayMM*m.dTre,"var(--orange2)")+dst(bp(m.dRew*100)+"% Reward","to recent traders",m.decayMM*m.dRew,"var(--green2)")+dst("Mirror → Pump","burned from LP → price ↑",m.decayMM*m.mir,"var(--green)");
