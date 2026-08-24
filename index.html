@@ -808,12 +808,12 @@ const IC={buy:{g:"▲",c:"#00C805"},sell:{g:"▼",c:"#ff5a2c"},burn:{g:"✷",c:"
 const icon=k=>{const o=IC[k]||IC.transfer;return `<span class="ico" style="color:${o.c};border-color:${o.c}44">${o.g}</span>`;};
 // ---- multi-series chart model (real on-chain data) ----
 const SERIES={
-  price :{label:"Price",   ab:"PRICE",color:"#00C805",on:true, data:[],fmtV:v=>ethUsd?usd(v*ethUsd):gwei(v).toFixed(4)+"g"},
-  pool  :{label:"Liquidity",ab:"LIQ", color:"#ffffff",on:true, data:[],fmtV:v=>compactNum(v)+" MM"},
-  supply:{label:"Supply",  ab:"SUPPLY",color:"#8a938e",on:true, data:[],fmtV:v=>compactNum(v)},
-  burn  :{label:"Deflation",ab:"DEFL",color:"#ff7a18",on:true, data:[],fmtV:v=>compactNum(v)},
-  index :{label:"Reflection",ab:"REFL",color:"#ff4d4d",on:true, data:[],fmtV:v=>v.toFixed(5)},
-  vol   :{label:"Volume",  ab:"VOL", color:"#5a635e",on:true, data:[],fmtV:v=>compactNum(v)+" MM"}};
+  price :{label:"Price",   ab:"PRICE",color:"#00e676",on:true, data:[],fmtV:v=>ethUsd?usd(v*ethUsd):gwei(v).toFixed(4)+"g"},   // green
+  pool  :{label:"Liquidity",ab:"LIQ", color:"#ffffff",on:true, data:[],fmtV:v=>compactNum(v)+" MM"},                          // white
+  supply:{label:"Supply",  ab:"SUPPLY",color:"#4d9bff",on:true, data:[],fmtV:v=>compactNum(v)},                              // blue
+  burn  :{label:"Deflation",ab:"DEFL",color:"#ff8c1a",on:true, data:[],fmtV:v=>compactNum(v)},                               // orange
+  index :{label:"Reflection",ab:"REFL",color:"#e05cff",on:true, data:[],fmtV:v=>v.toFixed(5)},                               // magenta
+  vol   :{label:"Volume",  ab:"VOL", color:"#7a8a83",on:true, data:[],fmtV:v=>compactNum(v)+" MM"}};                         // grey
 let chartRange=0; // last N points; 0 = all (full history)
 let chartLog=true; // logarithmic Y (per-series normalized)
 let volYr=0,incSupply=0,reflBps=0,burnBps=0,recentBps=0,treBps=0,mirrorX=1,poolMMg=0,debtBase=0,debtBaseT=0,allPool0=0,refreshFails=0;
@@ -1018,45 +1018,35 @@ async function buildHistory(attempt=0){
     if(!sync.length&&!decays.length){if(attempt<3)setTimeout(()=>buildHistory(attempt+1),1600);return;}
     const capMM=CFG.cap;
     Object.values(SERIES).forEach(s=>s.data=[]);
-    // EVENT-INDEXED x-axis: emit ONE point per block where something actually changed.
-    // Quiet stretches (no on-chain activity) collapse instead of drawing long flat lines,
-    // so the whole reachable history fits and every horizontal step is a real move.
-    const volAt={};swaps.forEach(s=>{volAt[s.b]=(volAt[s.b]||0)+s.vol;});
-    const evBlocks=[...new Set([...sync,...swaps,...decays].map(x=>x.b))].sort((a,b)=>a-b);
-    // downsample to keep the canvas light, preserving event density (dense periods keep more points)
-    const CAP=600,stride=Math.max(1,Math.ceil(evBlocks.length/CAP));
-    let si=0,di=0,lastP=sync[0]?.price||0,lastPool=sync[0]?.pool||0,lastIdx=decays[0]?.idx||1,burnCum=0;
-    const keptBlocks=[];
-    evBlocks.forEach((blk,ix)=>{
-      while(si<sync.length&&sync[si].b<=blk){lastP=sync[si].price;lastPool=sync[si].pool;si++;}
-      while(di<decays.length&&decays[di].b<=blk){burnCum+=decays[di].burn;lastIdx=decays[di].idx;di++;}
-      if(ix%stride!==0&&ix!==evBlocks.length-1)return; // keep every Nth + the very last
-      keptBlocks.push(blk);
-      SERIES.price.data.push(lastP);
-      SERIES.pool.data.push(lastPool);
-      SERIES.index.data.push(lastIdx);
-      SERIES.burn.data.push(burnCum);
-      SERIES.supply.data.push(capMM-burnCum);
-      SERIES.vol.data.push(volAt[blk]||0);
-    });
+    // TIMELINE = SYNC events = real price/liquidity MOVES (every swap & pump emits one).
+    // A point is added ONLY when reserves actually change — no flat filler, purely data-driven.
+    // burn/index (which drift continuously) are sampled at each move; volume = swaps since the
+    // previous move, so old volume bars stay but no-movement bars never appear.
+    let di=0,lastIdx=(decays[0]&&decays[0].idx)||1,burnCum=0,swi=0;
+    let pPrice=null,pPool=null,prevB=sync.length?sync[0].b-1:0;
+    const rawPts=[];
+    for(const sy of sync){
+      while(di<decays.length&&decays[di].b<=sy.b){burnCum+=decays[di].burn;lastIdx=decays[di].idx;di++;}
+      let vol=0;while(swi<swaps.length&&swaps[swi].b<=sy.b){if(swaps[swi].b>prevB)vol+=swaps[swi].vol;swi++;}
+      if(pPrice!==null&&sy.price===pPrice&&sy.pool===pPool){if(rawPts.length)rawPts[rawPts.length-1].vol+=vol;continue;} // unchanged → fold volume, no new point
+      rawPts.push({b:sy.b,price:sy.price,pool:sy.pool,idx:lastIdx,burn:burnCum,vol});
+      pPrice=sy.price;pPool=sy.pool;prevB=sy.b;
+    }
+    if(!rawPts.length){if(attempt<3)setTimeout(()=>buildHistory(attempt+1),1600);return;}
+    // cap only if there is a truly huge number of moves (keep shape via even stride)
+    const CAP=760;let pts=rawPts;
+    if(rawPts.length>CAP){const st=Math.ceil(rawPts.length/CAP);pts=rawPts.filter((_,i)=>i%st===0||i===rawPts.length-1);}
+    const keptBlocks=pts.map(p=>p.b);
+    pts.forEach(p=>{SERIES.price.data.push(p.price);SERIES.pool.data.push(p.pool);SERIES.index.data.push(p.idx);
+      SERIES.burn.data.push(p.burn);SERIES.supply.data.push(capMM-p.burn);SERIES.vol.data.push(p.vol);});
     // hero price coloring uses priceHist
     priceHist.length=0;priceHist.push(...SERIES.price.data.filter(x=>x>0));
     if(priceHist.length){price0=priceHist[0];histLoaded=true;}
     // annualized MM volume + real per-point timestamps (interpolated between boundary blocks)
-    const mnB=evBlocks[0],mxB=evBlocks[evBlocks.length-1],span=(mxB-mnB)||1;
+    const mnB=keptBlocks[0],mxB=keptBlocks[keptBlocks.length-1],span=(mxB-mnB)||1;
     try{const b0=await ro.getBlock(mnB),b1=await ro.getBlock(mxB);const el=(b1.timestamp-b0.timestamp)||1;
       const totVol=swaps.reduce((a,s)=>a+s.vol,0);volYr=totVol*(31536000/el);
       TS=keptBlocks.map(blk=>b0.timestamp+((blk-mnB)/span)*(b1.timestamp-b0.timestamp));}catch(e){}
-    // COLLAPSE near-flat stretches: drop points where nothing moved vs the last kept point,
-    // so long stable periods don't eat horizontal space — active moves keep all their detail.
-    {const rel=(a,b)=>{const m=Math.max(Math.abs(a),Math.abs(b),1e-30);return Math.abs(a-b)/m;};
-     const ks=["price","pool","index"],n=TS.length; // burn/supply grow monotonically — exclude, else nothing ever collapses
-     if(n>8){const keep=[0];
-       for(let i=1;i<n-1;i++){const L=keep[keep.length-1];
-         let moved=false;for(const k of ks){if(rel(SERIES[k].data[i],SERIES[k].data[L])>0.01){moved=true;break;}}
-         if(moved)keep.push(i);}
-       keep.push(n-1);
-       if(keep.length>=4&&keep.length<n){Object.values(SERIES).forEach(s=>{if(s.data.length===n)s.data=keep.map(i=>s.data[i]);});TS=keep.map(i=>TS[i]);}}}
     revealChart();
     // if RPC contention starved the fetch, retry a couple times
     if(SERIES.price.data.every(v=>!v)&&attempt<3)setTimeout(()=>buildHistory(attempt+1),1600);
