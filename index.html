@@ -703,9 +703,9 @@
     <path id="pB" d="M194,150 L250,64" stroke="var(--orange)" stroke-width="1.2" fill="none" opacity=".35"/>
     <path id="pT" d="M194,150 L250,150" stroke="var(--green)" stroke-width="1.2" fill="none" opacity=".35"/>
     <path id="pR" d="M194,150 L250,236" stroke="var(--green2)" stroke-width="1.2" fill="none" opacity=".35"/>
-    <rect x="250" y="42" width="150" height="44" rx="9" fill="rgba(255,122,24,.12)" stroke="var(--orange)"/><text x="325" y="63" text-anchor="middle" fill="var(--orange)" font-family="Archivo" font-weight="700" font-size="12">50% Burn</text><text x="325" y="77" text-anchor="middle" fill="var(--soft)" font-size="9.5">deflation</text>
-    <rect x="250" y="128" width="150" height="44" rx="9" fill="rgba(0,200,5,.1)" stroke="var(--green)"/><text x="325" y="149" text-anchor="middle" fill="var(--green)" font-family="Archivo" font-weight="700" font-size="12">20% Treasury</text><text x="325" y="163" text-anchor="middle" fill="var(--soft)" font-size="9.5">funding</text>
-    <rect x="250" y="214" width="150" height="44" rx="9" fill="rgba(56,255,126,.1)" stroke="var(--green2)"/><text x="325" y="235" text-anchor="middle" fill="var(--green2)" font-family="Archivo" font-weight="700" font-size="12">30% Reward</text><text x="325" y="249" text-anchor="middle" fill="var(--soft)" font-size="9.5">to holders</text>
+    <rect x="250" y="42" width="150" height="44" rx="9" fill="rgba(255,122,24,.12)" stroke="var(--orange)"/><text id="dsBurn" x="325" y="63" text-anchor="middle" fill="var(--orange)" font-family="Archivo" font-weight="700" font-size="12">50% Burn</text><text x="325" y="77" text-anchor="middle" fill="var(--soft)" font-size="9.5">deflation</text>
+    <rect x="250" y="128" width="150" height="44" rx="9" fill="rgba(0,200,5,.1)" stroke="var(--green)"/><text id="dsTre" x="325" y="149" text-anchor="middle" fill="var(--green)" font-family="Archivo" font-weight="700" font-size="12">20% Treasury</text><text x="325" y="163" text-anchor="middle" fill="var(--soft)" font-size="9.5">funding</text>
+    <rect x="250" y="214" width="150" height="44" rx="9" fill="rgba(56,255,126,.1)" stroke="var(--green2)"/><text id="dsRew" x="325" y="235" text-anchor="middle" fill="var(--green2)" font-family="Archivo" font-weight="700" font-size="12">30% Reward</text><text x="325" y="249" text-anchor="middle" fill="var(--soft)" font-size="9.5">to recent traders</text>
     <circle r="3.2" fill="var(--orange)"><animateMotion dur="1.8s" repeatCount="indefinite"><mpath href="#pB"/></animateMotion></circle>
     <circle r="3.2" fill="var(--green)"><animateMotion dur="2.1s" repeatCount="indefinite"><mpath href="#pT"/></animateMotion></circle>
     <circle r="3.2" fill="var(--green2)"><animateMotion dur="1.6s" repeatCount="indefinite"><mpath href="#pR"/></animateMotion></circle>
@@ -716,7 +716,7 @@
       <circle cx="500" cy="212" r="4" fill="var(--green2)" opacity=".5"><animate attributeName="r" values="3;6;3" dur="2s" begin=".8s" repeatCount="indefinite"/></circle>
     </g>
   </svg>
-    <div class="lformula">gross = includedSupply × decayThisPeriod<br>→ <b>burn</b> 50% <span class="c">·</span> <b>treasury</b> 20% <span class="c">·</span> <b>reward pot</b> 30%  <span class="c">and</span>  pumpDebt += gross × <b>mirror</b></div>
+    <div class="lformula">gross = includedSupply × decayThisPeriod<br>→ <b>burn</b> <span id="dfBurn">50%</span> <span class="c">·</span> <b>treasury</b> <span id="dfTre">20%</span> <span class="c">·</span> <b>reward pot</b> <span id="dfRew">30%</span>  <span class="c">and</span>  pumpDebt += gross × <b>mirror</b></div>
   </div>
 
   <!-- 3 · SWAP TAX / REFLECTION -->
@@ -876,9 +876,9 @@
         <circle r="3" fill="var(--orange2)" filter="url(#ng)"><animateMotion dur="1.9s" repeatCount="indefinite"><mpath href="#cf2"/></animateMotion></circle>
         <circle r="3" fill="var(--green2)" filter="url(#ng)"><animateMotion dur="1.4s" repeatCount="indefinite"><mpath href="#cf3"/></animateMotion></circle>
         <circle r="3" fill="var(--green)" filter="url(#ng)"><animateMotion dur="1.2s" repeatCount="indefinite"><mpath href="#cf4"/></animateMotion></circle>
-        <text x="312" y="30" fill="var(--orange)" font-family="IBM Plex Mono" font-size="10.5">🔥 50% burned → supply ↓</text>
-        <text x="312" y="78" fill="var(--orange2)" font-family="IBM Plex Mono" font-size="10.5">🏦 20% → treasury</text>
-        <text x="312" y="124" fill="var(--green2)" font-family="IBM Plex Mono" font-size="10.5">✦ 30% → recent traders</text>
+        <text id="dfl1" x="312" y="30" fill="var(--orange)" font-family="IBM Plex Mono" font-size="10.5">🔥 50% burned → supply ↓</text>
+        <text id="dfl2" x="312" y="78" fill="var(--orange2)" font-family="IBM Plex Mono" font-size="10.5">🏦 20% → treasury</text>
+        <text id="dfl3" x="312" y="124" fill="var(--green2)" font-family="IBM Plex Mono" font-size="10.5">✦ 30% → recent traders</text>
         <text x="312" y="154" fill="var(--green)" font-family="IBM Plex Mono" font-size="10.5">⚙ mirror → pump → price ↑</text>
       </svg>
       <div class="dsts" id="calcDsts"></div>
@@ -935,6 +935,7 @@ const SERIES={
 let chartRange=0; // last N points; 0 = all (full history)
 let chartLog=true; // logarithmic Y (per-series normalized)
 let volYr=0,incSupply=0,reflBps=0,burnBps=0,recentBps=0,treBps=0,mirrorX=1,poolMMg=0,debtBase=0,debtBaseT=0,allPool0=0,refreshFails=0;
+let decTreBps=2000,decRewBps=3000; // decay split (bps): treasury / reward; burn = 10000 − these. Read live from chain.
 let gMirrorBps=10000,gBbOn=false,gPPool=null,AN={},TS=[];
 let lastSettleWall=Date.now(),pumpCumPrev=-1; // pending pump accrues from last realized burn
 // Anchor "last settle" to the last on-chain settle time. Sources arrive over ~seconds:
@@ -1247,9 +1248,10 @@ async function buildHistory(attempt=0){
 // Rarely-changing protocol config — fetched every 30s, not every 5s (RPC-light).
 async function fetchSlow(){
   try{
-    const [dR,fb,fr,frc,ft,mirror,bbOn,pPool,bbThresh,bbRouters]=await mmMulti([["decayRatePerSecond"],["burnFeeBps"],["reflectFeeBps"],["recentFeeBps"],["treasuryFeeBps"],["pumpMirrorBps"],["buybackEnabled"],["pumpPool"],["buybackThreshold"],["buybackRoutersLength"]]);
+    const [dR,dTre,dRew,fb,fr,frc,ft,mirror,bbOn,pPool,bbThresh,bbRouters]=await mmMulti([["decayRatePerSecond"],["decayTreasuryBps"],["decayRewardBps"],["burnFeeBps"],["reflectFeeBps"],["recentFeeBps"],["treasuryFeeBps"],["pumpMirrorBps"],["buybackEnabled"],["pumpPool"],["buybackThreshold"],["buybackRoutersLength"]]);
     const ethBal=await rr(()=>ro.getBalance(CFG.mm));
     decayR=Number(dR)/1e18;burnBps=Number(fb);reflBps=Number(fr);recentBps=Number(frc);treBps=Number(ft);mirrorX=Number(mirror)/10000;gMirrorBps=Number(mirror);gBbOn=bbOn;gPPool=pPool;
+    decTreBps=Number(dTre);decRewBps=Number(dRew);paintDecaySplit(); // live decay split → keep every "where decay goes" display in sync
     const yr=(1-Math.pow(1-decayR,31536000))*100;
     $("d_decay").innerHTML=yr.toFixed(1)+" <small style='color:var(--faint)'>%/yr</small>";
     $("d_fee").textContent=((burnBps+reflBps+recentBps+treBps)/100).toFixed(1)+"%";
@@ -1343,6 +1345,7 @@ function payoffModel(buyUSD,months,act){
   return {pUsd,feeTot,mir,years,yrLbl,entryTax,mm0,decayFrac,priceMult,netVal,netPnl,up:netPnl>=0,
     decayLoss:mm0*decayFrac*pUsd,reflGain:mm0*reflFrac*pUsd,pumpGain:mmAfter*pUsd*(priceMult-1),
     decayMM:mm0*decayFrac,reflAnnualPct:inc>0?(vol*act)*feeR/inc*100:0,pumpAnnualPct:(pm1-1)*100,
+    dTre:decTreBps/1e4,dRew:decRewBps/1e4,dBurn:(1e4-decTreBps-decRewBps)/1e4, // live decay split
     liq:(AN&&AN.liq)||0,s1:scen(100),s2:scen(1000)};
 }
 const _cD=v=>"$"+Math.abs(v).toLocaleString("en-US",{maximumFractionDigits:Math.abs(v)<100?2:0});
@@ -1368,7 +1371,8 @@ function calcEconomy(){
   _setf("calcBuy",10,10000,buyUSD);_setf("calcYears",1,24,months);_setf("calcAct",0,200,act*100);
   _hero("calcHero","calcHeroSub",buyUSD,m);$("calcBrk").innerHTML=payoffBrk(m);
   const dst=(p,w,amtMM,col)=>`<div class="dst"><div class="p" style="color:${col}">${p}</div><div class="a">${fmt(amtMM,0)} MM</div><div class="w">${w}</div></div>`;
-  $("calcDsts").innerHTML=dst("50% Burn","supply ↓ (helps price)",m.decayMM*0.5,"var(--orange)")+dst("20% Treasury","protocol funding",m.decayMM*0.2,"var(--orange2)")+dst("30% Reward","to recent traders",m.decayMM*0.3,"var(--green2)")+dst("Mirror → Pump","burned from LP → price ↑",m.decayMM*m.mir,"var(--green)");
+  const bp=v=>(v%1?v.toFixed(1):v.toFixed(0));
+  $("calcDsts").innerHTML=dst(bp(m.dBurn*100)+"% Burn","supply ↓ (helps price)",m.decayMM*m.dBurn,"var(--orange)")+dst(bp(m.dTre*100)+"% Treasury","protocol funding",m.decayMM*m.dTre,"var(--orange2)")+dst(bp(m.dRew*100)+"% Reward","to recent traders",m.decayMM*m.dRew,"var(--green2)")+dst("Mirror → Pump","burned from LP → price ↑",m.decayMM*m.mir,"var(--green)");
   $("calcDecayMM").textContent="· "+fmt(m.decayMM,0)+" MM decays over "+m.yrLbl;
   $("calcTwo").innerHTML=`<div class="b"><div class="h">$100 buyer</div><div class="o ${m.s1>=100?'cpos':'cneg'}">→ $${m.s1.toLocaleString("en-US",{maximumFractionDigits:0})}</div><div class="muted" style="font-size:10px">${(m.s1/100).toFixed(2)}× in ${m.yrLbl}</div></div>`+`<div class="b"><div class="h">$1,000 buyer</div><div class="o ${m.s2>=1000?'cpos':'cneg'}">→ $${m.s2.toLocaleString("en-US",{maximumFractionDigits:0})}</div><div class="muted" style="font-size:10px">${(m.s2/1000).toFixed(2)}× — same rate, 10× stake</div></div>`;
   $("calcSeed").innerHTML=[["MM price","$"+m.pUsd.toExponential(2)],["ETH","$"+ethUsd.toLocaleString("en-US",{maximumFractionDigits:0})],["Decay","50%/yr"],["Swap tax","4%"],["Reflection","+"+m.reflAnnualPct.toFixed(0)+"%/yr"],["Pump","+"+m.pumpAnnualPct.toFixed(0)+"%/yr"],["Pool","$"+fmt(m.liq,0)]].map(([k,v])=>`<span class="seedchip">${k} <b>${v}</b></span>`).join("");
@@ -1388,6 +1392,15 @@ function posTab(which){
   if(mn)mn.style.display=which==="calc"?"none":"";if(cx)cx.style.display=which==="calc"?"":"none";
   if(tp)tp.classList.toggle("on",which!=="calc");if(tc)tc.classList.toggle("on",which==="calc");
   if(which==="calc")posCalc();
+}
+// Keep every decay-split display (How-it-works flywheel + formula) in sync with the live on-chain
+// bps. Burn = 10000 − treasury − reward. NOTE the reward pot goes to RECENT TRADERS, not passive holders.
+function paintDecaySplit(){
+  const tre=decTreBps/100, rew=decRewBps/100, burn=(10000-decTreBps-decRewBps)/100, p=v=>v%1?v.toFixed(1):v.toFixed(0);
+  const set=(id,v)=>{const el=$(id);if(el)el.textContent=v;};
+  set("dsBurn",p(burn)+"% Burn");set("dsTre",p(tre)+"% Treasury");set("dsRew",p(rew)+"% Reward");
+  set("dfBurn",p(burn)+"%");set("dfTre",p(tre)+"%");set("dfRew",p(rew)+"%");
+  set("dfl1","🔥 "+p(burn)+"% burned → supply ↓");set("dfl2","🏦 "+p(tre)+"% → treasury");set("dfl3","✦ "+p(rew)+"% → recent traders");
 }
 // Append a live point ONLY when price or liquidity actually moved — no change, no new point,
 // so the chart never scrolls right on empty ticks. Keeps every series + TS length-aligned.
@@ -1559,7 +1572,7 @@ const MC_ABI=["function aggregate3((address target,bool allowFailure,bytes callD
 let multicall;const mif=new E.Interface(["function balanceOf(address) view returns(uint256)","function isExcluded(address) view returns(bool)"]);
 async function mcall(calls){if(!multicall)multicall=new E.Contract(MULTICALL,MC_ABI,ro);return rr(()=>multicall.aggregate3(calls));}
 // batched read of many MM view calls in ONE atomic eth_call (robust vs partial batch drops)
-const RD=new E.Interface(["function totalSupply() view returns(uint256)","function treasuryBalance() view returns(uint256)","function holderRewardPot() view returns(uint256)","function currentIndex() view returns(uint256)","function excludedSupply() view returns(uint256)","function balanceOf(address) view returns(uint256)","function pumpDebt() view returns(uint256)","function decayRatePerSecond() view returns(uint256)","function burnFeeBps() view returns(uint256)","function reflectFeeBps() view returns(uint256)","function recentFeeBps() view returns(uint256)","function treasuryFeeBps() view returns(uint256)","function pumpMirrorBps() view returns(uint256)","function buybackEnabled() view returns(bool)","function pumpPool() view returns(address)","function buybackThreshold() view returns(uint256)","function buybackRoutersLength() view returns(uint256)"]);
+const RD=new E.Interface(["function totalSupply() view returns(uint256)","function treasuryBalance() view returns(uint256)","function holderRewardPot() view returns(uint256)","function currentIndex() view returns(uint256)","function excludedSupply() view returns(uint256)","function balanceOf(address) view returns(uint256)","function pumpDebt() view returns(uint256)","function decayRatePerSecond() view returns(uint256)","function decayTreasuryBps() view returns(uint256)","function decayRewardBps() view returns(uint256)","function burnFeeBps() view returns(uint256)","function reflectFeeBps() view returns(uint256)","function recentFeeBps() view returns(uint256)","function treasuryFeeBps() view returns(uint256)","function pumpMirrorBps() view returns(uint256)","function buybackEnabled() view returns(bool)","function pumpPool() view returns(address)","function buybackThreshold() view returns(uint256)","function buybackRoutersLength() view returns(uint256)"]);
 async function mmMulti(spec){ // spec: [[method,...args],...] on CFG.mm; last optional {eth:addr} handled by caller
   const calls=spec.map(([m,...args])=>({target:CFG.mm,allowFailure:false,callData:RD.encodeFunctionData(m,args)}));
   const res=await mcall(calls);
