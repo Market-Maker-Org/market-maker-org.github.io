@@ -171,7 +171,8 @@
   .crange .cbtn.on{background:var(--green);color:#00220a;border-color:transparent}
   .chartwrap{position:relative;flex:1;min-height:0;display:flex;margin-top:6px}
   #c_price{flex:1;width:100%;min-height:0;background:transparent;border:0;margin-top:0}
-  .clegend{position:absolute;top:6px;left:6px;z-index:3;display:flex;flex-direction:column;align-items:stretch;gap:3px;
+  .clegend{display:none!important}
+  .clegend.legacy{position:absolute;top:6px;left:6px;z-index:3;flex-direction:column;align-items:stretch;gap:3px;
     font-family:var(--mono);font-size:10.5px;background:rgba(3,5,4,.72);backdrop-filter:blur(4px);border:1px solid var(--line);border-radius:10px;padding:6px 7px;min-width:150px}
   .clegend .li{display:grid;grid-template-columns:52px 1fr auto;align-items:center;gap:7px;white-space:nowrap;
     border-left:2px solid;padding:1.5px 0 1.5px 7px}
@@ -809,7 +810,7 @@ const icon=k=>{const o=IC[k]||IC.transfer;return `<span class="ico" style="color
 const SERIES={
   price :{label:"Price",   ab:"PRICE",color:"#00C805",on:true, data:[],fmtV:v=>ethUsd?usd(v*ethUsd):gwei(v).toFixed(4)+"g"},
   pool  :{label:"Liquidity",ab:"LIQ", color:"#ffffff",on:true, data:[],fmtV:v=>compactNum(v)+" MM"},
-  supply:{label:"Supply",  ab:"SUPPLY",color:"#8a938e",on:false,data:[],fmtV:v=>compactNum(v)},
+  supply:{label:"Supply",  ab:"SUPPLY",color:"#8a938e",on:true, data:[],fmtV:v=>compactNum(v)},
   burn  :{label:"Deflation",ab:"DEFL",color:"#ff7a18",on:true, data:[],fmtV:v=>compactNum(v)},
   index :{label:"Reflection",ab:"REFL",color:"#ff4d4d",on:true, data:[],fmtV:v=>v.toFixed(5)},
   vol   :{label:"Volume",  ab:"VOL", color:"#5a635e",on:true, data:[],fmtV:v=>compactNum(v)+" MM"}};
@@ -834,13 +835,14 @@ function showSkeletons(){
   const pr=$("d_price");if(pr)pr.innerHTML='<span class="sk" style="width:200px;height:32px"></span>';
   const fe=$("feed");if(fe)fe.innerHTML='<div class="ev" style="pointer-events:none"><span class="sk" style="width:100%;height:15px"></span></div>'.repeat(4);
   const hl=$("holderList");if(hl)hl.innerHTML='<div class="hrow" style="pointer-events:none"><span class="sk" style="width:100%;height:15px"></span></div>'.repeat(6);}
-function savePrefs(){try{localStorage.setItem("mm_prefs",JSON.stringify({watch,range:chartRange,log:chartLog,slip:swSlip,series:Object.fromEntries(Object.entries(SERIES).map(([k,s])=>[k,s.on]))}));}catch(e){}}
+function savePrefs(){try{localStorage.setItem("mm_prefs",JSON.stringify({v:2,watch,range:chartRange,log:chartLog,slip:swSlip,series:Object.fromEntries(Object.entries(SERIES).map(([k,s])=>[k,s.on]))}));}catch(e){}}
 function loadPrefs(){try{const p=JSON.parse(localStorage.getItem("mm_prefs")||"{}");
   if(p.watch&&/^0x[a-fA-F0-9]{40}$/.test(p.watch))watch=p.watch;
   if(typeof p.range==="number")chartRange=p.range;
   if(typeof p.log==="boolean")chartLog=p.log;
   if(typeof p.slip==="number")swSlip=p.slip;
-  if(p.series)Object.entries(p.series).forEach(([k,v])=>{if(SERIES[k])SERIES[k].on=!!v;});}catch(e){}}
+  // v2 migration: SUPPLY is now on by default — don't let an old stored "off" hide it
+  if(p.series)Object.entries(p.series).forEach(([k,v])=>{if(SERIES[k]&&!(k==="supply"&&p.v!==2))SERIES[k].on=!!v;});}catch(e){}}
 const gwei=p=>p*1e9; // ETH per MM -> gwei per MM
 let ethUsd=0;
 const BS="https://robinhoodchain.blockscout.com";
@@ -995,46 +997,66 @@ const DECAY_TOPIC=E.id("Decay(uint256,uint256,uint256,uint256,uint256)");
 // liquidity, volume) and the token's Decay events (reflection index, deflation).
 async function buildHistory(attempt=0){
   try{
-    const cur=await ro.getBlockNumber();const c=E.AbiCoder.defaultAbiCoder();const CH=45000,N=5;
+    const cur=await ro.getBlockNumber();const c=E.AbiCoder.defaultAbiCoder();
+    const CH=45000,MAX=28; // walk back up to ~1.26M blocks, but STOP EARLY once history runs dry
     const sync=[],swaps=[],decays=[];
-    // SEQUENTIAL fetches — the /rpc proxy returns empty arrays under concurrent getLogs load.
-    for(let i=N-1;i>=0;i--){const to=cur-i*CH,from=Math.max(0,to-CH+1);if(to<=0)continue;
+    let emptyRun=0,seen=false;
+    // SEQUENTIAL, walking backward from head — the /rpc proxy returns empty arrays under
+    // concurrent getLogs load. Keep going until the token's history runs out (or the cap).
+    for(let ci=0;ci<MAX;ci++){
+      const to=cur-ci*CH,from=Math.max(0,to-CH+1);if(to<=0)break;let got=0;
       try{const ls=await ro.getLogs({address:CFG.ethPair,topics:[SYNC_TOPIC],fromBlock:from,toBlock:to});
-        ls.forEach(l=>{const d=c.decode(["uint112","uint112"],l.data);const w=Number(E.formatUnits(d[0],18)),m=Number(E.formatUnits(d[1],18));if(m>0)sync.push({b:l.blockNumber,price:w/m,pool:m});});}catch(e){}
+        ls.forEach(l=>{const d=c.decode(["uint112","uint112"],l.data);const w=Number(E.formatUnits(d[0],18)),m=Number(E.formatUnits(d[1],18));if(m>0){sync.push({b:l.blockNumber,price:w/m,pool:m});got++;}});}catch(e){}
       try{const ls=await ro.getLogs({address:CFG.ethPair,topics:[V2SWAP_TOPIC],fromBlock:from,toBlock:to});
-        ls.forEach(l=>{const d=c.decode(["uint256","uint256","uint256","uint256"],l.data);swaps.push({b:l.blockNumber,vol:Number(E.formatUnits(d[1],18))+Number(E.formatUnits(d[3],18))});});}catch(e){}
+        ls.forEach(l=>{const d=c.decode(["uint256","uint256","uint256","uint256"],l.data);swaps.push({b:l.blockNumber,vol:Number(E.formatUnits(d[1],18))+Number(E.formatUnits(d[3],18))});got++;});}catch(e){}
       try{const ls=await ro.getLogs({address:CFG.mm,topics:[DECAY_TOPIC],fromBlock:from,toBlock:to});
-        ls.forEach(l=>{const d=c.decode(["uint256","uint256","uint256","uint256","uint256"],l.data);decays.push({b:l.blockNumber,burn:Number(E.formatUnits(d[1],18)),idx:Number(E.formatUnits(d[4],18))});});}catch(e){}
+        ls.forEach(l=>{const d=c.decode(["uint256","uint256","uint256","uint256","uint256"],l.data);decays.push({b:l.blockNumber,burn:Number(E.formatUnits(d[1],18)),idx:Number(E.formatUnits(d[4],18))});got++;});}catch(e){}
+      if(got>0){seen=true;emptyRun=0;}else if(seen&&++emptyRun>=3)break; // 3 empty chunks in a row → reached genesis
+      if(from<=0)break;
     }
     sync.sort((a,b)=>a.b-b.b);swaps.sort((a,b)=>a.b-b.b);decays.sort((a,b)=>a.b-b.b);
-    if(!sync.length&&!decays.length)return;
-    const blks=[...sync,...swaps,...decays].map(x=>x.b);
-    const mnB=Math.min(...blks),mxB=Math.max(...blks),span=(mxB-mnB)||1,B=120;
+    if(!sync.length&&!decays.length){if(attempt<3)setTimeout(()=>buildHistory(attempt+1),1600);return;}
     const capMM=CFG.cap;
     Object.values(SERIES).forEach(s=>s.data=[]);
+    // EVENT-INDEXED x-axis: emit ONE point per block where something actually changed.
+    // Quiet stretches (no on-chain activity) collapse instead of drawing long flat lines,
+    // so the whole reachable history fits and every horizontal step is a real move.
+    const volAt={};swaps.forEach(s=>{volAt[s.b]=(volAt[s.b]||0)+s.vol;});
+    const evBlocks=[...new Set([...sync,...swaps,...decays].map(x=>x.b))].sort((a,b)=>a-b);
+    // downsample to keep the canvas light, preserving event density (dense periods keep more points)
+    const CAP=600,stride=Math.max(1,Math.ceil(evBlocks.length/CAP));
     let si=0,di=0,lastP=sync[0]?.price||0,lastPool=sync[0]?.pool||0,lastIdx=decays[0]?.idx||1,burnCum=0;
-    // seed cumulative burn before window with 0 (relative deflation over the window)
-    for(let k=0;k<B;k++){
-      const lo=mnB+span*k/B,hi=mnB+span*(k+1)/B;
-      while(si<sync.length&&sync[si].b<=hi){lastP=sync[si].price;lastPool=sync[si].pool;si++;}
-      let vol=0;
-      // volume + burn in this bucket
-      for(const sw of swaps)if(sw.b>lo&&sw.b<=hi)vol+=sw.vol;
-      while(di<decays.length&&decays[di].b<=hi){burnCum+=decays[di].burn;lastIdx=decays[di].idx;di++;}
+    const keptBlocks=[];
+    evBlocks.forEach((blk,ix)=>{
+      while(si<sync.length&&sync[si].b<=blk){lastP=sync[si].price;lastPool=sync[si].pool;si++;}
+      while(di<decays.length&&decays[di].b<=blk){burnCum+=decays[di].burn;lastIdx=decays[di].idx;di++;}
+      if(ix%stride!==0&&ix!==evBlocks.length-1)return; // keep every Nth + the very last
+      keptBlocks.push(blk);
       SERIES.price.data.push(lastP);
       SERIES.pool.data.push(lastPool);
       SERIES.index.data.push(lastIdx);
       SERIES.burn.data.push(burnCum);
       SERIES.supply.data.push(capMM-burnCum);
-      SERIES.vol.data.push(vol);
-    }
+      SERIES.vol.data.push(volAt[blk]||0);
+    });
     // hero price coloring uses priceHist
     priceHist.length=0;priceHist.push(...SERIES.price.data.filter(x=>x>0));
     if(priceHist.length){price0=priceHist[0];histLoaded=true;}
-    // annualized MM volume from the window (for reflection-yield math)
+    // annualized MM volume + real per-point timestamps (interpolated between boundary blocks)
+    const mnB=evBlocks[0],mxB=evBlocks[evBlocks.length-1],span=(mxB-mnB)||1;
     try{const b0=await ro.getBlock(mnB),b1=await ro.getBlock(mxB);const el=(b1.timestamp-b0.timestamp)||1;
       const totVol=swaps.reduce((a,s)=>a+s.vol,0);volYr=totVol*(31536000/el);
-      const B=SERIES.price.data.length;TS=[];for(let k=0;k<B;k++)TS.push(b0.timestamp+((k+0.5)/B)*(b1.timestamp-b0.timestamp));}catch(e){}
+      TS=keptBlocks.map(blk=>b0.timestamp+((blk-mnB)/span)*(b1.timestamp-b0.timestamp));}catch(e){}
+    // COLLAPSE near-flat stretches: drop points where nothing moved vs the last kept point,
+    // so long stable periods don't eat horizontal space — active moves keep all their detail.
+    {const rel=(a,b)=>{const m=Math.max(Math.abs(a),Math.abs(b),1e-30);return Math.abs(a-b)/m;};
+     const ks=["price","pool","index"],n=TS.length; // burn/supply grow monotonically — exclude, else nothing ever collapses
+     if(n>8){const keep=[0];
+       for(let i=1;i<n-1;i++){const L=keep[keep.length-1];
+         let moved=false;for(const k of ks){if(rel(SERIES[k].data[i],SERIES[k].data[L])>0.01){moved=true;break;}}
+         if(moved)keep.push(i);}
+       keep.push(n-1);
+       if(keep.length>=4&&keep.length<n){Object.values(SERIES).forEach(s=>{if(s.data.length===n)s.data=keep.map(i=>s.data[i]);});TS=keep.map(i=>TS[i]);}}}
     revealChart();
     // if RPC contention starved the fetch, retry a couple times
     if(SERIES.price.data.every(v=>!v)&&attempt<3)setTimeout(()=>buildHistory(attempt+1),1600);
@@ -1132,13 +1154,15 @@ function renderPnL(bal){
   const netAll=pumpPct+reflPct-decayPct;                // all-in value net
   const pill=v=>`<span class="netpill ${v>=0?'pos':'neg'}">${v>=0?'net +':'net −'}</span>`;
   const cls=v=>v>=0?'pos':'neg',sg=v=>(v>=0?'+':'−')+Math.abs(v).toFixed(0)+'%';
+  const amt=n=>fmt(Math.abs(n),0)+" MM";
+  const decayMM=bal*dFrac,reflMM=bal*reflPct/100,netExMM=bal*netEx/100,netAllMM=bal*netAll/100; // YOUR MM amounts — differ per wallet
   box.innerHTML=`
-   <div class="row"><span class="l">${icon('decay')} Decay <span class="muted">/yr · your MM</span></span><span class="v neg">−${decayPct.toFixed(0)}%</span></div>
-   <div class="row"><span class="l">${icon('pump')} Pump lift <span class="muted">/yr · LP burn</span></span><span class="v pos">+${pumpPct.toFixed(0)}%</span></div>
-   <div class="row"><span class="l">${icon('reflect')} Reflection <span class="muted">/yr · fees</span></span><span class="v pos">+${reflPct.toFixed(0)}%</span></div>
-   <div class="row net"><span class="l">Net · ex-swap ${pill(netEx)}</span><span class="v ${cls(netEx)}">${sg(netEx)}<span class="muted">/yr</span></span></div>
-   <div class="row"><span class="l">Net · all-in ${pill(netAll)}</span><span class="v ${cls(netAll)}">${sg(netAll)}<span class="muted">/yr</span></span></div>
-   <div class="row"><span class="l muted" style="font-size:9.5px">value terms · pump bounded by pool refill · refl by volume run-rate</span></div>`;
+   <div class="row"><span class="l">${icon('decay')} Decay <span class="muted">/yr</span></span><span class="v neg">−${decayPct.toFixed(0)}% <span class="muted">·−${amt(decayMM)}</span></span></div>
+   <div class="row"><span class="l">${icon('pump')} Pump lift <span class="muted">/yr</span></span><span class="v pos">+${pumpPct.toFixed(0)}%</span></div>
+   <div class="row"><span class="l">${icon('reflect')} Reflection <span class="muted">/yr</span></span><span class="v pos">+${reflPct.toFixed(0)}% <span class="muted">·+${amt(reflMM)}</span></span></div>
+   <div class="row net"><span class="l">Net · ex-swap ${pill(netEx)}</span><span class="v ${cls(netEx)}">${sg(netEx)} <span class="muted">${netEx>=0?'+':'−'}${amt(netExMM)}</span></span></div>
+   <div class="row"><span class="l">Net · all-in ${pill(netAll)}</span><span class="v ${cls(netAll)}">${sg(netAll)} <span class="muted">${netAll>=0?'+':'−'}${amt(netAllMM)}</span></span></div>
+   <div class="row"><span class="l muted" style="font-size:9.5px">% is per-unit (same for every holder) — MM amounts are yours</span></div>`;
 }
 // adaptive: show tiny debt down to ~1e-9 so accrual is visible live
 function fmtDebt(v){if(!v)return "0";if(Math.abs(v)>=1)return v.toLocaleString("en-US",{maximumFractionDigits:4});
@@ -1167,18 +1191,26 @@ function tickDebt(){
 }
 
 const TT=E.id("Transfer(address,address,uint256)"),tif=new E.Interface(["event Transfer(address indexed from,address indexed to,uint256 value)"]);
-async function getFeed(){try{const cur=await ro.getBlockNumber();const logs=await ro.getLogs({address:CFG.mm,topics:[TT],fromBlock:Math.max(0,cur-40000),toBlock:cur});
-  // anchor pending-pump accrual to the REAL last settle: any transfer runs _settleDecay,
-  // so decay only accrues on-chain since the most recent transfer's block.
-  try{if(logs.length){const lastTx=Math.max(...logs.map(l=>l.blockNumber));const[bl,now]=await Promise.all([ro.getBlock(lastTx),ro.getBlock("latest")]);
-    const elapsed=Math.max(0,now.timestamp-bl.timestamp);lastSettleWall=Date.now()-elapsed*1000;}}catch(e){}
-  const pm=CFG.pm.toLowerCase(),hk=CFG.hook.toLowerCase(),mm=CFG.mm.toLowerCase(),Z="0x0000000000000000000000000000000000000000",D=10n**15n;
-  const evs=logs.map(l=>{const p=tif.parseLog(l);return{f:p.args.from.toLowerCase(),t:p.args.to.toLowerCase(),v:p.args.value,h:l.transactionHash,b:l.blockNumber};}).filter(e=>e.v>=D).slice(-14).reverse();
-  $("feed").innerHTML=evs.map(e=>{let k="transfer",cls="",lb="transfer";
-    if(e.f===pm){k="buy";cls="buy";lb="buy";}else if(e.t===pm){k="sell";cls="sell";lb="sell";}
-    else if(e.t===Z){k="burn";cls="burnE";lb="burn";}else if(e.f===Z&&e.t===mm){k="decay";cls="refl";lb="decay → treasury/pot";}else if(e.t===mm||e.t===hk){k="treasury";cls="refl";lb="fee → treasury";}
-    const t=ago((cur-e.b)*avgBlockMs/1000);
-    return `<a class="ev ${cls}" href="${EXPLORER}/tx/${e.h}" target="_blank" title="View tx on explorer">${icon(k)}<span>${lb}</span><span class="evago">${t}</span><span class="mono">${fmt(e.v,2)}</span></a>`;}).join("")||'<div class="muted">no recent activity</div>';
+// Reliable feed + real last-settle anchor from Blockscout transfers (has timestamps).
+async function getFeed(){try{
+  const r=await fetch(BS+"/api/v2/tokens/"+CFG.mm+"/transfers");const j=await r.json();
+  if(!j.items||!j.items.length)return;
+  const now=Date.now();
+  // newest transfer's REAL timestamp = last on-chain _settleDecay → anchor pending pump
+  const nt=j.items[0]&&j.items[0].timestamp?new Date(j.items[0].timestamp).getTime():0;
+  if(nt>0)lastSettleWall=nt;
+  const pm=CFG.pm.toLowerCase(),hk=CFG.hook.toLowerCase(),mm=CFG.mm.toLowerCase(),Z="0x0000000000000000000000000000000000000000";
+  const pools=new Set([CFG.ethPair,CFG.pools[1].id,CFG.pools[2].id,CFG.pm].map(a=>a.toLowerCase()));
+  const evs=j.items.filter(it=>it.total&&BigInt(it.total.value)>=10n**15n).slice(0,14);
+  $("feed").innerHTML=evs.map(it=>{const f=(it.from&&it.from.hash||"").toLowerCase(),t=(it.to&&it.to.hash||"").toLowerCase(),v=Number(E.formatUnits(BigInt(it.total.value),18));
+    let k="transfer",cls="",lb="transfer";
+    if(t===Z){k="burn";cls="burnE";lb="burn";}
+    else if(f===Z&&t===mm){k="decay";cls="refl";lb="decay → treasury/pot";}
+    else if(pools.has(f)){k="buy";cls="buy";lb="buy";}
+    else if(pools.has(t)){k="sell";cls="sell";lb="sell";}
+    else if(t===mm||t===hk){k="treasury";cls="refl";lb="fee → treasury";}
+    const tago=it.timestamp?ago((now-new Date(it.timestamp).getTime())/1000):"";
+    return `<a class="ev ${cls}" href="${EXPLORER}/tx/${it.transaction_hash}" target="_blank" title="View tx on explorer">${icon(k)}<span>${lb}</span><span class="evago">${tago}</span><span class="mono">${fmt(v,2)}</span></a>`;}).join("")||'<div class="muted">no recent activity</div>';
 }catch(e){}}
 
 const KNOWN={};
@@ -1199,11 +1231,19 @@ async function getHolders(){
     if(!j.items||!j.items.length)return; // transient / empty -> keep existing list
     const items=j.items.slice(0,14);
     const pm=CFG.pm.toLowerCase(),hk=CFG.hook.toLowerCase(),mm=CFG.mm.toLowerCase(),sd="0x0bc6146b349446458383093e39b6c30a7c7bb571",me=(account||watch||"").toLowerCase();
+    // labelled infrastructure: pools, engine wallets, foundation
+    const LABELS={
+      [pm]:["V4 pool","pool"],[hk]:["hook","pool"],[mm]:["treasury","pool"],
+      [CFG.ethPair.toLowerCase()]:["MM/ETH LP","pool"],
+      [CFG.pools[1].id.toLowerCase()]:["MM/THROB LP","pool"],
+      [CFG.pools[2].id.toLowerCase()]:["MM/PACK LP","pool"],
+      [sd]:["seeder",""],
+      ["0x91b5965e81dac2687d0dad000bd6ef207d2d167f"]:["foundation","owner"]};
     const cand=[];
     for(const it of items){const a=(it.address&&it.address.hash||"").toLowerCase();if(!a)continue;
       let tag="",tc="",infra=false;
-      if(a===pm){tag="pool";tc="pool";infra=true;}else if(a===hk){tag="hook";tc="pool";infra=true;}else if(a===mm){tag="treasury";tc="pool";infra=true;}
-      else if(a===sd){tag="seeder";tc="";infra=true;}else if(a===me){tag="you";tc="you";}
+      if(LABELS[a]){tag=LABELS[a][0];tc=LABELS[a][1];infra=(a!==me);}
+      if(a===me){tag=tag?tag+" · you":"you";tc="you";}
       cand.push({a,tag,tc,infra,fallback:it.value||"0"});}
     // ONE multicall for all balances (+ isExcluded for unknown, non-infra addresses)
     const unknown=cand.filter(c=>!c.infra&&KNOWN[c.a]===undefined).map(c=>c.a);
@@ -1414,7 +1454,12 @@ function sliceN(a){return chartRange>0?a.slice(-chartRange):a;}
 function compactNum(v){const a=Math.abs(v);if(a>=1e9)return (v/1e9).toFixed(2)+"B";if(a>=1e6)return (v/1e6).toFixed(2)+"M";if(a>=1e3)return (v/1e3).toFixed(1)+"k";if(a>=1)return v.toFixed(2);if(a>0)return v.toPrecision(2);return "0";}
 function usdAxis(u){if(u>=1)return "$"+u.toFixed(2);if(u>=0.01)return "$"+u.toFixed(4);if(u<=0)return "$0";return "$"+u.toFixed(9).replace(/0+$/,"");}
 function axisFmt(k,v){return k==="price"?(ethUsd?usdAxis(v*ethUsd):gwei(v).toFixed(2)+"g"):k==="index"?v.toFixed(4):compactNum(v);}
-let _chart=null,_hoverI=null,_reveal=1,_revRaf=0;
+let _chart=null,_hoverI=null,_reveal=1,_revRaf=0,_flowPhase=0,_flowLast=0;
+// gentle flowing-neon animation for the legend connectors (throttled, only when chart visible)
+function flowTick(t){requestAnimationFrame(flowTick);
+  if(document.hidden)return;const c=$("c_price");if(!c||!c.offsetParent)return;
+  if(t-_flowLast<90)return;_flowLast=t;_flowPhase=(_flowPhase+3)%100000;if(_reveal>=1)drawChart();}
+requestAnimationFrame(flowTick);
 function smoothLine(ctx,p){if(!p.length)return;ctx.moveTo(p[0][0],p[0][1]);
   if(p.length<3){for(let i=1;i<p.length;i++)ctx.lineTo(p[i][0],p[i][1]);return;}
   for(let i=1;i<p.length-1;i++){const xc=(p[i][0]+p[i+1][0])/2,yc=(p[i][1]+p[i+1][1])/2;ctx.quadraticCurveTo(p[i][0],p[i][1],xc,yc);}
@@ -1427,55 +1472,88 @@ function drawChart(){
   c.width=W*dpr;c.height=H*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,W,H);
   const all=Object.entries(SERIES).filter(([k,s])=>s.on&&s.data.length>1);
   const lines=all.filter(([k])=>k!=="vol"),volOn=SERIES.vol.on&&SERIES.vol.data.length>1;
-  const PADT=12,PADR=52,PADL=4,volH=volOn?Math.round(H*0.20):0,plotB=H-6-volH;
-  ctx.strokeStyle="rgba(255,255,255,.05)";ctx.lineWidth=1;
-  for(let g=0;g<=4;g++){const y=PADT+g*(plotB-PADT)/4;ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W-PADR,y);ctx.stroke();}
+  const GUT=Math.min(120,Math.max(84,W*0.17)); // left gutter holds the stacked legend
+  const PADT=14,PADR=20,PADL=GUT,volH=volOn?Math.round(H*0.18):0,plotB=H-16-volH;
+  const plotL=PADL,plotW=W-PADR-plotL,centerY=(PADT+plotB)/2;
+  ctx.strokeStyle="rgba(255,255,255,.045)";ctx.lineWidth=1;
+  for(let g=0;g<=4;g++){const y=PADT+g*(plotB-PADT)/4;ctx.beginPath();ctx.moveTo(plotL,y);ctx.lineTo(W-PADR,y);ctx.stroke();}
   if(!lines.length&&!volOn){ctx.fillStyle="#5f6b64";ctx.font="12px 'IBM Plex Mono',monospace";ctx.textAlign="center";ctx.fillText("loading history…",W/2,H/2);return;}
   const maxLen=Math.max(...all.map(([k,s])=>sliceN(s.data).length));
-  const X=i=>maxLen<2?(W-PADR-2):PADL+i/(maxLen-1)*(W-PADR-PADL-2);
+  const X=i=>maxLen<2?(W-PADR-2):plotL+i/(maxLen-1)*(plotW-2);
+  // center baseline — every series starts here (indexed to its first value); up = gain, down = loss
+  ctx.strokeStyle="rgba(120,255,180,.14)";ctx.setLineDash([2,4]);ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(plotL,centerY);ctx.lineTo(W-PADR,centerY);ctx.stroke();ctx.setLineDash([]);
+  ctx.fillStyle="#5c6b62";ctx.font="8px 'IBM Plex Mono'";ctx.textAlign="left";ctx.fillText("start ×1",plotL+2,centerY-3);
   // volume bars (bottom band)
-  if(volOn){const d=sliceN(SERIES.vol.data),mx=Math.max(...d,1e-9),off=maxLen-d.length,bw=Math.max(1,(W-PADR-PADL)/maxLen*0.6);
-    d.forEach((v,i)=>{const x=X(off+i),bh=(v/mx)*(volH-4);if(bh>0.3){ctx.fillStyle=v>0?"rgba(0,200,5,.4)":"rgba(154,168,161,.25)";ctx.fillRect(x-bw/2,H-4-bh,bw,bh);}});
-    ctx.fillStyle="#5f6b64";ctx.font="9px 'IBM Plex Mono'";ctx.textAlign="left";ctx.fillText("volume",3,H-volH+9);}
-  // line series (top band)
+  if(volOn){const d=sliceN(SERIES.vol.data),mx=Math.max(...d,1e-9),off=maxLen-d.length,bw=Math.max(1,plotW/maxLen*0.6);
+    d.forEach((v,i)=>{const x=X(off+i),bh=(v/mx)*(volH-4);if(bh>0.3){ctx.fillStyle=v>0?"rgba(0,200,5,.4)":"rgba(154,168,161,.25)";ctx.fillRect(x-bw/2,H-14-bh,bw,bh);}});
+    ctx.fillStyle="#5f6b64";ctx.font="9px 'IBM Plex Mono'";ctx.textAlign="left";ctx.fillText("volume",plotL+2,H-volH-4);}
+  // LINE SERIES — each INDEXED to its own first value, plotted on a CENTERED baseline:
+  // start = center line, gains rise, losses fall. Heterogeneous units (price 8e-9,
+  // LP 273k, burn 94k) become directly comparable — highest line = biggest mover.
   const meta=[];
-  lines.forEach(([k,s],ai)=>{
-    const d=sliceN(s.data),mn=Math.min(...d),mx=Math.max(...d);
-    const useLog=chartLog&&mn>0&&mx/mn>1.0000001;   // log needs strictly-positive, non-flat data
-    const tf=v=>useLog?Math.log(v>0?v:1e-30):v;
-    const lmn=tf(mn),lmx=tf(mx),lrg=(lmx-lmn)||Math.abs(lmx)||1;
-    const Y=v=>plotB-((tf(v)-lmn)/lrg)*(plotB-PADT),off=maxLen-d.length;
-    meta.push({k,s,d,off,Y,mn,mx,useLog,lmn,lmx});
+  const based=lines.map(([k,s])=>{
+    const raw=sliceN(s.data);let lp2=0;
+    const d=raw.map(v=>{if(v>0)lp2=v;return v>0?v:(lp2||0);}); // forward-fill leading zeros (cumulative series start clean)
+    const base=d.find(v=>v>0)||1;
+    return {k,s,d,base,off:maxLen-d.length,mf:Math.log((d[d.length-1]||base)/base)};
+  });
+  // scale from the 2nd-biggest mover so a single runaway (cumulative burn) doesn't flatten the rest
+  const absSorted=based.map(o=>Math.abs(o.mf)).sort((a,b)=>b-a);
+  const scale=Math.max((absSorted[1]!==undefined?absSorted[1]:absSorted[0])||0.05,0.05)*1.15;
+  const halfH=(plotB-PADT)/2*0.94;
+  const MY=m=>centerY-Math.tanh(m/scale)*halfH; // centered, soft-saturating so outliers ease to the edge
+  const Yof=(d,base)=>v=>MY(Math.log((v>0?v:base*1e-9)/base));
+  // faint up/down guide labels
+  ctx.fillStyle="#4a544e";ctx.font="8px 'IBM Plex Mono'";ctx.textAlign="right";
+  ctx.fillText("▲ +"+ (Math.exp(scale)>=10?Math.exp(scale).toFixed(0):Math.exp(scale).toFixed(1))+"×",W-PADR-2,PADT+8);
+  ctx.fillText("▼ −"+((1-Math.exp(-scale))*100).toFixed(0)+"%",W-PADR-2,plotB-3);
+  based.forEach(o=>{
+    const {k,s,d,base,off}=o;const hero=k==="price";const Y=Yof(d,base);
+    meta.push({k,s,d,off,Y,base});
     const pts=d.map((v,i)=>[X(off+i),Y(v)]);
     const rc=Math.max(2,Math.ceil(pts.length*_reveal)),rp=pts.slice(0,rc);
     ctx.lineJoin="round";ctx.lineCap="round";
-    if(ai===0){ctx.beginPath();smoothLine(ctx,rp);ctx.lineTo(rp[rp.length-1][0],plotB);ctx.lineTo(rp[0][0],plotB);ctx.closePath();
-      const gr=ctx.createLinearGradient(0,PADT,0,plotB);gr.addColorStop(0,s.color+"34");gr.addColorStop(1,s.color+"00");ctx.fillStyle=gr;ctx.fill();}
+    if(hero){ctx.beginPath();smoothLine(ctx,rp);ctx.lineTo(rp[rp.length-1][0],centerY);ctx.lineTo(rp[0][0],centerY);ctx.closePath();
+      const gr=ctx.createLinearGradient(0,PADT,0,plotB);gr.addColorStop(0,s.color+"24");gr.addColorStop(.5,s.color+"08");gr.addColorStop(1,s.color+"00");ctx.fillStyle=gr;ctx.fill();}
     ctx.beginPath();smoothLine(ctx,rp);
-    ctx.strokeStyle=s.color;ctx.lineWidth=ai===0?2.1:1.3;ctx.globalAlpha=ai===0?1:.68;
-    if(ai===0){ctx.shadowColor=s.color;ctx.shadowBlur=8;}ctx.stroke();ctx.shadowBlur=0;ctx.globalAlpha=1;
-    const lp=rp[rp.length-1];ctx.fillStyle=s.color;ctx.beginPath();ctx.arc(lp[0],lp[1],ai===0?3.2:2.4,0,7);ctx.fill();
-    if(ai===0){ctx.globalAlpha=.5;ctx.beginPath();ctx.arc(lp[0],lp[1],5.5,0,7);ctx.strokeStyle=s.color;ctx.lineWidth=1;ctx.stroke();ctx.globalAlpha=1;}
-    if(ai===0){ // price gridline values on the LEFT edge
-      ctx.font="9px 'IBM Plex Mono'";ctx.textAlign="left";ctx.fillStyle="#6f7a74";
-      for(let g=0;g<=4;g++){const val=useLog?Math.exp(lmx-(lmx-lmn)*g/4):mx-(mx-mn)*g/4,yy=PADT+g*(plotB-PADT)/4;
-        ctx.fillText(axisFmt(k,val),3,g===0?yy+9:yy-2);}
-    }
+    ctx.strokeStyle=s.color;ctx.lineWidth=hero?2.3:1.6;ctx.globalAlpha=hero?1:.86;
+    ctx.shadowColor=s.color;ctx.shadowBlur=hero?9:5;ctx.stroke();ctx.shadowBlur=0;ctx.globalAlpha=1;
+    const lp=rp[rp.length-1];ctx.fillStyle=s.color;ctx.shadowColor=s.color;ctx.shadowBlur=6;ctx.beginPath();ctx.arc(lp[0],lp[1],hero?3.4:2.6,0,7);ctx.fill();ctx.shadowBlur=0;
   });
-  // right-edge markers: each line's name chip AT its endpoint, connector line from the point
-  {const lx=X(maxLen-1);
-   const items=meta.map(m=>({m,ry:m.Y(m.d[m.d.length-1])}));
-   items.forEach(it=>it.y=Math.max(PADT+7,Math.min(plotB-5,it.ry)));
-   items.sort((a,b)=>a.y-b.y);
-   for(let i=1;i<items.length;i++)if(items[i].y-items[i-1].y<13)items[i].y=items[i-1].y+13;
-   for(let i=items.length-1;i>0;i--)if(items[i].y>plotB-5){items[i].y=plotB-5;if(items[i].y-items[i-1].y<13)items[i-1].y=items[i].y-13;}
-   items.forEach(({m,y,ry})=>{
-     ctx.strokeStyle=m.s.color;ctx.globalAlpha=.4;ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(lx,ry);ctx.lineTo(W-PADR+2,y);ctx.stroke();ctx.globalAlpha=1;
-     ctx.fillStyle=m.s.color;ctx.beginPath();ctx.arc(lx,ry,2.6,0,7);ctx.fill();
-     const t=m.s.ab||m.s.label;ctx.font="bold 8.5px 'IBM Plex Mono'";const tw=ctx.measureText(t).width;
-     ctx.fillStyle=m.s.color;ctx.globalAlpha=.15;ctx.fillRect(W-PADR+3,y-6,Math.min(PADR-5,tw+6),12);ctx.globalAlpha=1;
-     ctx.fillStyle=m.s.color;ctx.textAlign="left";ctx.fillText(t,W-PADR+6,y+2.5);
-   });}
+  // ===== LEFT stacked legend, each card wired to its line with a flowing neon connector =====
+  {const rows=based.slice();const volRow=volOn?SERIES.vol:null;
+   const N=rows.length+(volRow?1:0);
+   const top=PADT+4,bot=plotB-4,rh=(bot-top)/Math.max(N,1);
+   const hi=_hoverI==null?null:Math.max(0,Math.min(maxLen-1,_hoverI));
+   const attachX=plotL+plotW*0.17,flow=(_flowPhase||0);
+   rows.forEach((o,ri)=>{
+     const {k,s,d,base,off}=o;const Y=Yof(d,base);const cy=top+rh*(ri+0.5);
+     // value + %chg (at hover point if hovering, else latest)
+     let val;if(hi!=null){const idx=hi-off;val=(idx>=0&&idx<d.length)?d[idx]:d[d.length-1];}else val=d[d.length-1];
+     const first=d.find(x=>x>0)||d[0]||1,chg=(val/first-1)*100,up=chg>=0;
+     const chgTxt=Math.abs(chg)>=1000?("×"+compactNum(val/first)):((up?"▲":"▼")+Math.abs(chg).toFixed(1)+"%");
+     // neon connector: card → a point on its own line (17% in, where lines have separated)
+     const ai=Math.max(0,Math.round((attachX-plotL)/(plotW||1)*(maxLen-1))),lidx=ai-off;
+     const ay=(lidx>=0&&lidx<d.length)?Y(d[lidx]):centerY;
+     const x0=GUT-8,cx=(x0+attachX)/2;
+     ctx.save();ctx.strokeStyle=s.color;ctx.shadowColor=s.color;ctx.shadowBlur=7;ctx.globalAlpha=.5;ctx.lineWidth=1.4;
+     ctx.setLineDash([5,6]);ctx.lineDashOffset=-flow*(ri%2?1:1.4);
+     ctx.beginPath();ctx.moveTo(x0,cy);ctx.bezierCurveTo(cx,cy,cx,ay,attachX,ay);ctx.stroke();
+     ctx.setLineDash([]);ctx.globalAlpha=1;ctx.fillStyle=s.color;ctx.beginPath();ctx.arc(attachX,ay,2.4,0,7);ctx.fill();ctx.restore();
+     // card
+     ctx.textAlign="left";
+     ctx.fillStyle=s.color;ctx.shadowColor=s.color;ctx.shadowBlur=6;ctx.beginPath();ctx.arc(6,cy,3,0,7);ctx.fill();ctx.shadowBlur=0;
+     ctx.font="bold 9.5px 'IBM Plex Mono'";ctx.fillStyle=s.color;ctx.fillText(s.ab||s.label,14,cy-3);
+     ctx.font="10px 'IBM Plex Mono'";ctx.fillStyle="#d7ded9";ctx.fillText(s.fmtV(val),14,cy+8);
+     ctx.font="8px 'IBM Plex Mono'";ctx.fillStyle=up?"#39d353":"#ff5a4d";ctx.textAlign="right";
+     ctx.fillText(chgTxt,GUT-4,cy-3);
+   });
+   if(volRow){const cy=top+rh*(rows.length+0.5);const vd=sliceN(volRow.data);let val=hi!=null?(vd[hi-(maxLen-vd.length)]??vd[vd.length-1]):vd[vd.length-1];
+     ctx.textAlign="left";ctx.fillStyle=volRow.color;ctx.beginPath();ctx.arc(6,cy,3,0,7);ctx.fill();
+     ctx.font="bold 9.5px 'IBM Plex Mono'";ctx.fillStyle=volRow.color;ctx.fillText(volRow.ab||volRow.label,14,cy-3);
+     ctx.font="10px 'IBM Plex Mono'";ctx.fillStyle="#d7ded9";ctx.fillText(volRow.fmtV(val||0),14,cy+8);}
+  }
   // x-axis time labels (relative), with dark backing chips for legibility
   if(TS.length>1){const ts=sliceN(TS),now=Math.floor(Date.now()/1000),off=maxLen-ts.length;
     ctx.font="8.5px 'IBM Plex Mono'";
@@ -1489,14 +1567,6 @@ function drawChart(){
     ctx.strokeStyle="rgba(255,255,255,.25)";ctx.setLineDash([3,4]);ctx.beginPath();ctx.moveTo(hx,PADT);ctx.lineTo(hx,plotB);ctx.stroke();ctx.setLineDash([]);
     meta.forEach(m=>{const idx=hi-m.off;if(idx>=0&&idx<m.d.length){ctx.fillStyle=m.s.color;ctx.beginPath();ctx.arc(hx,m.Y(m.d[idx]),3.2,0,7);ctx.fill();}});}
   _chart={W,PADR,PADL,maxLen,X};
-  updateLegend(all,_hoverI==null?null:Math.max(0,Math.min(maxLen-1,_hoverI)),maxLen);
-}
-function updateLegend(all,hi,maxLen){
-  const lg=$("clegend");if(!lg)return;
-  lg.innerHTML=all.map(([k,s])=>{const d=sliceN(s.data);
-    let val;if(hi!=null){const off=maxLen-d.length,idx=hi-off;val=(idx>=0&&idx<d.length)?d[idx]:d[d.length-1];}else val=d[d.length-1];
-    const first=d.find(x=>x>0)||d[0],chg=first?((val/first-1)*100):0,up=chg>=0;
-    return `<span class="li" style="border-left-color:${s.color}"><span class="lnm" style="color:${s.color}">${s.ab||s.label}</span><b>${s.fmtV(val)}</b><span class="lchg ${up?'u':'d'}">${up?'▲':'▼'}${Math.abs(chg).toFixed(1)}%</span></span>`;}).join("");
 }
 function drawPrice(){drawChart();}
 window.addEventListener("resize",()=>{clearTimeout(_flowT);_flowT=setTimeout(buildFlows,200);drawChart();});
