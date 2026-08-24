@@ -123,6 +123,19 @@
   .lnb{font-family:var(--disp);font-weight:700;font-size:11px;padding:6px 11px;border-radius:100px;border:1px solid var(--line2);background:var(--panel2);color:var(--soft);cursor:pointer;transition:.15s}
   .lnb.on{background:var(--green);color:#00220a;border-color:transparent}.lnb:hover{border-color:var(--faint)}
   .lsec{display:none;animation:fadein .35s ease}.lsec.on{display:block}
+  /* full-page terminal-style docs */
+  .docs{position:fixed;inset:0;z-index:60;display:none;overflow-y:auto;overflow-x:hidden;
+    background:radial-gradient(120% 80% at 90% -10%,#0c0c0c,transparent 55%),linear-gradient(rgba(255,255,255,.016) 1px,transparent 1px) 0 0/40px 40px,linear-gradient(90deg,rgba(255,255,255,.016) 1px,transparent 1px) 0 0/40px 40px,var(--bg);animation:fadeUp .3s ease}
+  .docs.on{display:block}
+  .docs-bar{position:sticky;top:0;z-index:6;display:flex;align-items:center;gap:11px;height:52px;padding:0 16px;border-bottom:1px solid var(--line);background:rgba(0,0,0,.72);backdrop-filter:blur(8px)}
+  .docs-bar .back{background:var(--panel2);border:1px solid var(--line2);color:var(--ink);font-family:var(--disp);font-weight:700;font-size:12px;padding:7px 12px;border-radius:8px;cursor:pointer;transition:.15s}
+  .docs-bar .back:hover{border-color:var(--green);color:var(--green2)}
+  .docs-bar .dt{font-family:var(--disp);font-weight:900;font-size:15px;letter-spacing:-.01em}
+  .docs-wrap{max-width:1020px;margin:0 auto;padding:16px 18px 64px}
+  .docs>.docs-wrap .lnav{position:sticky;top:52px;z-index:5;background:linear-gradient(180deg,var(--bg),rgba(0,0,0,.85));backdrop-filter:blur(6px);padding:10px 0;margin:0 0 14px;border-bottom:1px solid var(--line)}
+  .docs .lsec{display:block!important;margin:0 0 30px;scroll-margin-top:110px;animation:none}
+  .docs .lsec h3{font-size:19px;margin-top:0}
+  .docs .lnb.on{background:var(--green);color:#00220a;border-color:transparent}
   @keyframes fadein{from{opacity:0;transform:translateY(6px)}to{opacity:1}}
   .lsec h3{font-family:var(--disp);font-size:17px;color:var(--ink);margin:2px 0 4px;letter-spacing:-.01em;text-transform:none;display:flex;align-items:center;gap:9px}
   .lsec h3::before{content:"";width:3px;height:18px;background:var(--green);border-radius:2px;box-shadow:0 0 7px var(--green)}
@@ -567,16 +580,22 @@
 </div>
 
 <!-- LEARN MODAL -->
-<div class="modal" id="learn"><div class="modal-in learn2">
-  <span class="mclose" onclick="closeLearn()">✕</span>
-  <h2>How Market Maker works</h2>
-  <p class="muted">A self-balancing elastic-supply token. Idle balances decay; that decay is burned, funds the treasury, rewards holders — and mirrors into a permissionless <b style="color:var(--green2)">pump</b> that burns pool supply to lift price. Every swap also burns, reflects, and funds treasury.</p>
+<div class="docs" id="learn"><div class="docs-bar">
+    <button class="back" onclick="closeLearn()">← Terminal</button>
+    <img src="mm.png" class="mmlogo" style="width:22px;height:22px" alt="">
+    <span class="dt">How Market Maker works</span>
+    <span style="flex:1"></span>
+    <span class="chip ok"><span class="d"></span>docs</span>
+  </div>
+  <div class="docs-wrap">
+  <p class="muted" style="max-width:720px;font-size:13.5px;line-height:1.6">A self-balancing elastic-supply token. Idle balances <b style="color:var(--orange2)">decay</b>; that decay is burned, funds the treasury, rewards holders — and mirrors into a permissionless <b style="color:var(--green2)">pump</b> that burns pool supply to lift price. Every swap also burns, reflects, and funds treasury. This page explains the whole engine, its holder economics, and its exclusion/LP trade-offs.</p>
   <div class="lnav">
     <button class="lnb on" onclick="learnTab('s-supply',this)">Elastic supply</button>
     <button class="lnb" onclick="learnTab('s-decay',this)">Decay engine</button>
     <button class="lnb" onclick="learnTab('s-refl',this)">Swap tax · reflection</button>
     <button class="lnb" onclick="learnTab('s-pump',this)">Decay-mirror pump</button>
     <button class="lnb" onclick="learnTab('s-pnl',this)">Holder economics</button>
+    <button class="lnb" onclick="learnTab('s-excl',this)">Exclusions &amp; LP</button>
     <button class="lnb" onclick="learnTab('s-safe',this)">Safety</button>
   </div>
 
@@ -712,6 +731,43 @@
       <div class="k"><div class="t" style="color:var(--green)">⚙ Pump lift +</div><div class="d">Every MM worth more as pump burns LP supply. Scales with decay × mirror ÷ pool.</div></div>
     </div>
     <p class="muted" style="margin-top:10px">Above break-even volume, holding is net positive; below it, decay wins. The live panel on the terminal shows your real numbers.</p>
+  </div>
+
+  <!-- 5b · EXCLUSIONS & LP -->
+  <div class="lsec" id="s-excl">
+    <h3>Exclusions &amp; LP — who decays, who doesn't</h3>
+    <p>Decay only touches <b>included</b> balances. Pools, owner, treasury and the hook are <b>excluded</b> so AMM liquidity never bricks. Exclusion is <b>owner-only</b> — no wallet can exempt itself. So the natural question: can you dodge decay by becoming liquidity? It depends entirely on <i>which</i> pool.</p>
+    <div class="lformula">balanceOf = units × index   <span class="c">// only for INCLUDED holders — excluded addresses hold raw MM, never decays</span></div>
+    <div class="ldiag">
+      <svg viewBox="0 0 560 190" style="width:100%">
+        <rect x="16" y="78" width="96" height="40" rx="9" fill="rgba(0,200,5,.08)" stroke="#00C805"/>
+        <text x="64" y="102" text-anchor="middle" fill="#e8f0ea" font-family="Archivo" font-weight="800" font-size="12">YOUR MM</text>
+        <!-- branch 1: new pool -->
+        <path d="M112,90 C160,90 160,34 210,34" stroke="#ff5a2c" stroke-width="1.4" fill="none" opacity=".5"/>
+        <circle r="3" fill="#ff5a2c"><animateMotion dur="2s" repeatCount="indefinite" path="M112,90 C160,90 160,34 210,34"/></circle>
+        <rect x="210" y="16" width="330" height="36" rx="8" fill="rgba(255,90,44,.09)" stroke="#ff5a2c"/>
+        <text x="222" y="33" fill="#ff5a2c" font-family="IBM Plex Mono" font-size="10.5" font-weight="700">New / unregistered pool (V2/V3)</text>
+        <text x="222" y="46" fill="#9aa8a1" font-family="IBM Plex Mono" font-size="9.5">↓ MM DECAYS inside it — anyone can sync() · not an escape</text>
+        <!-- branch 2: pump pool -->
+        <path d="M112,98 H210" stroke="#ff7a18" stroke-width="1.4" fill="none" opacity=".5"/>
+        <circle r="3" fill="#ff7a18"><animateMotion dur="1.8s" repeatCount="indefinite" path="M112,98 H210"/></circle>
+        <rect x="210" y="80" width="330" height="36" rx="8" fill="rgba(255,122,24,.09)" stroke="#ff7a18"/>
+        <text x="222" y="97" fill="#ffa24d" font-family="IBM Plex Mono" font-size="10.5" font-weight="700">Pump pool (MM/ETH) — excluded</text>
+        <text x="222" y="110" fill="#9aa8a1" font-family="IBM Plex Mono" font-size="9.5">🔥 no decay, but PUMP BURNS its MM (mirrors decay)</text>
+        <!-- branch 3: other excluded pool -->
+        <path d="M112,106 C160,106 160,162 210,162" stroke="#38ff7e" stroke-width="1.4" fill="none" opacity=".5"/>
+        <circle r="3" fill="#38ff7e"><animateMotion dur="2.2s" repeatCount="indefinite" path="M112,106 C160,106 160,162 210,162"/></circle>
+        <rect x="210" y="144" width="330" height="36" rx="8" fill="rgba(56,255,126,.08)" stroke="#38ff7e"/>
+        <text x="222" y="161" fill="#38ff7e" font-family="IBM Plex Mono" font-size="10.5" font-weight="700">Other excluded pool (non-pump) — 🛡️ shelter</text>
+        <text x="222" y="174" fill="#9aa8a1" font-family="IBM Plex Mono" font-size="9.5">no decay & no pump — the one real decay-free zone</text>
+      </svg>
+    </div>
+    <div class="lkey">
+      <div class="k"><div class="t" style="color:var(--down)">🆕 New / unregistered pool</div><div class="d">Not excluded → your MM inside it <b>decays</b>; anyone can sync() to realize it. V3 positions erode and routers revert on the 4% fee-on-transfer. This is a <b>loss, not an escape</b>.</div></div>
+      <div class="k"><div class="t" style="color:var(--orange2)">⚙ The pump pool (MM/ETH)</div><div class="d">Excluded (no passive decay) but the <b>pump burns its MM</b>, mirroring holder decay → you still pay, as burns → price↑, plus impermanent loss.</div></div>
+      <div class="k"><div class="t" style="color:var(--green2)">🛡️ Other excluded pool</div><div class="d">Excluded <b>and</b> not the pump target → a genuine decay-free shelter. The deliberate price of "liquidity never bricks" — owner-gated, and costs paired capital + IL + a locked position.</div></div>
+      <div class="k"><div class="t">🔐 No self-exclude</div><div class="d">Only the owner sets exclusions; you can't exempt your own wallet. Churning trades to reset idle-time costs 4%/trade ≫ the decay saved — not viable.</div></div>
+    </div>
   </div>
 
   <!-- 6 · SAFETY -->
@@ -1310,14 +1366,11 @@ async function doSwap(){
   }catch(e){$("sw_note").textContent="Swap failed: "+((e.shortMessage||e.message||e)+"").slice(0,130);}
   btn.disabled=false;
 }
-function learnTab(id,btn){
-  document.querySelectorAll(".lsec").forEach(s=>s.classList.toggle("on",s.id===id));
-  document.querySelectorAll(".lnb").forEach(b=>b.classList.remove("on"));if(btn)btn.classList.add("on");
-  if(id==="s-refl")setTimeout(()=>document.querySelectorAll("#l_feebars .fill").forEach(f=>f.style.width=f.dataset.w+"%"),60);
-}
-function openLearn(){$("learn").classList.add("on");}
-function closeLearn(){$("learn").classList.remove("on");}
-$("learn").addEventListener("click",e=>{if(e.target.id==="learn")closeLearn();});
+function learnTab(id,btn){const el=$(id);if(el)el.scrollIntoView({behavior:"smooth",block:"start"});
+  document.querySelectorAll(".lnb").forEach(b=>b.classList.remove("on"));if(btn)btn.classList.add("on");}
+function openLearn(){const w=$("learn");w.classList.add("on");w.scrollTop=0;document.body.style.overflow="hidden";
+  setTimeout(()=>document.querySelectorAll("#l_feebars .fill").forEach(f=>f.style.width=f.dataset.w+"%"),250);}
+function closeLearn(){$("learn").classList.remove("on");document.body.style.overflow="";}
 document.addEventListener("keydown",e=>{if(e.key==="Escape")closeLearn();});
 // ===== ecosystem flow overlay: animated data lines between panels =====
 function edgePt(el,term,side){const r=el.getBoundingClientRect(),t=term.getBoundingClientRect();
