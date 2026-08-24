@@ -830,6 +830,17 @@ let chartLog=true; // logarithmic Y (per-series normalized)
 let volYr=0,incSupply=0,reflBps=0,burnBps=0,recentBps=0,treBps=0,mirrorX=1,poolMMg=0,debtBase=0,debtBaseT=0,allPool0=0,refreshFails=0;
 let gMirrorBps=10000,gBbOn=false,gPPool=null,AN={},TS=[];
 let lastSettleWall=Date.now(),pumpCumPrev=-1; // pending pump accrues from last realized burn
+// Anchor "last settle" to the last on-chain settle time. Sources arrive over ~seconds:
+// persisted (returning user) → RPC chart event → Blockscout transfer → a real pump.
+// The FIRST real observation wins outright (so a returning-user's exact value or the real
+// older settle replaces the seed), then we track the MOST RECENT settle. Persisted so a
+// reload continues from the real pending instead of resetting to 0.
+let settleReal=false;
+try{const s=+localStorage.getItem("mm_settle")||0;if(s>0&&s<=Date.now()){lastSettleWall=s;settleReal=true;}else lastSettleWall=Date.now()-300000;}catch(e){lastSettleWall=Date.now()-300000;}
+function anchorSettle(ms){if(!(ms>0)||ms>Date.now()+1000)return;
+  if(!settleReal){lastSettleWall=ms;settleReal=true;}      // first real observation wins outright
+  else if(ms>lastSettleWall)lastSettleWall=ms;             // then follow the most-recent settle
+  try{localStorage.setItem("mm_settle",String(Math.floor(lastSettleWall)));}catch(e){}}
 const fmt=(x,d=2)=>Number(typeof x==="bigint"?E.formatUnits(x,18):x).toLocaleString("en-US",{maximumFractionDigits:d});
 // retry helper — the public RPC occasionally drops a batched request (500/BAD_DATA)
 async function rr(fn,tries=2){for(let i=0;i<tries;i++){try{return await fn();}catch(e){if(i===tries-1)throw e;await new Promise(r=>setTimeout(r,280));}}}
@@ -1048,6 +1059,7 @@ async function buildHistory(attempt=0){
       const totVol=swc.reduce((a,s)=>a+s.vol,0),el=Math.max(1,(keptBlocks[keptBlocks.length-1]-keptBlocks[0])*secPerBlock);
       volYr=totVol*(31536000/el);
       TS=keptBlocks.map(blk=>headTs-(cur-blk)*secPerBlock); // per-point time from block number
+      anchorSettle(TS[TS.length-1]*1000); // newest swap/sync ≈ last settle (RPC-based, Blockscout-independent)
       committed?drawChart():revealChart(); // animate only the first paint
       committed=true;return true;
     };
@@ -1222,7 +1234,7 @@ async function getFeed(){try{
   const now=Date.now();
   // newest transfer's REAL timestamp = last on-chain _settleDecay → anchor pending pump
   const nt=j.items[0]&&j.items[0].timestamp?new Date(j.items[0].timestamp).getTime():0;
-  if(nt>0)lastSettleWall=nt;
+  anchorSettle(nt);
   const pm=CFG.pm.toLowerCase(),hk=CFG.hook.toLowerCase(),mm=CFG.mm.toLowerCase(),Z="0x0000000000000000000000000000000000000000";
   const pools=new Set([CFG.ethPair,CFG.pools[1].id,CFG.pools[2].id,CFG.pm].map(a=>a.toLowerCase()));
   const evs=j.items.filter(it=>it.total&&BigInt(it.total.value)>=10n**15n).slice(0,14);
@@ -1345,14 +1357,14 @@ async function fetchPumpStats(){
     for(let i=N-1;i>=0;i--){const to=cur-i*CH,from=Math.max(0,to-CH+1);if(to<=0)continue;
       try{const ls=await ro.getLogs({address:CFG.mm,topics:[PUMP_TOPIC],fromBlock:from,toBlock:to});
         ls.forEach(l=>{const d=c.decode(["uint256","uint256","uint256"],l.data);removed+=Number(E.formatUnits(d[0],18))+Number(E.formatUnits(d[1],18));n++;});}catch(e){}}
-    if(pumpCumPrev>=0&&removed>pumpCumPrev+1e-9)lastSettleWall=Date.now(); // a real burn happened → reset pending
+    if(pumpCumPrev>=0&&removed>pumpCumPrev+1e-9)anchorSettle(Date.now()); // a real burn happened → reset pending
     pumpCumPrev=removed;pumpCumMM=removed;
     const el=$("pm_cum");if(el)el.textContent=fmt(removed,2);
     const pct=poolMMg>0?removed/(poolMMg+removed)*100:0; // removed as % of what the pool would hold w/o pumps
     const e2=$("pm_cumpct");if(e2)e2.textContent="+"+pct.toFixed(3)+"%";
   }catch(e){}
 }
-async function pubPump(){if(!signer)return connectWallet();if(!await ensureChain())return;try{const mm=new E.Contract(CFG.mm,A.token.abi,signer);toast("Pump sent…");const tx=await mm.pump();await tx.wait();lastSettleWall=Date.now();toast("⚙ Pump confirmed — pool burned, price re-synced");refresh();fetchPumpStats();}catch(e){toast("Pump failed: "+(e.shortMessage||e.message||e).slice(0,80),"err");}}
+async function pubPump(){if(!signer)return connectWallet();if(!await ensureChain())return;try{const mm=new E.Contract(CFG.mm,A.token.abi,signer);toast("Pump sent…");const tx=await mm.pump();await tx.wait();anchorSettle(Date.now());toast("⚙ Pump confirmed — pool burned, price re-synced");refresh();fetchPumpStats();}catch(e){toast("Pump failed: "+(e.shortMessage||e.message||e).slice(0,80),"err");}}
 async function pubBuyback(){if(!signer)return connectWallet();if(!await ensureChain())return;try{const mm=new E.Contract(CFG.mm,A.token.abi,signer);toast("Buyback sent…");const tx=await mm.triggerBuyback();await tx.wait();toast("↻ Buyback confirmed");refresh();}catch(e){toast("Buyback failed: "+(e.shortMessage||e.message||e).slice(0,80),"err");}}
 function buildPools(){const pools=CFG.pools;
   $("poolList").innerHTML=pools.map(p=>`<a class="pchip" href="https://dexscreener.com/robinhood/${p.id}" target="_blank"><span class="nm">${p.name.replace(/ \(V2\)/,"")}</span><span class="tag">${p.tag}</span><span class="go">Swap ↗</span></a>`).join("");}
