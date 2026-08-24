@@ -70,6 +70,7 @@
   <div class="card">
     <h3>Havuz kaydı (V2/V3)</h3>
     <label>Havuz adresi</label><input id="poolAddr" class="mono" placeholder="0x... (V2 pair / V3 pool)">
+    <div class="hint">Kayıtlı V2 havuzları (hepsi vergili): MM/ETH <span class="mono">0x66f6f7…1434</span> · MM/THROBBIN <span class="mono">0x301470…1e25F</span> · MM/PACK <span class="mono">0x1b66EC…Ca24D</span> — kopyalayıp yeni havuz eklemek/yeniden ayarlamak için kullan.</div>
     <label>Tip</label>
     <select id="poolType">
       <option value="v2">V2 — vergili (burn/reflect/recent/treasury çalışır)</option>
@@ -93,7 +94,7 @@
 
   <div class="card">
     <h3>Pump (decay-aynası, V2 havuzu)</h3>
-    <label>Pump havuzu (V2 pair)</label><input id="pumpPool" class="mono" placeholder="0x...">
+    <label>Pump havuzu (V2 pair)</label><input id="pumpPool" class="mono" value="0x66f6f74235f113Cf39B821C6566057FbC1271434">
     <div class="row">
       <div><label>Ayna (bps · 10000=1:1)</label><input id="pumpMirror" class="mono" value="10000"></div>
       <div><label>Bounty (bps · 50=%0.5)</label><input id="pumpBounty" class="mono" value="50"></div>
@@ -104,7 +105,7 @@
 
   <div class="card">
     <h3>Buyback</h3>
-    <label>Router adresleri (virgülle)</label><input id="bbRouters" class="mono" placeholder="0xrouter1,0xrouter2">
+    <label>Router adresleri (virgülle)</label><input id="bbRouters" class="mono" value="0x89e5DB8B5aA49aA85AC63f691524311AEB649eba">
     <button class="ghost" onclick="setBBRouters()">setBuybackRouters</button>
     <div class="row3">
       <div><label>Eşik (ETH)</label><input id="bbThresh" class="mono" value="0.01"></div>
@@ -116,16 +117,24 @@
 
   <div class="card">
     <h3>Hazine</h3>
-    <label>Hazine cüzdanı</label><input id="treWallet" class="mono" placeholder="0x...">
+    <label>Hazine cüzdanı</label><input id="treWallet" class="mono" value="0x91b5965e81DAC2687D0dAD000bd6ef207D2D167f">
     <button class="ghost" onclick="act('setTreasuryWallet',[$('treWallet').value])">setTreasuryWallet</button>
-    <label>convertTreasury — router</label><input id="ctRouter" class="mono" placeholder="0x router">
+    <div class="row">
+      <div style="display:flex;align-items:flex-end"><button style="width:100%" onclick="oneClickConvert()">⚡ Tek tık: Doldur & Çevir</button></div>
+      <div style="display:flex;align-items:flex-end"><button class="ghost" style="width:100%" onclick="fillConvert()">Sadece doldur</button></div>
+    </div>
+    <div class="hint" id="ctQuote">Router + tüm hazine MM + path[MM,WETH] + minOut (slippage) otomatik dolar, native ETH → hazine cüzdanına.</div>
+    <label>convertTreasury — router</label><input id="ctRouter" class="mono" value="0x89e5DB8B5aA49aA85AC63f691524311AEB649eba">
     <div class="row">
       <div><label>Miktar (MM)</label><input id="ctAmt" class="mono" placeholder="0"></div>
       <div><label>minOut</label><input id="ctMin" class="mono" value="0"></div>
     </div>
-    <label>Path (virgülle, ilk = MM)</label><input id="ctPath" class="mono" placeholder="0xMM,0xWETH">
+    <div class="row">
+      <div><label>Path (virgülle, ilk = MM)</label><input id="ctPath" class="mono" placeholder="0xMM,0xWETH"></div>
+      <div><label>Slippage %</label><input id="ctSlip" class="mono" value="5"></div>
+    </div>
     <label>Çıkış</label><select id="ctNative"><option value="true">native ETH</option><option value="false">ERC-20 (NVDA vb.)</option></select>
-    <button onclick="convertTreasury()">convertTreasury</button>
+    <button onclick="convertTreasury()">convertTreasury (manuel)</button>
   </div>
 
   <div class="card">
@@ -250,6 +259,47 @@ async function setBBRouters(){const rs=$("bbRouters").value.split(",").map(s=>s.
 async function convertTreasury(){
   const path=$("ctPath").value.split(",").map(s=>s.trim()).filter(Boolean);
   await act('convertTreasury',[$("ctRouter").value.trim(),E.parseUnits($("ctAmt").value||"0",18),path,E.parseUnits($("ctMin").value||"0",18),$("ctNative").value==='true']);
+}
+
+// --- Tek-tık hazine çevrimi: router + tüm hazine MM + path[MM,WETH] + minOut'u
+//     (slippage'li canlı quote) otomatik doldurur; oneClick ayrıca gönderir. ---
+const CT_WETH="0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73"; // aeWETH
+const CT_ROUTER_ABI=["function WETH() view returns(address)","function getAmountsOut(uint256,address[]) view returns(uint256[])"];
+async function fillConvert(){
+  try{
+    mm=mmc();
+    const mmAddr=$("mmAddr").value.trim();
+    // router: kullanıcı yazmışsa onu, yoksa on-chain kayıtlı buyback router[0]'ı kullan
+    let router=$("ctRouter").value.trim();
+    if(!router){try{router=await mm.buybackRouters(0);}catch(e){}}
+    if(!router){log("⚠️ router yok — setBuybackRouters ile ekle veya elle yaz");return null;}
+    $("ctRouter").value=router;
+    const tre=await mm.treasuryBalance();           // tüm hazine MM'i
+    if(tre===0n){log("⚠️ hazine MM = 0");return null;}
+    $("ctAmt").value=E.formatUnits(tre,18);
+    // path: [MM, WETH] (router'ın kendi WETH'i)
+    let weth=CT_WETH;try{weth=await new E.Contract(router,CT_ROUTER_ABI,provider).WETH();}catch(e){}
+    const path=[mmAddr,weth];
+    $("ctPath").value=path.join(",");
+    $("ctNative").value="true";
+    // minOut = canlı quote × (1 − slippage)
+    const slip=Math.max(0,Math.min(50,parseFloat($("ctSlip").value||"5")))/100;
+    let out=0n;try{const a=await new E.Contract(router,CT_ROUTER_ABI,provider).getAmountsOut(tre,path);out=a[a.length-1];}catch(e){log("⚠️ quote alınamadı: "+(e.shortMessage||e.message||"").slice(0,60));}
+    const minOut=out - (out*BigInt(Math.round(slip*10000))/10000n);
+    $("ctMin").value=E.formatUnits(minOut,18);
+    const outN=Number(E.formatUnits(out,18));
+    $("ctQuote").innerHTML=`Beklenen çıkış: <b>${outN.toExponential(4)} ETH</b> · minOut (%${(slip*100).toFixed(0)} slip): <b>${Number(E.formatUnits(minOut,18)).toExponential(4)} ETH</b> → ${(await mm.treasuryWallet()).slice(0,8)}…`;
+    if(outN>0&&outN<1e-4)$("ctQuote").innerHTML+=` <span style="color:#ff7a18">⚠ Havuzda ETH yok — çıkış toz mertebesinde. Önce MM/ETH havuzuna ETH ekle.</span>`;
+    log("✅ alanlar dolduruldu ("+Number(E.formatUnits(tre,18)).toLocaleString("tr-TR")+" MM)");
+    return {router,tre,path,minOut,outN};
+  }catch(e){log("❌ doldurma hatası: "+(e.shortMessage||e.message||e).slice(0,90));return null;}
+}
+async function oneClickConvert(){
+  if(!signer){log("❌ önce Cüzdan Bağla'ya bas");return;}
+  const q=await fillConvert();
+  if(!q)return;
+  if(q.outN<1e-4 && !confirm("Beklenen çıkış ~"+q.outN.toExponential(3)+" ETH (havuzda ETH yok, toz mertebesinde). Yine de gönderilsin mi?"))return;
+  await convertTreasury();
 }
 </script>
 </body>

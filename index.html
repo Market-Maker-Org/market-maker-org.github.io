@@ -820,10 +820,10 @@ const icon=k=>{const o=IC[k]||IC.transfer;return `<span class="ico" style="color
 // ---- multi-series chart model (real on-chain data) ----
 const SERIES={
   price :{label:"Price",   ab:"PRICE",color:"#00e676",on:true, data:[],fmtV:v=>ethUsd?usd(v*ethUsd):gwei(v).toFixed(4)+"g"},   // green
-  pool  :{label:"Liquidity",ab:"LIQ", color:"#ffffff",on:true, data:[],fmtV:v=>compactNum(v)+" MM"},                          // white
-  supply:{label:"Supply",  ab:"SUPPLY",color:"#4d9bff",on:true, data:[],fmtV:v=>compactNum(v)},                              // blue
+  pool  :{label:"Liquidity",ab:"LIQ", color:"#ffffff",on:true, data:[],fmtV:v=>ethUsd?usd(v*ethUsd):v.toFixed(4)+" ETH"},     // white · $ TVL across all AMM pools (stored as ETH-denominated TVL)
+  supply:{label:"Supply",  ab:"SUPPLY",color:"#4d9bff",on:false,data:[],fmtV:v=>compactNum(v)},                              // blue (off by default)
   burn  :{label:"Deflation",ab:"DEFL",color:"#ff8c1a",on:true, data:[],fmtV:v=>compactNum(v)},                               // orange
-  index :{label:"Reflection",ab:"REFL",color:"#e05cff",on:true, data:[],fmtV:v=>v.toFixed(5)},                               // magenta
+  index :{label:"Reflection",ab:"REFL",color:"#e05cff",on:false,data:[],fmtV:v=>v.toFixed(5)},                               // magenta (off by default)
   vol   :{label:"Volume",  ab:"VOL", color:"#7a8a83",on:true, data:[],fmtV:v=>compactNum(v)+" MM"}};                         // grey
 let chartRange=0; // last N points; 0 = all (full history)
 let chartLog=true; // logarithmic Y (per-series normalized)
@@ -857,14 +857,15 @@ function showSkeletons(){
   const pr=$("d_price");if(pr)pr.innerHTML='<span class="sk" style="width:200px;height:32px"></span>';
   const fe=$("feed");if(fe)fe.innerHTML='<div class="ev" style="pointer-events:none"><span class="sk" style="width:100%;height:15px"></span></div>'.repeat(4);
   const hl=$("holderList");if(hl)hl.innerHTML='<div class="hrow" style="pointer-events:none"><span class="sk" style="width:100%;height:15px"></span></div>'.repeat(6);}
-function savePrefs(){try{localStorage.setItem("mm_prefs",JSON.stringify({v:2,watch,range:chartRange,log:chartLog,slip:swSlip,series:Object.fromEntries(Object.entries(SERIES).map(([k,s])=>[k,s.on]))}));}catch(e){}}
+function savePrefs(){try{localStorage.setItem("mm_prefs",JSON.stringify({v:3,watch,range:chartRange,log:chartLog,slip:swSlip,series:Object.fromEntries(Object.entries(SERIES).map(([k,s])=>[k,s.on]))}));}catch(e){}}
 function loadPrefs(){try{const p=JSON.parse(localStorage.getItem("mm_prefs")||"{}");
   if(p.watch&&/^0x[a-fA-F0-9]{40}$/.test(p.watch))watch=p.watch;
   if(typeof p.range==="number")chartRange=p.range;
   if(typeof p.log==="boolean")chartLog=p.log;
   if(typeof p.slip==="number")swSlip=p.slip;
-  // v2 migration: SUPPLY is now on by default — don't let an old stored "off" hide it
-  if(p.series)Object.entries(p.series).forEach(([k,v])=>{if(SERIES[k]&&!(k==="supply"&&p.v!==2))SERIES[k].on=!!v;});}catch(e){}}
+  // v3 migration: default-on set is now price+Liquidity+Deflation+Volume; Supply & Reflection
+  // default OFF. Don't let an old stored state override the new defaults for those two keys.
+  if(p.series)Object.entries(p.series).forEach(([k,v])=>{if(SERIES[k]&&!((k==="supply"||k==="index")&&p.v!==3))SERIES[k].on=!!v;});}catch(e){}}
 const gwei=p=>p*1e9; // ETH per MM -> gwei per MM
 let ethUsd=0;
 const BS="https://robinhoodchain.blockscout.com";
@@ -1027,6 +1028,13 @@ async function buildHistory(attempt=0){
     try{const back=Math.max(1,cur-20000);const [bh,bp,ts]=await Promise.all([ro.getBlock(cur),ro.getBlock(back),mmRead.totalSupply()]);
       headTs=bh.timestamp;secPerBlock=Math.max(0.05,(bh.timestamp-bp.timestamp)/Math.max(1,cur-back));
       realBurned=Math.max(0,capMM-Number(E.formatUnits(ts,18)));}catch(e){}
+    // Liquidity series = TOTAL $ TVL across ALL registered AMM pools, not MM units. The ETH/MM
+    // pair moves over time (it's the pump target); PACK/THROBBIN MM reserves are near-static, so
+    // we snapshot their current MM once and treat them as a constant offset. TVL is stored in ETH
+    // (2 × priceETH × totalMM) and rendered in $ at draw time via ethUsd — feed-independent shape.
+    let otherPoolMM=0;
+    try{const [tb,pb]=await Promise.all([mmRead.balanceOf(CFG.pools[1].id),mmRead.balanceOf(CFG.pools[2].id)]);
+      otherPoolMM=Number(E.formatUnits(tb,18))+Number(E.formatUnits(pb,18));}catch(e){}
     const sync=[],swaps=[],decays=[];let emptyRun=0,seen=false,committed=false;
     // Rebuild the series from whatever has loaded so far and paint. Called after the FIRST chunk
     // (fast first paint — one chunk ≈ most of the token's short history) and again at the end.
@@ -1052,7 +1060,7 @@ async function buildHistory(attempt=0){
       if(winBurn>1e-9&&realBurned>0)burnScale=realBurned/winBurn;
       else if(realBurned>0&&winBurn<=1e-9)pts.forEach((p,i)=>p.burn=realBurned*(i/(pts.length-1||1)));
       Object.values(SERIES).forEach(s=>s.data=[]);
-      pts.forEach(p=>{const bch=p.burn*burnScale;SERIES.price.data.push(p.price);SERIES.pool.data.push(p.pool);SERIES.index.data.push(p.idx);
+      pts.forEach(p=>{const bch=p.burn*burnScale;SERIES.price.data.push(p.price);SERIES.pool.data.push(2*p.price*(p.pool+otherPoolMM));SERIES.index.data.push(p.idx);
         SERIES.burn.data.push(bch);SERIES.supply.data.push(capMM-bch);SERIES.vol.data.push(p.vol);});
       priceHist.length=0;priceHist.push(...SERIES.price.data.filter(x=>x>0));
       if(priceHist.length){price0=priceHist[0];histLoaded=true;}
@@ -1137,12 +1145,16 @@ async function refresh(){
       const chg=(price/price0-1)*100;$("d_chg").textContent=(chg>=0?"▲ +":"▼ ")+chg.toFixed(2)+"%";$("d_chg").className="chg "+(chg>=0?"up":"down");
       $("d_priceSub").textContent=`${gwei(price).toFixed(4)} gwei · ${price.toExponential(3)} ETH / MM`;
       $("d_mcap").textContent=ethUsd?usdBig(pUsd*supN):fmt(price*supN,3)+" ETH";
-      $("d_depth").textContent=ethUsd?usdBig(pUsd*pmN*2):fmt(price*pmN*2,4)+" ETH";
+      // Liquidity = ALL registered AMM pools (MM/ETH + MM/PACK + MM/THROBBIN), valued in $.
+      // Uses the MM/ETH price as the single MM anchor (arbitrage-equilibrium assumption) and
+      // doubles the MM side to cover the counter side. Falls back to ETH-denominated off-feed.
+      const liqUsd=pUsd*allPoolN*2, liqEth=price*allPoolN*2;
+      $("d_depth").textContent=ethUsd?usdBig(liqUsd):fmt(liqEth,4)+" ETH";
       priceHist.push(price);if(priceHist.length>400)priceHist.shift();
       // snapshot for the Analytics dashboard
-      AN={price,pUsd,sup:supN,burned:CFG.cap-supN,inc:incSupply,pool:pmN,allPool:allPoolN,tre:Number(E.formatUnits(tre,18)),pot:Number(E.formatUnits(pot,18)),idx:idxN,mcap:ethUsd?pUsd*supN:price*supN,liq:ethUsd?pUsd*pmN*2:price*pmN*2};
+      AN={price,pUsd,sup:supN,burned:CFG.cap-supN,inc:incSupply,pool:pmN,allPool:allPoolN,tre:Number(E.formatUnits(tre,18)),pot:Number(E.formatUnits(pot,18)),idx:idxN,mcap:ethUsd?pUsd*supN:price*supN,liq:ethUsd?liqUsd:liqEth};
       // append a live point ONLY if something actually moved (pushLive returns false otherwise)
-      if(histLoaded&&pushLive({price,pool:pmN,supply:supN,burn:CFG.cap-supN,index:idxN}))drawChart();
+      if(histLoaded&&pushLive({price,pool:liqEth,supply:supN,burn:CFG.cap-supN,index:idxN}))drawChart();
     }
     if($("pv-analytics")&&getComputedStyle($("pv-analytics")).display!=="none")renderAnalytics();
     if(watch){const b=await mmRead.balanceOf(watch);excluded=await mmRead.isExcluded(watch);liveBal=Number(E.formatUnits(b,18));
