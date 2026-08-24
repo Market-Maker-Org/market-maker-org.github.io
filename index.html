@@ -273,6 +273,10 @@
   .swinfo{margin-top:10px;font-size:11.5px;color:var(--soft);display:flex;flex-direction:column;gap:5px}
   .swinfo .r{display:flex;justify-content:space-between}.swinfo .r .v{font-family:var(--mono);color:var(--ink)}
   .swinfo .r .v.warn{color:var(--orange2)}
+  .pcts{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-top:9px}
+  .pct{font-family:var(--mono);font-size:11px;text-align:center;padding:6px 0;border-radius:8px;border:1px solid var(--line2);background:var(--panel2);color:var(--soft);cursor:pointer;transition:all .14s;user-select:none}
+  .pct:hover{border-color:var(--greenDim);color:var(--green2)}
+  .pct.on{background:var(--green);color:#00220a;border-color:transparent;font-weight:700}
   .slips{display:flex;gap:6px;align-items:center;margin-top:9px}
   .slip{font-family:var(--mono);font-size:11px;padding:4px 9px;border-radius:100px;border:1px solid var(--line2);background:var(--panel2);color:var(--soft);cursor:pointer}
   .slip.on{background:var(--green);color:#00220a;border-color:transparent}
@@ -474,13 +478,20 @@
       <div class="swapbox compact">
         <div class="swrow">
           <div class="top"><span>You pay</span><span id="sw_balA"></span></div>
-          <div class="mid"><input id="sw_in" type="text" inputmode="decimal" placeholder="0.0" oninput="quoteSwap()" autocomplete="off"><span class="tokchip" id="sw_tokA"></span></div>
+          <div class="mid"><input id="sw_in" type="text" inputmode="decimal" placeholder="0.0" oninput="document.querySelectorAll('.pct').forEach(x=>x.classList.remove('on'));quoteSwap()" autocomplete="off"><span class="tokchip" id="sw_tokA"></span></div>
         </div>
         <button class="swflip" onclick="flipSwap()" title="Flip">⇅</button>
         <div class="swrow">
           <div class="top"><span>You receive <span class="muted">est.</span></span><span id="sw_balB"></span></div>
           <div class="mid"><div class="rcv" id="sw_out">0.0</div><span class="tokchip" id="sw_tokB"></span></div>
         </div>
+      </div>
+      <div class="pcts">
+        <span class="pct" data-p="10" onclick="setSwPct(10)">10%</span>
+        <span class="pct" data-p="25" onclick="setSwPct(25)">25%</span>
+        <span class="pct" data-p="50" onclick="setSwPct(50)">50%</span>
+        <span class="pct" data-p="75" onclick="setSwPct(75)">75%</span>
+        <span class="pct" data-p="100" onclick="setSwPct(100)">MAX</span>
       </div>
       <div class="slips"><span class="muted" style="font-size:10.5px">Slippage</span>
         <span class="slip" onclick="setSlip(1,this)">1%</span><span class="slip on" onclick="setSlip(5,this)">5%</span><span class="slip" onclick="setSlip(10,this)">10%</span>
@@ -998,20 +1009,29 @@ const DECAY_TOPIC=E.id("Decay(uint256,uint256,uint256,uint256,uint256)");
 async function buildHistory(attempt=0){
   try{
     const cur=await ro.getBlockNumber();const c=E.AbiCoder.defaultAbiCoder();
-    const CH=45000,MAX=28; // walk back up to ~1.26M blocks, but STOP EARLY once history runs dry
+    const CH=45000,MAX=48; // walk back up to ~2.16M blocks; STOP EARLY only at true genesis
     const sync=[],swaps=[],decays=[];
     let emptyRun=0,seen=false;
     // SEQUENTIAL, walking backward from head — the /rpc proxy returns empty arrays under
-    // concurrent getLogs load. Keep going until the token's history runs out (or the cap).
+    // concurrent getLogs load. Keep going until the token's history truly runs out (or the cap).
     for(let ci=0;ci<MAX;ci++){
-      const to=cur-ci*CH,from=Math.max(0,to-CH+1);if(to<=0)break;let got=0;
-      try{const ls=await ro.getLogs({address:CFG.ethPair,topics:[SYNC_TOPIC],fromBlock:from,toBlock:to});
-        ls.forEach(l=>{const d=c.decode(["uint112","uint112"],l.data);const w=Number(E.formatUnits(d[0],18)),m=Number(E.formatUnits(d[1],18));if(m>0){sync.push({b:l.blockNumber,price:w/m,pool:m});got++;}});}catch(e){}
-      try{const ls=await ro.getLogs({address:CFG.ethPair,topics:[V2SWAP_TOPIC],fromBlock:from,toBlock:to});
-        ls.forEach(l=>{const d=c.decode(["uint256","uint256","uint256","uint256"],l.data);swaps.push({b:l.blockNumber,vol:Number(E.formatUnits(d[1],18))+Number(E.formatUnits(d[3],18))});got++;});}catch(e){}
-      try{const ls=await ro.getLogs({address:CFG.mm,topics:[DECAY_TOPIC],fromBlock:from,toBlock:to});
-        ls.forEach(l=>{const d=c.decode(["uint256","uint256","uint256","uint256","uint256"],l.data);decays.push({b:l.blockNumber,burn:Number(E.formatUnits(d[1],18)),idx:Number(E.formatUnits(d[4],18))});got++;});}catch(e){}
-      if(got>0){seen=true;emptyRun=0;}else if(seen&&++emptyRun>=3)break; // 3 empty chunks in a row → reached genesis
+      const to=cur-ci*CH,from=Math.max(0,to-CH+1);if(to<=0)break;
+      let got=0,errd=false;
+      // one retry per chunk if it comes back totally empty — distinguishes a transient 500
+      // from a real gap so we don't false-stop before genesis and cut history short.
+      for(let tryn=0;tryn<2;tryn++){
+        const s0=sync.length,w0=swaps.length,d0=decays.length;errd=false;
+        try{const ls=await ro.getLogs({address:CFG.ethPair,topics:[SYNC_TOPIC],fromBlock:from,toBlock:to});
+          ls.forEach(l=>{const d=c.decode(["uint112","uint112"],l.data);const w=Number(E.formatUnits(d[0],18)),m=Number(E.formatUnits(d[1],18));if(m>0){sync.push({b:l.blockNumber,price:w/m,pool:m});}});}catch(e){errd=true;}
+        try{const ls=await ro.getLogs({address:CFG.ethPair,topics:[V2SWAP_TOPIC],fromBlock:from,toBlock:to});
+          ls.forEach(l=>{const d=c.decode(["uint256","uint256","uint256","uint256"],l.data);swaps.push({b:l.blockNumber,vol:Number(E.formatUnits(d[1],18))+Number(E.formatUnits(d[3],18))});});}catch(e){errd=true;}
+        try{const ls=await ro.getLogs({address:CFG.mm,topics:[DECAY_TOPIC],fromBlock:from,toBlock:to});
+          ls.forEach(l=>{const d=c.decode(["uint256","uint256","uint256","uint256","uint256"],l.data);decays.push({b:l.blockNumber,burn:Number(E.formatUnits(d[1],18)),idx:Number(E.formatUnits(d[4],18))});});}catch(e){errd=true;}
+        got=(sync.length-s0)+(swaps.length-w0)+(decays.length-d0);
+        if(got>0||!errd)break; // got data, or a clean empty (real gap) → no retry needed
+        await new Promise(r=>setTimeout(r,350)); // transient error → back off and retry once
+      }
+      if(got>0){seen=true;emptyRun=0;}else if(seen&&++emptyRun>=4)break; // 4 clean-empty chunks → genesis
       if(from<=0)break;
     }
     sync.sort((a,b)=>a.b-b.b);swaps.sort((a,b)=>a.b-b.b);decays.sort((a,b)=>a.b-b.b);
@@ -1106,8 +1126,8 @@ async function refresh(){
       priceHist.push(price);if(priceHist.length>400)priceHist.shift();
       // snapshot for the Analytics dashboard
       AN={price,pUsd,sup:supN,burned:CFG.cap-supN,inc:incSupply,pool:pmN,allPool:allPoolN,tre:Number(E.formatUnits(tre,18)),pot:Number(E.formatUnits(pot,18)),idx:idxN,mcap:ethUsd?pUsd*supN:price*supN,liq:ethUsd?pUsd*pmN*2:price*pmN*2};
-      // append a live sample to every series so the chart keeps moving
-      if(histLoaded){pushLive({price,pool:pmN,supply:supN,burn:CFG.cap-supN,index:idxN});drawChart();}
+      // append a live point ONLY if something actually moved (pushLive returns false otherwise)
+      if(histLoaded&&pushLive({price,pool:pmN,supply:supN,burn:CFG.cap-supN,index:idxN}))drawChart();
     }
     if($("pv-analytics")&&getComputedStyle($("pv-analytics")).display!=="none")renderAnalytics();
     if(watch){const b=await mmRead.balanceOf(watch);excluded=await mmRead.isExcluded(watch);liveBal=Number(E.formatUnits(b,18));
@@ -1125,7 +1145,18 @@ function tickLive(){if(!watch||excluded||liveBal<=0)return;liveBal*=Math.pow(1-d
   $("p_bal").textContent=liveBal.toLocaleString("en-US",{minimumFractionDigits:4,maximumFractionDigits:4});$("p_tick").textContent="↓ decaying live";}
 function projFor(bal){const r=[["1h",3600],["1d",86400],["1w",604800],["1mo",2592000],["1y",31536000]];
   $("p_proj").innerHTML=r.map(([l,s])=>{const v=bal*Math.pow(1-decayR,s);return `<tr><td class="muted">${l}</td><td>${fmt(v,2)} <span class="muted">(${((v/bal-1)*100).toFixed(1)}%)</span></td></tr>`;}).join("");}
-function pushLive(o){for(const k in o){if(SERIES[k]){SERIES[k].data.push(o[k]);if(SERIES[k].data.length>720)SERIES[k].data.shift();}}TS.push(Math.floor(Date.now()/1000));if(TS.length>720)TS.shift();}
+// Append a live point ONLY when price or liquidity actually moved — no change, no new point,
+// so the chart never scrolls right on empty ticks. Keeps every series + TS length-aligned.
+function pushLive(o){
+  const pd=SERIES.price.data,ld=SERIES.pool.data;
+  const lastP=pd[pd.length-1],lastPool=ld[ld.length-1];
+  if(lastP!==undefined&&o.price===lastP&&o.pool===lastPool)return false; // nothing moved → skip
+  SERIES.price.data.push(o.price);SERIES.pool.data.push(o.pool);SERIES.supply.data.push(o.supply);
+  SERIES.burn.data.push(o.burn);SERIES.index.data.push(o.index);SERIES.vol.data.push(0); // live move, no swap-volume sample
+  TS.push(Math.floor(Date.now()/1000));
+  const MX=1400;Object.values(SERIES).forEach(s=>{while(s.data.length>MX)s.data.shift();});while(TS.length>MX)TS.shift();
+  return true;
+}
 function fmtSigned(v,d=2){return (v>=0?"+":"−")+fmt(Math.abs(v),d);}
 // Holder economics: reflection (gain) vs decay (loss) → net. Not just loss.
 function renderPnL(bal){
@@ -1328,7 +1359,7 @@ const LIFI="https://li.quest/v1",NATIVE="0x0000000000000000000000000000000000000
 const LOGO_ETH='<svg viewBox="0 0 24 24"><rect width="24" height="24" rx="12" fill="#0a0f16"/><path d="M12 3.2 L12 9.9 L17.6 12.3 Z" fill="#8ab4ff"/><path d="M12 3.2 L6.4 12.3 L12 9.9 Z" fill="#dbe6ff"/><path d="M12 13.3 L12 20.8 L17.7 13.5 Z" fill="#8ab4ff"/><path d="M12 20.8 L12 13.3 L6.4 13.5 Z" fill="#dbe6ff"/></svg>';
 const LOGO_MM='<img src="mm.png" alt="MM" style="width:22px;height:22px;border-radius:50%;object-fit:cover">';
 const ERC20_ABI2=["function allowance(address,address) view returns(uint256)","function approve(address,uint256) returns(bool)"];
-let swBuy=true,swSlip=5,swQuote=null,_swSeq=0;
+let swBuy=true,swSlip=5,swQuote=null,_swSeq=0,swPayBal=0;
 const tokChip=s=>(s==="ETH"?LOGO_ETH+" ETH":LOGO_MM+" MM");
 function swTokens(){return swBuy?{from:NATIVE,to:CFG.mm}:{from:CFG.mm,to:NATIVE};}
 function protoTab(which){
@@ -1341,14 +1372,23 @@ function protoTab(which){
 function openSwap(){protoTab("swap");}
 function closeSwap(){protoTab("proto");}
 function renderSwapTokens(){$("sw_tokA").innerHTML=tokChip(swBuy?"ETH":"MM");$("sw_tokB").innerHTML=tokChip(swBuy?"MM":"ETH");}
-function flipSwap(){swBuy=!swBuy;renderSwapTokens();$("sw_in").value="";$("sw_out").textContent="0.0";swQuote=null;updateSwapBalances();quoteSwap();}
+function flipSwap(){swBuy=!swBuy;renderSwapTokens();$("sw_in").value="";$("sw_out").textContent="0.0";swQuote=null;document.querySelectorAll(".pct").forEach(x=>x.classList.remove("on"));updateSwapBalances();quoteSwap();}
 function setSlip(s,el){swSlip=s;document.querySelectorAll(".slip").forEach(x=>x.classList.remove("on"));el.classList.add("on");quoteSwap();savePrefs();}
 async function updateSwapBalances(){
   if(!account){$("sw_balA").textContent="";$("sw_balB").textContent="";return;}
   try{const [eth,mmb]=await Promise.all([ro.getBalance(account),mmRead.balanceOf(account)]);
     const e=Number(E.formatUnits(eth,18)),m=Number(E.formatUnits(mmb,18));
+    swPayBal=swBuy?e:m; // pay-side balance for the % quick-fill buttons
     $("sw_balA").textContent="bal "+fmt(swBuy?e:m,swBuy?5:2);$("sw_balB").textContent="bal "+fmt(swBuy?m:e,swBuy?2:5);}catch(e){}
 }
+// quick-fill the pay amount as a % of balance (on 100% ETH, keep a little for gas)
+function setSwPct(p){if(!account){toast("Connect a wallet first");return;}
+  let amt=swPayBal*p/100;
+  if(swBuy&&p>=100)amt=Math.max(0,swPayBal-0.0003); // reserve gas
+  if(amt<=0){toast("No balance");return;}
+  $("sw_in").value=swBuy?amt.toFixed(6):amt.toFixed(3);
+  document.querySelectorAll(".pct").forEach(x=>x.classList.toggle("on",+x.dataset.p===p));
+  quoteSwap();}
 function setSwBtn(inv,noRoute){const btn=$("sw_exec");if(!btn)return;
   if(!signer){btn.textContent="Connect wallet";btn.className="swexec alt";}
   else if(inv<=0){btn.textContent="Enter an amount";btn.className="swexec alt";}
