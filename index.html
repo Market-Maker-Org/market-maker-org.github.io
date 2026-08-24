@@ -873,9 +873,23 @@ function usd(x){if(!x)return "$0";if(x>=1)return "$"+x.toLocaleString("en-US",{m
   const s=x.toFixed(15).replace(/0+$/,"");return "$"+s;} // full digits, no e-notation
 function usdBig(x){return "$"+x.toLocaleString("en-US",{maximumFractionDigits:x>=100?0:2});}
 let avgBlockMs=100; // Robinhood ~0.1s/block; refined from stats
+// Shared Blockscout fetch with a 429 circuit-breaker. On rate-limit it opens a short cooldown
+// so we stop hammering (and let the limit recover) instead of 429-looping. Returns parsed JSON,
+// or null while cooling down / on any failure — every caller treats null/empty as "keep the last
+// data", so the same data still shows and nothing ever goes blank or wrong. Same-origin dev
+// proxy URLs (/holders,/ethusd) never 429, so they pass straight through.
+let bsCoolUntil=0;
+async function bsFetch(url){
+  if(Date.now()<bsCoolUntil)return null;                 // in cooldown → skip this call
+  try{const r=await fetch(url);
+    if(r.status===429){bsCoolUntil=Date.now()+20000;return null;} // 20s breather, then retry normally
+    if(!r.ok)return null;
+    return await r.json();
+  }catch(e){return null;}
+}
 async function fetchEthUsd(){
   const urls=LOCAL?["/ethusd",BS+"/api/v2/stats"]:[BS+"/api/v2/stats"];
-  for(const u of urls){try{const r=await fetch(u);const j=await r.json();if(j){if(j.average_block_time)avgBlockMs=Number(j.average_block_time)||avgBlockMs;if(j.coin_price){ethUsd=Number(j.coin_price);return;}}}catch(e){}}
+  for(const u of urls){const j=await bsFetch(u);if(j){if(j.average_block_time)avgBlockMs=Number(j.average_block_time)||avgBlockMs;if(j.coin_price){ethUsd=Number(j.coin_price);return;}}}
 }
 function ago(sec){sec=Math.max(0,Math.round(sec));if(sec<60)return sec+"s";if(sec<3600)return Math.round(sec/60)+"m";if(sec<86400)return Math.round(sec/3600)+"h";return Math.round(sec/86400)+"d";}
 
@@ -899,7 +913,7 @@ async function boot(){
   setTimeout(buildFlows,900);setTimeout(buildFlows,2500); // draw ecosystem flow lines once laid out
   // pause network polling while the tab is hidden (saves RPC + battery); UI ticks keep running cheaply
   const vis=fn=>()=>{if(!document.hidden)fn();};
-  setInterval(vis(refresh),5000);setInterval(vis(fetchSlow),30000);setInterval(vis(fetchEthUsd),60000);setInterval(vis(getHolders),30000);setInterval(vis(fetchPumpStats),60000);
+  setInterval(vis(refresh),5000);setInterval(vis(fetchSlow),30000);setInterval(vis(fetchEthUsd),90000);setInterval(vis(getHolders),45000);setInterval(vis(fetchPumpStats),60000);
   // one consolidated UI ticker (was 3 timers) — lighter, pauses when hidden
   setInterval(()=>{if(document.hidden)return;tickLive();tickHolders();tickDebt();},250);
   document.addEventListener("visibilitychange",()=>{if(!document.hidden){refresh();fetchSlow();}});
@@ -1025,7 +1039,7 @@ async function bsLogs(addr,topic){
   try{let out=[],from=0;
     for(let i=0;i<25;i++){
       const u=BS+"/api?module=logs&action=getLogs&fromBlock="+from+"&toBlock=latest&address="+addr+"&topic0="+topic;
-      const r=await fetch(u);const j=await r.json();const res=Array.isArray(j&&j.result)?j.result:[];
+      const j=await bsFetch(u);const res=Array.isArray(j&&j.result)?j.result:[];
       if(!res.length)break;out=out.concat(res);
       if(res.length<1000)break;from=parseInt(res[res.length-1].blockNumber,16)+1; // next page (skip boundary block)
     }
@@ -1091,7 +1105,8 @@ async function buildHistory(attempt=0){
     // One shot, no throttling, works the same on GitHub Pages as locally. If it yields any
     // Sync points we're done; otherwise fall through to the sequential RPC walk below.
     try{
-      const [sl,wl,dl]=await Promise.all([bsLogs(CFG.ethPair,SYNC_TOPIC),bsLogs(CFG.ethPair,V2SWAP_TOPIC),bsLogs(CFG.mm,DECAY_TOPIC)]);
+      // sequential (not Promise.all) so the 429 breaker can engage between series instead of firing a burst
+      const sl=await bsLogs(CFG.ethPair,SYNC_TOPIC),wl=await bsLogs(CFG.ethPair,V2SWAP_TOPIC),dl=await bsLogs(CFG.mm,DECAY_TOPIC);
       sl.forEach(l=>{const d=c.decode(["uint112","uint112"],l.data);const w=Number(E.formatUnits(d[0],18)),m=Number(E.formatUnits(d[1],18));if(m>0)sync.push({b:parseInt(l.blockNumber,16),price:w/m,pool:m});});
       wl.forEach(l=>{const d=c.decode(["uint256","uint256","uint256","uint256"],l.data);swaps.push({b:parseInt(l.blockNumber,16),vol:Number(E.formatUnits(d[1],18))+Number(E.formatUnits(d[3],18))});});
       dl.forEach(l=>{const d=c.decode(["uint256","uint256","uint256","uint256","uint256"],l.data);decays.push({b:parseInt(l.blockNumber,16),burn:Number(E.formatUnits(d[1],18)),idx:Number(E.formatUnits(d[4],18))});});
@@ -1189,7 +1204,7 @@ async function refresh(){
       ensureEntry(watch); // fire-and-forget: real entry point, no await → never blocks refresh
       renderPnL(liveBal);}
     if(account&&$("pv-wallet")&&getComputedStyle($("pv-wallet")).display!=="none")renderWallet(); // keep wallet balances live
-    if(feedTick%3===0)getFeed();
+    if(feedTick%4===0)getFeed(); // Live Activity every ~20s (was 15s) — lighter on Blockscout, same data
     feedTick++;
     refreshFails=0;$("net").classList.add("ok");$("nettxt").textContent="Robinhood · live";
     ro.getBlockNumber().then(b=>{const el=$("netblk");if(el)el.textContent="#"+b.toLocaleString("en-US");}).catch(()=>{});
@@ -1228,7 +1243,8 @@ async function ensureEntry(w){
   entryCache[k]="pending";
   try{
     const url=BS+"/api?module=account&action=tokentx&address="+w+"&contractaddress="+CFG.mm+"&sort=asc&page=1&offset=30";
-    const r=await fetch(url);const j=await r.json();
+    const j=await bsFetch(url);
+    if(!j){entryCache[k]=undefined;return;}            // cooling down / failed → leave untried so a later tick retries
     const list=Array.isArray(j&&j.result)?j.result:[];
     const first=list.find(x=>x.to&&x.to.toLowerCase()===k); // first RECEIVE = entry
     if(!first){entryCache[k]=false;}
@@ -1339,8 +1355,8 @@ const TT=E.id("Transfer(address,address,uint256)"),tif=new E.Interface(["event T
 async function getFeed(){try{
   // etherscan-style tokentx is CORS-open (the v2 /transfers endpoint is NOT) → works on
   // GitHub Pages exactly as locally. Newest first; same event classification as before.
-  const r=await fetch(BS+"/api?module=account&action=tokentx&contractaddress="+CFG.mm+"&sort=desc&page=1&offset=40");
-  const j=await r.json();const items=Array.isArray(j&&j.result)?j.result:[];
+  const j=await bsFetch(BS+"/api?module=account&action=tokentx&contractaddress="+CFG.mm+"&sort=desc&page=1&offset=40");
+  const items=Array.isArray(j&&j.result)?j.result:[];
   if(!items.length)return;
   const now=Date.now();
   const nt=Number(items[0].timeStamp)*1000||0; // newest transfer's REAL ts → anchor pending pump
@@ -1373,8 +1389,8 @@ async function mmMulti(spec){ // spec: [[method,...args],...] on CFG.mm; last op
 }
 async function getHolders(){
   try{
-    const r=await fetch(LOCAL?"/holders":BS+"/api/v2/tokens/"+CFG.mm+"/holders");const j=await r.json();
-    if(!j.items||!j.items.length)return; // transient / empty -> keep existing list
+    const j=await bsFetch(LOCAL?"/holders":BS+"/api/v2/tokens/"+CFG.mm+"/holders");
+    if(!j||!j.items||!j.items.length)return; // transient / empty / cooling down -> keep existing list
     const items=j.items.slice(0,14);
     const pm=CFG.pm.toLowerCase(),hk=CFG.hook.toLowerCase(),mm=CFG.mm.toLowerCase(),sd="0x0bc6146b349446458383093e39b6c30a7c7bb571",me=(account||watch||"").toLowerCase();
     // labelled infrastructure: pools, engine wallets, foundation
