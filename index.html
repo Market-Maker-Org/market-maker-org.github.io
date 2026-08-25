@@ -209,17 +209,20 @@
   .psbox{background:radial-gradient(120% 120% at 50% 0%,#0a0a0a,#040404);border:1px solid var(--line);border-radius:14px;padding:14px;max-width:520px}
   .psrow{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:7px 0;border-top:1px dashed var(--line);font-size:12.5px}
   .psrow:first-child{border-top:none}.psrow .l{color:var(--soft)}.psrow .v{font-family:var(--mono);font-weight:600}
-  .pstable{border:1px solid var(--line);border-radius:12px;overflow:hidden}
-  .pstable .hd,.pstable .rw{display:grid;grid-template-columns:34px 1fr 90px 62px 1fr 84px;gap:8px;align-items:center;padding:9px 12px;font-size:12px}
+  .pstable{border:1px solid var(--line);border-radius:12px;overflow-x:auto}
+  .pstable .hd,.pstable .rw{min-width:560px}
+  .pstable .hd,.pstable .rw{display:grid;grid-template-columns:30px 1fr 78px 54px 1fr 158px;gap:8px;align-items:center;padding:9px 12px;font-size:12px}
   .pstable .hd{background:var(--panel2);color:var(--faint);font-size:10px;text-transform:uppercase;letter-spacing:.06em}
   .pstable .rw{border-top:1px solid var(--line)}
   .pstable .rw .mono,.pstable .hd .mono{font-family:var(--mono)}
   .pstable .sendb{background:var(--green);color:#00220a;border:0;border-radius:7px;padding:5px 8px;font-family:var(--disp);font-weight:700;font-size:11px;cursor:pointer}
   .pstable .sendb:disabled{background:var(--panel2);color:var(--faint);cursor:not-allowed}
   .pstable .sent{color:var(--green2);font-family:var(--mono);font-size:11px}
+  .pstable .togb{background:var(--panel2);border:1px solid var(--orange);color:var(--orange2);border-radius:7px;padding:5px 7px;font-family:var(--disp);font-weight:700;font-size:10.5px;cursor:pointer;white-space:nowrap}
+  .pstable .togb.on{border-color:var(--green2);color:var(--green2);background:rgba(56,255,126,.08)}
   .pspct{background:var(--panel2);border:1px solid var(--line2);color:var(--soft);border-radius:7px;padding:4px 8px;font-family:var(--mono);font-size:11px;cursor:pointer;transition:.15s}
   .pspct:hover{border-color:var(--orange);color:var(--orange2)}
-  @media(max-width:640px){.pstable .hd,.pstable .rw{grid-template-columns:26px 1fr 70px 74px;font-size:11px}.pstable .col-pct,.pstable .hd .col-pct{display:none}}
+  @media(max-width:640px){.pstable .hd,.pstable .rw{font-size:11px}}
   .postabs{margin-left:auto;display:inline-flex;gap:4px}
   .postab{font-family:var(--disp);font-weight:700;font-size:10px;padding:3px 9px;border-radius:100px;border:1px solid var(--line2);background:var(--panel2);color:var(--soft);cursor:pointer;transition:.15s}
   .postab.on{background:var(--green);color:#00220a;border-color:transparent}
@@ -970,6 +973,7 @@
     <span class="dt">Presale — pro-rata ETH deposit</span>
     <span style="flex:1"></span>
     <span class="chip" id="ps_state"><span class="d"></span><span id="ps_statetxt">reading…</span></span>
+    <button class="hbtn green" id="ps_connectbtn" onclick="presaleConnectToggle()" style="margin-left:8px">Connect</button>
   </div>
   <div class="docs-wrap">
   <p class="muted" style="max-width:720px;font-size:13.5px;line-height:1.6">Deposit ETH and receive a <b style="color:var(--orange2)">pro-rata</b> share of <b>800M MM</b> — your share = your ETH ÷ total ETH raised. No fixed price: the more that's raised, the finer the split. Min deposit <b>0.0001 ETH</b>. The rest of the supply stays with the foundation to seed liquidity. <b style="color:var(--orange2)">Once MM lands in your wallet it decays like every holder</b> — this is a live, elastic-supply token.</p>
@@ -1024,16 +1028,7 @@
 
   <div class="lsec" id="ps-admin" style="display:none">
     <h3>◎ Grace period <span class="muted" style="font-weight:400;font-size:12px">· foundation only</span></h3>
-    <p>After you've distributed the MM, mark <b>every participant wallet as stable</b> — their MM stops decaying for a grace window (we plan <b>7 days</b>). When the window ends, flip it back and decay resumes for everyone, exactly like any holder. <b style="color:var(--orange2)">Stable freezes each balance at its current value — no jump, no loss</b> (verified against the token).</p>
-    <div class="psbox" style="max-width:640px">
-      <div class="psrow"><span class="l">Participants</span><span class="v mono" id="ps_admincount">0</span></div>
-      <div class="psrow"><span class="l muted" style="font-size:11px">One transaction per wallet — sign each in your wallet.</span><span></span></div>
-      <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
-        <button class="wbtn" style="flex:1;min-width:180px;background:rgba(56,255,126,.12);border-color:var(--green2)" onclick="presaleStableAll(true)">🛡 Make all stable (start grace)</button>
-        <button class="wbtn" style="flex:1;min-width:180px;background:rgba(255,122,24,.12);border-color:var(--orange)" onclick="presaleStableAll(false)">⌁ End grace → start decay</button>
-      </div>
-      <div class="muted" style="font-size:10px;margin-top:8px">Plan: distribute MM → make stable → after ~7 days end grace. Only the foundation (token owner) can run these.</div>
-    </div>
+    <p>After you distribute the MM, set each participant <b style="color:var(--green2)">🛡 stable</b> from the row above — their MM stops decaying for a grace window (plan: <b>7 days</b>). When it ends, hit <b style="color:var(--orange2)">⌁ decay</b> per wallet and decay resumes like any holder. <b>Stable freezes each balance at its current value — no jump, no loss</b> (verified against the token). Each toggle is one transaction on the MM token, owner-only.</p>
   </div>
   </div>
 </div>
@@ -1956,7 +1951,7 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape"){closeLearn();closeP
 
 // ===== Presale — pro-rata ETH deposit sale =====
 const PRESALE_ABI=["function totalRaised() view returns(uint256)","function closed() view returns(bool)","function allContributions() view returns(address[],uint256[])"];
-let _psWho=[],_psAmt=[],_psRaised=0,_psClosed=false,_psFoundBal=0;
+let _psWho=[],_psAmt=[],_psRaised=0,_psClosed=false,_psFoundBal=0,_psExcl=[];
 const psSent=new Set(JSON.parse(localStorage.getItem("ps_sent")||"[]"));
 function openPresale(){const w=$("presale");w.classList.add("on");w.scrollTop=0;document.body.style.overflow="hidden";renderPresale();}
 function closePresale(){const w=$("presale");if(w)w.classList.remove("on");document.body.style.overflow="";}
@@ -1970,9 +1965,14 @@ async function renderPresale(){
   }catch(e){}}
   _psWho=who;_psAmt=amts;_psRaised=raised;_psClosed=closed;
   try{_psFoundBal=Number(E.formatUnits(await mmRead.balanceOf(CFG.foundation),18));}catch(e){}
+  try{_psExcl=await Promise.all(who.map(w=>mmRead.isExcluded(w).catch(()=>false)));}catch(e){_psExcl=who.map(()=>false);}
+  // connect button reflects wallet state
+  const cb=$("ps_connectbtn");if(cb){if(account){cb.textContent=short(account)+" · ✕";cb.title="Disconnect";}else{cb.textContent="Connect";cb.title="";}}
   $("ps_statetxt").textContent=!deployed?"not live yet":closed?"closed":"● live";
   $("ps_state").className="chip"+(deployed&&!closed?" ok":"");
-  const ael=$("ps_addr");ael.textContent=deployed?short(CFG.presale):"not deployed yet";ael.title=deployed?CFG.presale:"";
+  const ael=$("ps_addr");
+  if(deployed)ael.innerHTML=`<a href="${EXPLORER}/address/${CFG.presale}?tab=contract" target="_blank" title="${CFG.presale}">${short(CFG.presale)}</a> <span style="color:var(--green2);font-size:10px" title="source verified (Sourcify exact match)">✓ verified</span>`;
+  else{ael.textContent="not deployed yet";ael.title="";}
   $("ps_depbtn").disabled=!deployed||closed;
   const card=(l,v,s)=>`<div class="c"><div class="l">${l}</div><div class="v">${v}</div>${s?`<div class="s">${s}</div>`:""}</div>`;
   $("ps_stats").innerHTML=card("Raised",raised.toFixed(3)+" ETH",ethUsd?usd(raised*ethUsd):"")+card("Contributors",who.length,"")+card("For sale",fmt(dist,0)+" MM","pro-rata")+card("Min deposit","0.0001 ETH","per deposit");
@@ -1987,19 +1987,20 @@ async function renderPresale(){
   renderBook();
   const isF2=account&&account.toLowerCase()===CFG.foundation.toLowerCase();
   const adm=$("ps-admin");if(adm)adm.style.display=isF2?"block":"none";
-  if(isF2&&$("ps_admincount"))$("ps_admincount").textContent=_psWho.length;
 }
-async function presaleStableAll(on){ // foundation-only: setExcluded(true/false) for every participant (grace period)
+async function presaleToggleStable(addr,on){ // foundation-only: setExcluded on/off for one participant
   if(!signer){await connectWallet();if(!signer)return;}
   if(!account||account.toLowerCase()!==CFG.foundation.toLowerCase()){toast("Only the foundation (token owner) can do this","warn");return;}
-  if(!_psWho.length){toast("No participants yet","warn");return;}
-  if(!confirm((on?"Make":"Stop keeping")+" all "+_psWho.length+" participant wallet(s) "+(on?"STABLE (no decay)":"DECAYING again")+"?\n\nThis sends ONE transaction per wallet — you sign each.")) return;
-  const wc=new E.Contract(CFG.mm,["function setExcluded(address,bool)"],signer);let done=0;
-  for(const addr of _psWho){
-    try{const tx=await wc.setExcluded(addr,on);await tx.wait();done++;toast((on?"stable":"decay")+" "+done+"/"+_psWho.length+" ✓");}
-    catch(e){toast("Stopped at "+short(addr)+": "+(e.shortMessage||e.message||e),"err");break;}
-  }
-  toast("Done — "+done+"/"+_psWho.length+" wallet(s) "+(on?"now stable":"now decaying"));
+  try{const wc=new E.Contract(CFG.mm,["function setExcluded(address,bool)"],signer);
+    toast((on?"Making stable":"Starting decay")+" "+short(addr)+"…");
+    const tx=await wc.setExcluded(addr,on);await tx.wait();
+    const gi=_psWho.findIndex(w=>w.toLowerCase()===addr.toLowerCase());if(gi>=0)_psExcl[gi]=on;
+    toast(short(addr)+" → "+(on?"stable 🛡":"decaying ⌁"));renderBook();
+  }catch(e){toast("Failed: "+(e.shortMessage||e.message||e),"err");}
+}
+async function presaleConnectToggle(){
+  if(account){await disconnectWallet();}else{await connectWallet();}
+  renderPresale();
 }
 function renderBook(){
   const dist=CFG.presaleSupplyMM,total=_psRaised;
@@ -2007,9 +2008,13 @@ function renderBook(){
   $("ps_bookcount").textContent=rows.length?"· "+rows.length+" wallets · "+total.toFixed(3)+" ETH":"";
   if(!rows.length){$("ps_book").innerHTML='<div class="muted" style="padding:14px">No deposits yet.</div>';return;}
   const isF=account&&account.toLowerCase()===CFG.foundation.toLowerCase();
-  const hd=`<div class="hd"><span>#</span><span>Wallet</span><span class="mono">ETH</span><span class="col-pct">Share</span><span class="mono">MM allocation</span><span>${isF?"Send":""}</span></div>`;
-  $("ps_book").innerHTML=hd+rows.map((r,i)=>{const me=account&&r.a.toLowerCase()===account.toLowerCase(),done=psSent.has(r.a.toLowerCase());
-    return `<div class="rw"><span>${i+1}</span><span class="mono" title="${r.a}">${short(r.a)}${me?' <span style="color:var(--green2)">you</span>':''}</span><span class="mono">${r.eth.toFixed(3)}</span><span class="col-pct mono">${(r.pct*100).toFixed(1)}%</span><span class="mono">${fmt(r.mm,0)}</span><span>${isF?(done?'<span class="sent">sent ✓</span>':`<button class="sendb" onclick="presaleSend('${r.a}',${r.mm})">Send</button>`):(done?'<span class="sent">sent ✓</span>':'')}</span></div>`;}).join("");
+  const exclOf=a=>{const gi=_psWho.findIndex(w=>w.toLowerCase()===a.toLowerCase());return gi>=0?!!_psExcl[gi]:false;};
+  const hd=`<div class="hd"><span>#</span><span>Wallet</span><span class="mono">ETH</span><span class="col-pct">Share</span><span class="mono">MM allocation</span><span>${isF?"Actions":""}</span></div>`;
+  $("ps_book").innerHTML=hd+rows.map((r,i)=>{const me=account&&r.a.toLowerCase()===account.toLowerCase(),done=psSent.has(r.a.toLowerCase()),stable=exclOf(r.a);
+    const actions=isF
+      ? `<span style="display:flex;gap:4px;justify-content:flex-end;flex-wrap:wrap">${done?'<span class="sent">sent ✓</span>':`<button class="sendb" onclick="presaleSend('${r.a}',${r.mm})">Send</button>`}<button class="togb ${stable?'on':''}" title="${stable?'Currently stable — click to start decay':'Currently decaying — click to make stable'}" onclick="presaleToggleStable('${r.a}',${!stable})">${stable?'⌁ decay':'🛡 stable'}</button></span>`
+      : (stable?'<span class="sent" title="not decaying (grace)">🛡 stable</span>':'');
+    return `<div class="rw"><span>${i+1}</span><span class="mono" title="${r.a}">${short(r.a)}${me?' <span style="color:var(--green2)">you</span>':''}</span><span class="mono">${r.eth.toFixed(3)}</span><span class="col-pct mono">${(r.pct*100).toFixed(1)}%</span><span class="mono">${fmt(r.mm,0)}</span><span>${actions}</span></div>`;}).join("");
 }
 function presaleQuote(){
   const el=$("ps_amt");if(!el)return;const amt=parseFloat(el.value||"0")||0,dist=CFG.presaleSupplyMM;
