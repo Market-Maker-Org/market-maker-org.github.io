@@ -1276,15 +1276,20 @@ async function buildHistory(attempt=0){
     // One shot, no throttling, works the same on GitHub Pages as locally. If it yields any
     // Sync points we're done; otherwise fall through to the sequential RPC walk below.
     try{
-      // sequential (not Promise.all) so the 429 breaker can engage between series instead of firing a burst
-      // Decay logs (1000+ rows, paginated) only feed the Reflection-index curve, which is OFF by
-      // default — skip them for a fast first paint; burn/deflation is anchored to real totalSupply anyway.
-      const sl=await bsLogs(CFG.ethPair,SYNC_TOPIC),wl=await bsLogs(CFG.ethPair,V2SWAP_TOPIC),dl=SERIES.index.on?await bsLogs(CFG.mm,DECAY_TOPIC):[];
-      sl.forEach(l=>{const d=c.decode(["uint112","uint112"],l.data);const w=Number(E.formatUnits(d[0],18)),m=Number(E.formatUnits(d[1],18));if(m>0)sync.push({b:parseInt(l.blockNumber,16),price:w/m,pool:m});});
-      wl.forEach(l=>{const d=c.decode(["uint256","uint256","uint256","uint256"],l.data);swaps.push({b:parseInt(l.blockNumber,16),vol:Number(E.formatUnits(d[1],18))+Number(E.formatUnits(d[3],18))});});
+      // FAST PATH — pull the whole history straight from the RPC in ONE wide getLogs per series (no
+      // Blockscout → no rate-limit). The public RPC handles fromBlock 0..latest for these low-frequency
+      // pair events (verified). Decay logs are numerous (1000+) → only fetched (via Blockscout, paginated)
+      // when the Reflection-index curve is actually shown, which is OFF by default.
+      const [sl,wl]=await Promise.all([
+        ro.getLogs({address:CFG.ethPair,topics:[SYNC_TOPIC],fromBlock:0,toBlock:"latest"}).catch(()=>[]),
+        ro.getLogs({address:CFG.ethPair,topics:[V2SWAP_TOPIC],fromBlock:0,toBlock:"latest"}).catch(()=>[])
+      ]);
+      const dl=SERIES.index.on?await bsLogs(CFG.mm,DECAY_TOPIC):[];
+      sl.forEach(l=>{const d=c.decode(["uint112","uint112"],l.data);const w=Number(E.formatUnits(d[0],18)),m=Number(E.formatUnits(d[1],18));if(m>0)sync.push({b:Number(l.blockNumber),price:w/m,pool:m});});
+      wl.forEach(l=>{const d=c.decode(["uint256","uint256","uint256","uint256"],l.data);swaps.push({b:Number(l.blockNumber),vol:Number(E.formatUnits(d[1],18))+Number(E.formatUnits(d[3],18))});});
       dl.forEach(l=>{const d=c.decode(["uint256","uint256","uint256","uint256","uint256"],l.data);decays.push({b:parseInt(l.blockNumber,16),burn:Number(E.formatUnits(d[1],18)),idx:Number(E.formatUnits(d[4],18))});});
-      if(sync.length){seen=true;commit(true);return;} // full history from Blockscout — skip the RPC walk
-    }catch(e){/* Blockscout unreachable → RPC fallback */}
+      if(sync.length){seen=true;commit(true);return;} // full history in one shot — skip the chunked walk
+    }catch(e){/* RPC wide query failed → chunked walk fallback */}
     // SEQUENTIAL, walking backward from head — the /rpc proxy returns empty arrays under
     // concurrent getLogs load. Keep going until the token's history truly runs out (or the cap).
     for(let ci=0;ci<MAX;ci++){
@@ -1502,20 +1507,20 @@ async function ensureEntry(w){
   if(entryCache[k]!==undefined)return;              // tried already (pending/done/failed)
   entryCache[k]="pending";
   try{
-    const url=BS+"/api?module=account&action=tokentx&address="+w+"&contractaddress="+CFG.mm+"&sort=asc&page=1&offset=30";
-    const j=await bsFetch(url);
-    if(!j){entryCache[k]=undefined;return;}            // cooling down / failed → leave untried so a later tick retries
-    const list=Array.isArray(j&&j.result)?j.result:[];
-    const first=list.find(x=>x.to&&x.to.toLowerCase()===k); // first RECEIVE = entry
+    // first RECEIVE = entry, straight from the RPC (indexed `to` filter → few logs, no Blockscout)
+    const padded="0x000000000000000000000000"+k.slice(2);
+    const logs=await ro.getLogs({address:CFG.mm,topics:[TT,null,padded],fromBlock:0,toBlock:"latest"});
+    const first=logs&&logs.length?logs[0]:null; // oldest = entry
     if(!first){entryCache[k]=false;}
     else{
-      const t=Number(first.timeStamp)*1000;
+      const blk=await ro.getBlock(first.blockNumber);
+      const t=(blk?Number(blk.timestamp):Math.floor(Date.now()/1000))*1000;
       let price=null,idx=null;                       // entry-time price/index from loaded SYNC history
       if(TS.length&&t>=TS[0]*1000){let bi=0;for(let i=0;i<TS.length;i++){if(TS[i]*1000<=t)bi=i;else break;}
         price=SERIES.price.data[bi];idx=SERIES.index.data[bi];}
       entryCache[k]={t,price,idx};
     }
-  }catch(e){entryCache[k]=false;}
+  }catch(e){entryCache[k]=undefined;return;}          // failed → leave untried for a later retry
   if(watch&&watch.toLowerCase()===k)renderPnL(liveBal||0); // repaint with the real entry
 }
 function pnlToDate(bal){
@@ -1616,26 +1621,26 @@ function tickDebt(){
 const TT=E.id("Transfer(address,address,uint256)"),tif=new E.Interface(["event Transfer(address indexed from,address indexed to,uint256 value)"]);
 // Reliable feed + real last-settle anchor from Blockscout transfers (has timestamps).
 async function getFeed(){try{
-  // etherscan-style tokentx is CORS-open (the v2 /transfers endpoint is NOT) → works on
-  // GitHub Pages exactly as locally. Newest first; same event classification as before.
-  const j=await bsFetch(BS+"/api?module=account&action=tokentx&contractaddress="+CFG.mm+"&sort=desc&page=1&offset=40");
-  const items=Array.isArray(j&&j.result)?j.result:[];
-  if(!items.length)return;
-  const now=Date.now();
-  const nt=Number(items[0].timeStamp)*1000||0; // newest transfer's REAL ts → anchor pending pump
-  anchorSettle(nt);
+  // Recent transfers straight from the RPC (one windowed getLogs → no Blockscout, no rate-limit).
+  // Timestamps are estimated from block height (getLogs carries none); good enough for "Xh ago".
+  const cur=Number(await ro.getBlockNumber());
+  const logs=await ro.getLogs({address:CFG.mm,topics:[TT],fromBlock:Math.max(0,cur-500000),toBlock:cur}).catch(()=>[]);
+  if(!logs.length)return;
+  const spb=(avgBlockMs||100)/1000, nowMs=Date.now(), tOf=blk=>nowMs-(cur-Number(blk))*spb*1000;
+  const rev=logs.slice().reverse(); // newest first
+  anchorSettle(tOf(rev[0].blockNumber));
   const hk=CFG.hook.toLowerCase(),mm=CFG.mm.toLowerCase(),Z="0x0000000000000000000000000000000000000000";
   const pools=new Set([CFG.ethPair,CFG.pools[1].id,CFG.pools[2].id,CFG.pm].map(a=>a.toLowerCase()));
-  const evs=items.filter(it=>{try{return BigInt(it.value)>=10n**15n;}catch(e){return false;}}).slice(0,14);
-  $("feed").innerHTML=evs.map(it=>{const f=(it.from||"").toLowerCase(),t=(it.to||"").toLowerCase(),v=Number(E.formatUnits(BigInt(it.value),18));
+  const evs=rev.filter(l=>{try{return BigInt(l.data)>=10n**15n;}catch(e){return false;}}).slice(0,14);
+  $("feed").innerHTML=evs.map(l=>{const f=("0x"+l.topics[1].slice(26)).toLowerCase(),t=("0x"+l.topics[2].slice(26)).toLowerCase(),v=Number(E.formatUnits(BigInt(l.data),18));
     let k="transfer",cls="",lb="transfer";
     if(t===Z){k="burn";cls="burnE";lb="burn";}
     else if(f===Z&&t===mm){k="decay";cls="refl";lb="decay → treasury/pot";}
     else if(pools.has(f)){k="buy";cls="buy";lb="buy";}
     else if(pools.has(t)){k="sell";cls="sell";lb="sell";}
     else if(t===mm||t===hk){k="treasury";cls="refl";lb="fee → treasury";}
-    const tago=it.timeStamp?ago((now-Number(it.timeStamp)*1000)/1000):"";
-    return `<a class="ev ${cls}" href="${EXPLORER}/tx/${it.hash}" target="_blank" title="View tx on explorer">${icon(k)}<span>${lb}</span><span class="evago">${tago}</span><span class="mono">${fmt(v,2)}</span></a>`;}).join("")||'<div class="muted">no recent activity</div>';
+    const tago=ago((nowMs-tOf(l.blockNumber))/1000);
+    return `<a class="ev ${cls}" href="${EXPLORER}/tx/${l.transactionHash}" target="_blank" title="View tx on explorer">${icon(k)}<span>${lb}</span><span class="evago">${tago}</span><span class="mono">${fmt(v,2)}</span></a>`;}).join("")||'<div class="muted">no recent activity</div>';
   try{localStorage.setItem("mm_feed",$("feed").innerHTML);}catch(e){} // cache for instant paint next load
 }catch(e){}}
 
