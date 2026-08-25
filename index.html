@@ -979,6 +979,7 @@
   <p class="muted" style="max-width:720px;font-size:13.5px;line-height:1.6">Deposit ETH and receive a <b style="color:var(--orange2)">pro-rata</b> share of <b>800M MM</b> — your share = your ETH ÷ total ETH raised. No fixed price: the more that's raised, the finer the split. Min deposit <b>0.0001 ETH</b>. The rest of the supply stays with the foundation to seed liquidity. <b style="color:var(--orange2)">Once MM lands in your wallet it decays like every holder</b> — this is a live, elastic-supply token.</p>
 
   <div class="psgrid" id="ps_stats"></div>
+  <div id="ps_timer" style="margin:4px 0 2px"></div>
 
   <div class="lsec">
     <h3>How the presale works</h3>
@@ -1027,8 +1028,14 @@
   </div>
 
   <div class="lsec" id="ps-admin" style="display:none">
-    <h3>◎ Grace period <span class="muted" style="font-weight:400;font-size:12px">· foundation only</span></h3>
-    <p>After you distribute the MM, set each participant <b style="color:var(--green2)">🛡 stable</b> from the row above — their MM stops decaying for a grace window (plan: <b>7 days</b>). When it ends, hit <b style="color:var(--orange2)">⌁ decay</b> per wallet and decay resumes like any holder. <b>Stable freezes each balance at its current value — no jump, no loss</b> (verified against the token). Each toggle is one transaction on the MM token, owner-only.</p>
+    <h3>◎ Admin <span class="muted" style="font-weight:400;font-size:12px">· owner / foundation</span></h3>
+    <div class="calcnote" id="ps_roles" style="margin-bottom:10px"></div>
+    <p style="margin-top:0">Two roles — the buttons on each row show for whichever you connect:</p>
+    <ul style="color:var(--soft);font-size:12.5px;line-height:1.7;margin:4px 0 0;padding-left:18px">
+      <li><b>Foundation</b> (<span class="mono">0x91b5…167f</span>, holds the MM) → <b class="up">Send</b> each wallet its pro-rata MM. Sent rows show <b class="up">paid ✓</b>.</li>
+      <li><b>Owner</b> (<span class="mono" id="ps_ownershort">0x…</span>, token owner) → per-wallet <b style="color:var(--green2)">🛡 stable</b> / <b style="color:var(--orange2)">⌁ decay</b> toggle, and <b class="down">Close deposits</b>. Stable freezes each balance at its current value — no jump, no loss (verified).</li>
+    </ul>
+    <p class="muted" style="font-size:11px;margin-top:8px">Plan: close deposits → Send MM to everyone → 🛡 make each stable (grace) → after ~7 days ⌁ start decay. Each action is one transaction you sign.</p>
   </div>
   </div>
 </div>
@@ -1045,6 +1052,7 @@ const CFG={rpc:(LOCAL?location.origin+"/rpc":"https://rpc.mainnet.chain.robinhoo
   foundation:"0x91b5965e81DAC2687D0dAD000bd6ef207D2D167f", // holds the presale MM + receives ETH
   presale:"0x85C46a570F9770Fe1a6a9d411731c02AB31BDa19", // MarketMakerPresale — live
   presaleSupplyMM:8e8,   // 800M MM sold pro-rata in the presale; the rest stays with the foundation (LP + reserve)
+  presaleEnd:"2026-09-24T00:00:00Z", // 30-day countdown target (informational; owner can close early)
   ethPair:"0x66f6f74235f113Cf39B821C6566057FbC1271434", // V2 WETH/MM (token0=WETH, token1=MM)
   pools:[{name:"MM / ETH (V2)",id:"0x66f6f74235f113Cf39B821C6566057FbC1271434",tag:"V2 · main"},
          {name:"MM / THROBBIN (V2)",id:"0x3014706B83aff71A4Ef5550900A0A437f3F1e25F",tag:"V2"},
@@ -1951,7 +1959,8 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape"){closeLearn();closeP
 
 // ===== Presale — pro-rata ETH deposit sale =====
 const PRESALE_ABI=["function totalRaised() view returns(uint256)","function closed() view returns(bool)","function allContributions() view returns(address[],uint256[])"];
-let _psWho=[],_psAmt=[],_psRaised=0,_psClosed=false,_psFoundBal=0,_psExcl=[];
+let _psWho=[],_psAmt=[],_psRaised=0,_psClosed=false,_psFoundBal=0,_psExcl=[],_psOwner="";
+const fmtEth=v=>v>=1?v.toFixed(3):v>0?String(parseFloat(v.toFixed(6))):"0"; // keep small ETH amounts (0.0001) visible
 const psSent=new Set(JSON.parse(localStorage.getItem("ps_sent")||"[]"));
 function openPresale(){const w=$("presale");w.classList.add("on");w.scrollTop=0;document.body.style.overflow="hidden";renderPresale();}
 function closePresale(){const w=$("presale");if(w)w.classList.remove("on");document.body.style.overflow="";}
@@ -1966,8 +1975,16 @@ async function renderPresale(){
   _psWho=who;_psAmt=amts;_psRaised=raised;_psClosed=closed;
   try{_psFoundBal=Number(E.formatUnits(await mmRead.balanceOf(CFG.foundation),18));}catch(e){}
   try{_psExcl=await Promise.all(who.map(w=>mmRead.isExcluded(w).catch(()=>false)));}catch(e){_psExcl=who.map(()=>false);}
+  try{if(!_psOwner)_psOwner=(await mmRead.owner()).toLowerCase();}catch(e){}
+  const isOwner=account&&_psOwner&&account.toLowerCase()===_psOwner;
+  const isFound=account&&account.toLowerCase()===CFG.foundation.toLowerCase();
   // connect button reflects wallet state
   const cb=$("ps_connectbtn");if(cb){if(account){cb.textContent=short(account)+" · ✕";cb.title="Disconnect";}else{cb.textContent="Connect";cb.title="";}}
+  // countdown + close (owner)
+  const endTs=Date.parse(CFG.presaleEnd)/1000, nowS=Date.now()/1000, left=endTs-nowS;
+  const dd=Math.floor(left/86400),hh=Math.floor(left%86400/3600),mm2=Math.floor(left%3600/60);
+  const timeTxt=closed?'<b class="down">Closed</b>':left<=0?'<b class="down">Ended</b>':`Ends in <b class="mono">${dd}d ${hh}h ${mm2}m</b>`;
+  $("ps_timer").innerHTML=`<div class="psbox" style="max-width:none;display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 14px"><span style="font-size:12.5px;color:var(--soft)">⏳ ${timeTxt} <span class="muted" style="font-size:10px">· target ${new Date(endTs*1000).toLocaleDateString("en-GB",{day:"2-digit",month:"short",year:"numeric"})}</span></span>${isOwner&&!closed?'<button class="wbtn" style="width:auto;background:rgba(255,90,44,.14);border-color:var(--down)" onclick="presaleClose()">■ Close deposits (end now)</button>':""}</div>`;
   $("ps_statetxt").textContent=!deployed?"not live yet":closed?"closed":"● live";
   $("ps_state").className="chip"+(deployed&&!closed?" ok":"");
   const ael=$("ps_addr");
@@ -1975,7 +1992,7 @@ async function renderPresale(){
   else{ael.textContent="not deployed yet";ael.title="";}
   $("ps_depbtn").disabled=!deployed||closed;
   const card=(l,v,s)=>`<div class="c"><div class="l">${l}</div><div class="v">${v}</div>${s?`<div class="s">${s}</div>`:""}</div>`;
-  $("ps_stats").innerHTML=card("Raised",raised.toFixed(3)+" ETH",ethUsd?usd(raised*ethUsd):"")+card("Contributors",who.length,"")+card("For sale",fmt(dist,0)+" MM","pro-rata")+card("Min deposit","0.0001 ETH","per deposit");
+  $("ps_stats").innerHTML=card("Raised",fmtEth(raised)+" ETH",ethUsd&&raised>0?usd(raised*ethUsd):"")+card("Contributors",who.length,"")+card("For sale",fmt(dist,0)+" MM","pro-rata")+card("Min deposit","0.0001 ETH","per deposit");
   presaleQuote();
   const cap=CFG.cap,supply=(AN&&AN.sup)||cap,burned=Math.max(0,cap-supply),fkeep=Math.max(0,_psFoundBal-dist),circ=Math.max(0,supply-_psFoundBal);
   $("ps_tok").innerHTML=card("Total supply",fmt(supply,0),"cap "+fmt(cap,0))+card("Presale",fmt(dist,0),"→ buyers")+card("Foundation keeps",fmt(fkeep,0),"LP + reserve")+card("Circulating now",fmt(circ,0),"holders + pools")+card("Burned to date",fmt(burned,0),(burned/cap*100).toFixed(3)+"%")+card("Decay","50%/yr","on held MM");
@@ -1985,12 +2002,20 @@ async function renderPresale(){
   $("ps_barleg").innerHTML=leg("var(--orange)","Presale",dist)+leg("var(--orange2)","Foundation",fkeep)+leg("var(--green2)","Circulating",circ)+leg("#555","Burned",burned);
   $("ps_toknote").innerHTML="Presale MM is sold pro-rata; the foundation keeps ~<b>"+fmt(fkeep,0)+" MM</b> for the first liquidity + reserve. <b style='color:var(--orange2)'>The moment MM reaches a buyer's wallet it starts decaying ~50%/yr</b> (pools & foundation are excluded and don't decay). Burn, treasury and the pump keep running exactly as on the terminal.";
   renderBook();
-  const isF2=account&&account.toLowerCase()===CFG.foundation.toLowerCase();
-  const adm=$("ps-admin");if(adm)adm.style.display=isF2?"block":"none";
+  const adm=$("ps-admin");if(adm)adm.style.display=(isOwner||isFound)?"block":"none";
+  if($("ps_ownershort"))$("ps_ownershort").textContent=short(_psOwner||"0x…");
+  const rn=$("ps_roles");if(rn)rn.innerHTML=account?("Connected: <b class='mono'>"+short(account)+"</b> — "+(isOwner?"<b style='color:var(--green2)'>owner</b> (toggle stable/decay + close)":isFound?"<b style='color:var(--green2)'>foundation</b> (Send MM)":"<b class='down'>not owner/foundation</b> — connect owner ("+short(_psOwner||"0x…")+") for toggles/close, or foundation ("+short(CFG.foundation)+") to Send.")):"Connect the owner or foundation wallet to manage.";
 }
-async function presaleToggleStable(addr,on){ // foundation-only: setExcluded on/off for one participant
+async function presaleClose(){
   if(!signer){await connectWallet();if(!signer)return;}
-  if(!account||account.toLowerCase()!==CFG.foundation.toLowerCase()){toast("Only the foundation (token owner) can do this","warn");return;}
+  if(!account||!_psOwner||account.toLowerCase()!==_psOwner){toast("Only the presale owner can close","warn");return;}
+  if(!confirm("Close deposits now? No more contributions will be accepted. (You can still distribute + toggle stable/decay afterwards.)")) return;
+  try{const wc=new E.Contract(CFG.presale,["function close()"],signer);toast("Closing…");const tx=await wc.close();await tx.wait();toast("Presale closed ✓");renderPresale();}
+  catch(e){toast("Close failed: "+(e.shortMessage||e.message||e),"err");}
+}
+async function presaleToggleStable(addr,on){ // owner-only: setExcluded on/off for one participant
+  if(!signer){await connectWallet();if(!signer)return;}
+  if(!account||!_psOwner||account.toLowerCase()!==_psOwner){toast("Only the token owner ("+short(_psOwner)+") can toggle decay","warn");return;}
   try{const wc=new E.Contract(CFG.mm,["function setExcluded(address,bool)"],signer);
     toast((on?"Making stable":"Starting decay")+" "+short(addr)+"…");
     const tx=await wc.setExcluded(addr,on);await tx.wait();
@@ -2005,16 +2030,21 @@ async function presaleConnectToggle(){
 function renderBook(){
   const dist=CFG.presaleSupplyMM,total=_psRaised;
   const rows=_psWho.map((a,i)=>({a,eth:_psAmt[i],pct:total>0?_psAmt[i]/total:0,mm:total>0?_psAmt[i]/total*dist:0})).sort((x,y)=>y.eth-x.eth);
-  $("ps_bookcount").textContent=rows.length?"· "+rows.length+" wallets · "+total.toFixed(3)+" ETH":"";
+  $("ps_bookcount").textContent=rows.length?"· "+rows.length+" wallets · "+fmtEth(total)+" ETH":"";
   if(!rows.length){$("ps_book").innerHTML='<div class="muted" style="padding:14px">No deposits yet.</div>';return;}
-  const isF=account&&account.toLowerCase()===CFG.foundation.toLowerCase();
+  const isOwner=account&&_psOwner&&account.toLowerCase()===_psOwner; // can toggle stable/decay
+  const isFound=account&&account.toLowerCase()===CFG.foundation.toLowerCase(); // holds MM → can Send
+  const admin=isOwner||isFound;
   const exclOf=a=>{const gi=_psWho.findIndex(w=>w.toLowerCase()===a.toLowerCase());return gi>=0?!!_psExcl[gi]:false;};
-  const hd=`<div class="hd"><span>#</span><span>Wallet</span><span class="mono">ETH</span><span class="col-pct">Share</span><span class="mono">MM allocation</span><span>${isF?"Actions":""}</span></div>`;
+  const hd=`<div class="hd"><span>#</span><span>Wallet</span><span class="mono">ETH</span><span class="col-pct">Share</span><span class="mono">MM allocation</span><span>${admin?"Actions":""}</span></div>`;
   $("ps_book").innerHTML=hd+rows.map((r,i)=>{const me=account&&r.a.toLowerCase()===account.toLowerCase(),done=psSent.has(r.a.toLowerCase()),stable=exclOf(r.a);
-    const actions=isF
-      ? `<span style="display:flex;gap:4px;justify-content:flex-end;flex-wrap:wrap">${done?'<span class="sent">sent ✓</span>':`<button class="sendb" onclick="presaleSend('${r.a}',${r.mm})">Send</button>`}<button class="togb ${stable?'on':''}" title="${stable?'Currently stable — click to start decay':'Currently decaying — click to make stable'}" onclick="presaleToggleStable('${r.a}',${!stable})">${stable?'⌁ decay':'🛡 stable'}</button></span>`
-      : (stable?'<span class="sent" title="not decaying (grace)">🛡 stable</span>':'');
-    return `<div class="rw"><span>${i+1}</span><span class="mono" title="${r.a}">${short(r.a)}${me?' <span style="color:var(--green2)">you</span>':''}</span><span class="mono">${r.eth.toFixed(3)}</span><span class="col-pct mono">${(r.pct*100).toFixed(1)}%</span><span class="mono">${fmt(r.mm,0)}</span><span>${actions}</span></div>`;}).join("");
+    let a="";
+    if(admin){
+      const sendBtn=done?'<span class="sent">paid ✓</span>':`<button class="sendb" onclick="presaleSend('${r.a}',${r.mm})">Send</button>`;
+      const togBtn=isOwner?`<button class="togb ${stable?'on':''}" title="${stable?'Stable now — click to start decay':'Decaying now — click to make stable'}" onclick="presaleToggleStable('${r.a}',${!stable})">${stable?'⌁ decay':'🛡 stable'}</button>`:(stable?'<span class="sent">🛡</span>':"");
+      a=`<span style="display:flex;gap:4px;justify-content:flex-end;flex-wrap:wrap">${sendBtn}${togBtn}</span>`;
+    } else a=(stable?'<span class="sent" title="not decaying (grace)">🛡 stable</span>':'');
+    return `<div class="rw"><span>${i+1}</span><span class="mono" title="${r.a}">${short(r.a)}${me?' <span style="color:var(--green2)">you</span>':''}</span><span class="mono">${fmtEth(r.eth)}</span><span class="col-pct mono">${(r.pct*100).toFixed(1)}%</span><span class="mono">${fmt(r.mm,0)}</span><span>${a}</span></div>`;}).join("");
 }
 function presaleQuote(){
   const el=$("ps_amt");if(!el)return;const amt=parseFloat(el.value||"0")||0,dist=CFG.presaleSupplyMM;
@@ -2040,8 +2070,9 @@ async function presaleDeposit(){
 }
 async function presaleSend(addr,mm){
   if(!signer){await connectWallet();if(!signer)return;}
-  if(!account||account.toLowerCase()!==CFG.foundation.toLowerCase()){toast("Only the foundation wallet can send MM","warn");return;}
-  try{const wc=new E.Contract(CFG.mm,["function transfer(address,uint256) returns(bool)"],signer);
+  try{const wc=new E.Contract(CFG.mm,["function transfer(address,uint256) returns(bool)","function balanceOf(address) view returns(uint256)"],signer);
+    const bal=Number(E.formatUnits(await wc.balanceOf(account),18));
+    if(bal<mm){toast("This wallet holds "+fmt(bal,0)+" MM — need "+fmt(mm,0)+". Connect the wallet that holds the presale MM (foundation "+short(CFG.foundation)+").","warn");return;}
     const tx=await wc.transfer(addr,E.parseUnits(String(Math.floor(mm)),18));toast("Sending "+fmt(mm,0)+" MM…");await tx.wait();
     psSent.add(addr.toLowerCase());try{localStorage.setItem("ps_sent",JSON.stringify([...psSent]));}catch(e){}
     toast("Sent ✓");renderBook();}
