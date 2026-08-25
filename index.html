@@ -201,6 +201,23 @@
   .covbar{position:relative;height:9px;background:#181818;border-radius:6px;overflow:hidden;margin-top:9px}
   .covfill{height:100%;border-radius:6px;transition:width .4s ease,background .4s ease}
   .covmark{position:absolute;top:-3px;left:50%;width:2px;height:15px;background:var(--soft);opacity:.55;border-radius:2px}
+  .psgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:6px 0}
+  .psgrid .c{background:linear-gradient(180deg,var(--panel2),#070707);border:1px solid var(--line);border-radius:12px;padding:12px}
+  .psgrid .c .l{font-size:10.5px;color:var(--faint);text-transform:uppercase;letter-spacing:.08em}
+  .psgrid .c .v{font-family:var(--mono);font-size:18px;font-weight:600;margin-top:4px}
+  .psgrid .c .s{font-size:10px;color:var(--soft);margin-top:2px}
+  .psbox{background:radial-gradient(120% 120% at 50% 0%,#0a0a0a,#040404);border:1px solid var(--line);border-radius:14px;padding:14px;max-width:520px}
+  .psrow{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:7px 0;border-top:1px dashed var(--line);font-size:12.5px}
+  .psrow:first-child{border-top:none}.psrow .l{color:var(--soft)}.psrow .v{font-family:var(--mono);font-weight:600}
+  .pstable{border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  .pstable .hd,.pstable .rw{display:grid;grid-template-columns:34px 1fr 90px 62px 1fr 84px;gap:8px;align-items:center;padding:9px 12px;font-size:12px}
+  .pstable .hd{background:var(--panel2);color:var(--faint);font-size:10px;text-transform:uppercase;letter-spacing:.06em}
+  .pstable .rw{border-top:1px solid var(--line)}
+  .pstable .rw .mono,.pstable .hd .mono{font-family:var(--mono)}
+  .pstable .sendb{background:var(--green);color:#00220a;border:0;border-radius:7px;padding:5px 8px;font-family:var(--disp);font-weight:700;font-size:11px;cursor:pointer}
+  .pstable .sendb:disabled{background:var(--panel2);color:var(--faint);cursor:not-allowed}
+  .pstable .sent{color:var(--green2);font-family:var(--mono);font-size:11px}
+  @media(max-width:640px){.pstable .hd,.pstable .rw{grid-template-columns:26px 1fr 70px 74px;font-size:11px}.pstable .col-pct,.pstable .hd .col-pct{display:none}}
   .postabs{margin-left:auto;display:inline-flex;gap:4px}
   .postab{font-family:var(--disp);font-weight:700;font-size:10px;padding:3px 9px;border-radius:100px;border:1px solid var(--line2);background:var(--panel2);color:var(--soft);cursor:pointer;transition:.15s}
   .postab.on{background:var(--green);color:#00220a;border-color:transparent}
@@ -484,6 +501,7 @@
   <div class="spacer"></div>
   <span class="chip" id="net"><span class="d"></span><span id="nettxt">connecting…</span><span id="netblk" class="mono"></span></span>
   <button class="hbtn" onclick="openLearn()">How it works</button>
+  <button class="hbtn" onclick="openPresale()" style="border-color:#3a2a12;color:var(--orange2)">◎ Presale</button>
   <button class="hbtn green" id="connectBtn" onclick="connectWallet()">Connect</button>
   <span class="chip" id="acct" style="display:none"></span>
   <button class="hbtn" id="adminBtn" style="display:none" onclick="window.open('admin.html','_blank')">Admin</button>
@@ -943,6 +961,49 @@
   </div>
 </div></div>
 
+<!-- PRESALE MODAL -->
+<div class="docs" id="presale"><div class="docs-bar">
+    <button class="back" onclick="closePresale()">← Terminal</button>
+    <img src="mm.png" class="mmlogo" style="width:22px;height:22px" alt="">
+    <span class="dt">Presale — pro-rata ETH deposit</span>
+    <span style="flex:1"></span>
+    <span class="chip" id="ps_state"><span class="d"></span><span id="ps_statetxt">reading…</span></span>
+  </div>
+  <div class="docs-wrap">
+  <p class="muted" style="max-width:720px;font-size:13.5px;line-height:1.6">Deposit ETH and receive a <b style="color:var(--orange2)">pro-rata</b> share of <b>800M MM</b> — your share = your ETH ÷ total ETH raised. No fixed price: the more that's raised, the finer the split. Min deposit <b>0.01 ETH</b>. The rest of the supply stays with the foundation to seed liquidity. <b style="color:var(--orange2)">Once MM lands in your wallet it decays like every holder</b> — this is a live, elastic-supply token.</p>
+
+  <div class="psgrid" id="ps_stats"></div>
+
+  <div class="lsec" id="ps-deposit">
+    <h3>Deposit</h3>
+    <p>Send ETH to the presale contract; it forwards straight to the foundation and records your share on-chain. You can top up anytime before it closes.</p>
+    <div class="psbox">
+      <div class="psrow"><span class="l">Presale contract</span><span class="v mono" id="ps_addr">not deployed yet</span></div>
+      <div class="psrow"><span class="l">You deposit</span>
+        <span style="display:flex;gap:6px;align-items:center"><input class="mm" id="ps_amt" placeholder="0.10" style="width:110px;margin:0" inputmode="decimal" oninput="presaleQuote()"> ETH</span></div>
+      <div class="psrow"><span class="l muted">You'd receive now <span style="font-size:9.5px">(at the current split)</span></span><span class="v" id="ps_quote">—</span></div>
+      <button class="wbtn" style="width:100%;margin-top:6px;background:rgba(255,122,24,.12);border-color:var(--orange)" id="ps_depbtn" onclick="presaleDeposit()">◎ Deposit ETH</button>
+      <div class="muted" style="font-size:10px;margin-top:6px">Allocation is finalized when the sale closes; it dilutes as more ETH comes in. This is a foundation-run sale — you're trusting the team to distribute MM afterwards.</div>
+    </div>
+  </div>
+
+  <div class="lsec" id="ps-tok">
+    <h3>Tokenomics — live</h3>
+    <p>The whole supply picture, reflecting what has already happened (burn, decay, circulating) and the presale split going forward. Everything below reads live from the chain.</p>
+    <div class="psgrid" id="ps_tok"></div>
+    <div class="ldiag" style="margin-top:10px"><div id="ps_bar" style="display:flex;height:26px;border-radius:8px;overflow:hidden;border:1px solid var(--line)"></div>
+      <div id="ps_barleg" style="display:flex;flex-wrap:wrap;gap:12px;margin-top:8px;font-size:11px"></div></div>
+    <div class="calcnote" id="ps_toknote" style="margin-top:8px"></div>
+  </div>
+
+  <div class="lsec" id="ps-book">
+    <h3>Contributors <span class="muted" id="ps_bookcount" style="font-weight:400;font-size:12px"></span></h3>
+    <p>Every deposit, live, with its current pro-rata MM allocation. The <b>Send</b> button (foundation wallet only) transfers the allocated MM to that address.</p>
+    <div class="pstable" id="ps_book"><div class="muted" style="padding:14px">No deposits yet.</div></div>
+  </div>
+  </div>
+</div>
+
 <div id="toasts"></div>
 
 <script>
@@ -952,6 +1013,9 @@ const LOCAL=/^(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])$/.test(location.hostna
 const CFG={rpc:(LOCAL?location.origin+"/rpc":"https://rpc.mainnet.chain.robinhood.com"),mm:"0xA6FA16a2257d5cF8755216311837955904FD8271",
   hook:"0xbc1a927A61fe72a52E046afce0817771C3BB0044",pm:"0x8366a39CC670B4001A1121B8F6A443A643e40951",cap:1e9,
   defaultWatch:"0x87A7A3D8f13f92795e2Ce5016B36E15893439B4F",
+  foundation:"0x91b5965e81DAC2687D0dAD000bd6ef207D2D167f", // holds the presale MM + receives ETH
+  presale:"",            // MarketMakerPresale contract address — fill in after deploy to go live
+  presaleSupplyMM:8e8,   // 800M MM sold pro-rata in the presale; the rest stays with the foundation (LP + reserve)
   ethPair:"0x66f6f74235f113Cf39B821C6566057FbC1271434", // V2 WETH/MM (token0=WETH, token1=MM)
   pools:[{name:"MM / ETH (V2)",id:"0x66f6f74235f113Cf39B821C6566057FbC1271434",tag:"V2 · main"},
          {name:"MM / THROBBIN (V2)",id:"0x3014706B83aff71A4Ef5550900A0A437f3F1e25F",tag:"V2"},
@@ -1387,6 +1451,7 @@ async function refresh(){
     feedTick++;
     if($("learn")&&$("learn").classList.contains("on"))calcEconomy(); // keep the payoff calculator on live rates while it's open
     if($("pos-calc")&&$("pos-calc").style.display!=="none")posCalc();  // same for the compact one in Your Position
+    if($("presale")&&$("presale").classList.contains("on")&&feedTick%2===0)renderPresale(); // keep the presale book live while open
     refreshFails=0;$("net").classList.add("ok");$("nettxt").textContent="Robinhood · live";
     ro.getBlockNumber().then(b=>{const el=$("netblk");if(el)el.textContent="#"+b.toLocaleString("en-US");}).catch(()=>{});
   }catch(e){refreshFails++;if(refreshFails>=2){$("net").classList.remove("ok");$("nettxt").textContent="reconnecting…";}}
@@ -1853,7 +1918,74 @@ function openLearn(){const w=$("learn");w.classList.add("on");w.scrollTop=0;docu
   calcEconomy(); // populate the payoff calculator immediately from current live data
   setTimeout(()=>document.querySelectorAll("#l_feebars .fill").forEach(f=>f.style.width=f.dataset.w+"%"),250);}
 function closeLearn(){$("learn").classList.remove("on");document.body.style.overflow="";}
-document.addEventListener("keydown",e=>{if(e.key==="Escape")closeLearn();});
+document.addEventListener("keydown",e=>{if(e.key==="Escape"){closeLearn();closePresale();}});
+
+// ===== Presale — pro-rata ETH deposit sale =====
+const PRESALE_ABI=["function totalRaised() view returns(uint256)","function closed() view returns(bool)","function allContributions() view returns(address[],uint256[])"];
+let _psWho=[],_psAmt=[],_psRaised=0,_psClosed=false,_psFoundBal=0;
+const psSent=new Set(JSON.parse(localStorage.getItem("ps_sent")||"[]"));
+function openPresale(){const w=$("presale");w.classList.add("on");w.scrollTop=0;document.body.style.overflow="hidden";renderPresale();}
+function closePresale(){const w=$("presale");if(w)w.classList.remove("on");document.body.style.overflow="";}
+async function renderPresale(){
+  if(!$("presale")||!$("presale").classList.contains("on"))return;
+  const deployed=/^0x[a-fA-F0-9]{40}$/.test(CFG.presale),dist=CFG.presaleSupplyMM;
+  let raised=0,who=[],amts=[],closed=false;
+  if(deployed){try{const pc=new E.Contract(CFG.presale,PRESALE_ABI,ro);
+    const [tr,cl,con]=await Promise.all([pc.totalRaised(),pc.closed(),pc.allContributions()]);
+    raised=Number(E.formatEther(tr));closed=cl;who=con[0];amts=con[1].map(a=>Number(E.formatEther(a)));
+  }catch(e){}}
+  _psWho=who;_psAmt=amts;_psRaised=raised;_psClosed=closed;
+  try{_psFoundBal=Number(E.formatUnits(await mmRead.balanceOf(CFG.foundation),18));}catch(e){}
+  $("ps_statetxt").textContent=!deployed?"not live yet":closed?"closed":"● live";
+  $("ps_state").className="chip"+(deployed&&!closed?" ok":"");
+  const ael=$("ps_addr");ael.textContent=deployed?short(CFG.presale):"not deployed yet";ael.title=deployed?CFG.presale:"";
+  $("ps_depbtn").disabled=!deployed||closed;
+  const card=(l,v,s)=>`<div class="c"><div class="l">${l}</div><div class="v">${v}</div>${s?`<div class="s">${s}</div>`:""}</div>`;
+  $("ps_stats").innerHTML=card("Raised",raised.toFixed(3)+" ETH",ethUsd?usd(raised*ethUsd):"")+card("Contributors",who.length,"")+card("For sale",fmt(dist,0)+" MM","pro-rata")+card("Min deposit","0.01 ETH","per deposit");
+  presaleQuote();
+  const cap=CFG.cap,supply=(AN&&AN.sup)||cap,burned=Math.max(0,cap-supply),fkeep=Math.max(0,_psFoundBal-dist),circ=Math.max(0,supply-_psFoundBal);
+  $("ps_tok").innerHTML=card("Total supply",fmt(supply,0),"cap "+fmt(cap,0))+card("Presale",fmt(dist,0),"→ buyers")+card("Foundation keeps",fmt(fkeep,0),"LP + reserve")+card("Circulating now",fmt(circ,0),"holders + pools")+card("Burned to date",fmt(burned,0),(burned/cap*100).toFixed(3)+"%")+card("Decay","50%/yr","on held MM");
+  const seg=(w,col,lab)=>w>0.2?`<div style="width:${w}%;background:${col}" title="${lab}"></div>`:"";
+  $("ps_bar").innerHTML=seg(dist/cap*100,"var(--orange)","Presale")+seg(fkeep/cap*100,"var(--orange2)","Foundation")+seg(circ/cap*100,"var(--green2)","Circulating")+seg(burned/cap*100,"#555","Burned");
+  const leg=(col,l,v)=>`<span style="display:flex;align-items:center;gap:5px"><span style="width:9px;height:9px;border-radius:2px;background:${col}"></span>${l} <b class="mono">${(v/cap*100).toFixed(1)}%</b></span>`;
+  $("ps_barleg").innerHTML=leg("var(--orange)","Presale",dist)+leg("var(--orange2)","Foundation",fkeep)+leg("var(--green2)","Circulating",circ)+leg("#555","Burned",burned);
+  $("ps_toknote").innerHTML="Presale MM is sold pro-rata; the foundation keeps ~<b>"+fmt(fkeep,0)+" MM</b> for the first liquidity + reserve. <b style='color:var(--orange2)'>The moment MM reaches a buyer's wallet it starts decaying ~50%/yr</b> (pools & foundation are excluded and don't decay). Burn, treasury and the pump keep running exactly as on the terminal.";
+  renderBook();
+}
+function renderBook(){
+  const dist=CFG.presaleSupplyMM,total=_psRaised;
+  const rows=_psWho.map((a,i)=>({a,eth:_psAmt[i],pct:total>0?_psAmt[i]/total:0,mm:total>0?_psAmt[i]/total*dist:0})).sort((x,y)=>y.eth-x.eth);
+  $("ps_bookcount").textContent=rows.length?"· "+rows.length+" wallets · "+total.toFixed(3)+" ETH":"";
+  if(!rows.length){$("ps_book").innerHTML='<div class="muted" style="padding:14px">No deposits yet.</div>';return;}
+  const isF=account&&account.toLowerCase()===CFG.foundation.toLowerCase();
+  const hd=`<div class="hd"><span>#</span><span>Wallet</span><span class="mono">ETH</span><span class="col-pct">Share</span><span class="mono">MM allocation</span><span>${isF?"Send":""}</span></div>`;
+  $("ps_book").innerHTML=hd+rows.map((r,i)=>{const me=account&&r.a.toLowerCase()===account.toLowerCase(),done=psSent.has(r.a.toLowerCase());
+    return `<div class="rw"><span>${i+1}</span><span class="mono" title="${r.a}">${short(r.a)}${me?' <span style="color:var(--green2)">you</span>':''}</span><span class="mono">${r.eth.toFixed(3)}</span><span class="col-pct mono">${(r.pct*100).toFixed(1)}%</span><span class="mono">${fmt(r.mm,0)}</span><span>${isF?(done?'<span class="sent">sent ✓</span>':`<button class="sendb" onclick="presaleSend('${r.a}',${r.mm})">Send</button>`):(done?'<span class="sent">sent ✓</span>':'')}</span></div>`;}).join("");
+}
+function presaleQuote(){
+  const el=$("ps_amt");if(!el)return;const amt=parseFloat(el.value||"0")||0,dist=CFG.presaleSupplyMM;
+  if(amt<=0){$("ps_quote").textContent="—";return;}
+  const after=_psRaised+amt,mm=after>0?amt/after*dist:0;
+  $("ps_quote").innerHTML=fmt(mm,0)+" MM <span class='muted' style='font-size:10px'>("+(amt/after*100).toFixed(1)+"% of pool · dilutes as more join)</span>";
+}
+async function presaleDeposit(){
+  if(!/^0x[a-fA-F0-9]{40}$/.test(CFG.presale)){toast("Presale isn't deployed yet","warn");return;}
+  if(_psClosed){toast("Presale is closed","warn");return;}
+  if(!signer){await connectWallet();if(!signer)return;}
+  const amt=parseFloat($("ps_amt").value||"0")||0;
+  if(amt<0.01){toast("Minimum deposit is 0.01 ETH","warn");return;}
+  try{const tx=await signer.sendTransaction({to:CFG.presale,value:E.parseEther(String(amt))});toast("Depositing "+amt+" ETH…");await tx.wait();toast("Deposited ✓");renderPresale();}
+  catch(e){toast("Deposit failed: "+(e.shortMessage||e.message||e),"err");}
+}
+async function presaleSend(addr,mm){
+  if(!signer){await connectWallet();if(!signer)return;}
+  if(!account||account.toLowerCase()!==CFG.foundation.toLowerCase()){toast("Only the foundation wallet can send MM","warn");return;}
+  try{const wc=new E.Contract(CFG.mm,["function transfer(address,uint256) returns(bool)"],signer);
+    const tx=await wc.transfer(addr,E.parseUnits(String(Math.floor(mm)),18));toast("Sending "+fmt(mm,0)+" MM…");await tx.wait();
+    psSent.add(addr.toLowerCase());try{localStorage.setItem("ps_sent",JSON.stringify([...psSent]));}catch(e){}
+    toast("Sent ✓");renderBook();}
+  catch(e){toast("Send failed: "+(e.shortMessage||e.message||e),"err");}
+}
 // ===== ecosystem flow overlay: animated data lines between panels =====
 function edgePt(el,term,side){const r=el.getBoundingClientRect(),t=term.getBoundingClientRect();
   const x=r.left-t.left,y=r.top-t.top;
