@@ -976,6 +976,18 @@
 
   <div class="psgrid" id="ps_stats"></div>
 
+  <div class="lsec">
+    <h3>How the presale works</h3>
+    <div class="lkey">
+      <div class="k"><div class="t">① Deposit</div><div class="d">Send ETH (min 0.0001) to the presale contract. It forwards straight to the foundation and records your share on-chain. Top up anytime before it closes.</div></div>
+      <div class="k"><div class="t">② Pro-rata share</div><div class="d">No fixed price. Your MM = your ETH ÷ total ETH raised × <b>800M</b>. As more ETH comes in, the split gets finer — your % dilutes, but the pool of buyers grows.</div></div>
+      <div class="k"><div class="t">③ Distribution</div><div class="d">When the sale closes, the foundation sends each wallet its MM from the 800M pool. The remaining ~192M stays with the foundation to seed the first liquidity + reserve.</div></div>
+      <div class="k"><div class="t">④ Grace period</div><div class="d">Right after distribution, every participant is set <b style="color:var(--green2)">stable</b> — no decay — for a grace window (~7 days), so your fresh MM doesn't erode before you can act.</div></div>
+      <div class="k"><div class="t">⑤ Decay resumes</div><div class="d">After the grace window the foundation flips it off and your MM decays ~50%/yr like every holder — but that decay feeds burn, treasury, reflection and the <b style="color:var(--green2)">pump</b> that lifts price. See <b>How it works</b>.</div></div>
+      <div class="k"><div class="t">⑥ Liquidity</div><div class="d">The ETH you deposited funds a deep MM/ETH pool — real, exitable liquidity — paired with the foundation's reserved MM. Deep liquidity is what makes the price and the pump real.</div></div>
+    </div>
+  </div>
+
   <div class="lsec" id="ps-deposit">
     <h3>Deposit</h3>
     <p>Send ETH to the presale contract; it forwards straight to the foundation and records your share on-chain. You can top up anytime before it closes.</p>
@@ -1009,6 +1021,20 @@
     <p>Every deposit, live, with its current pro-rata MM allocation. The <b>Send</b> button (foundation wallet only) transfers the allocated MM to that address.</p>
     <div class="pstable" id="ps_book"><div class="muted" style="padding:14px">No deposits yet.</div></div>
   </div>
+
+  <div class="lsec" id="ps-admin" style="display:none">
+    <h3>◎ Grace period <span class="muted" style="font-weight:400;font-size:12px">· foundation only</span></h3>
+    <p>After you've distributed the MM, mark <b>every participant wallet as stable</b> — their MM stops decaying for a grace window (we plan <b>7 days</b>). When the window ends, flip it back and decay resumes for everyone, exactly like any holder. <b style="color:var(--orange2)">Stable freezes each balance at its current value — no jump, no loss</b> (verified against the token).</p>
+    <div class="psbox" style="max-width:640px">
+      <div class="psrow"><span class="l">Participants</span><span class="v mono" id="ps_admincount">0</span></div>
+      <div class="psrow"><span class="l muted" style="font-size:11px">One transaction per wallet — sign each in your wallet.</span><span></span></div>
+      <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+        <button class="wbtn" style="flex:1;min-width:180px;background:rgba(56,255,126,.12);border-color:var(--green2)" onclick="presaleStableAll(true)">🛡 Make all stable (start grace)</button>
+        <button class="wbtn" style="flex:1;min-width:180px;background:rgba(255,122,24,.12);border-color:var(--orange)" onclick="presaleStableAll(false)">⌁ End grace → start decay</button>
+      </div>
+      <div class="muted" style="font-size:10px;margin-top:8px">Plan: distribute MM → make stable → after ~7 days end grace. Only the foundation (token owner) can run these.</div>
+    </div>
+  </div>
   </div>
 </div>
 
@@ -1022,7 +1048,7 @@ const CFG={rpc:(LOCAL?location.origin+"/rpc":"https://rpc.mainnet.chain.robinhoo
   hook:"0xbc1a927A61fe72a52E046afce0817771C3BB0044",pm:"0x8366a39CC670B4001A1121B8F6A443A643e40951",cap:1e9,
   defaultWatch:"0x87A7A3D8f13f92795e2Ce5016B36E15893439B4F",
   foundation:"0x91b5965e81DAC2687D0dAD000bd6ef207D2D167f", // holds the presale MM + receives ETH
-  presale:"",            // MarketMakerPresale contract address — fill in after deploy to go live
+  presale:"0x85C46a570F9770Fe1a6a9d411731c02AB31BDa19", // MarketMakerPresale — live
   presaleSupplyMM:8e8,   // 800M MM sold pro-rata in the presale; the rest stays with the foundation (LP + reserve)
   ethPair:"0x66f6f74235f113Cf39B821C6566057FbC1271434", // V2 WETH/MM (token0=WETH, token1=MM)
   pools:[{name:"MM / ETH (V2)",id:"0x66f6f74235f113Cf39B821C6566057FbC1271434",tag:"V2 · main"},
@@ -1959,6 +1985,21 @@ async function renderPresale(){
   $("ps_barleg").innerHTML=leg("var(--orange)","Presale",dist)+leg("var(--orange2)","Foundation",fkeep)+leg("var(--green2)","Circulating",circ)+leg("#555","Burned",burned);
   $("ps_toknote").innerHTML="Presale MM is sold pro-rata; the foundation keeps ~<b>"+fmt(fkeep,0)+" MM</b> for the first liquidity + reserve. <b style='color:var(--orange2)'>The moment MM reaches a buyer's wallet it starts decaying ~50%/yr</b> (pools & foundation are excluded and don't decay). Burn, treasury and the pump keep running exactly as on the terminal.";
   renderBook();
+  const isF2=account&&account.toLowerCase()===CFG.foundation.toLowerCase();
+  const adm=$("ps-admin");if(adm)adm.style.display=isF2?"block":"none";
+  if(isF2&&$("ps_admincount"))$("ps_admincount").textContent=_psWho.length;
+}
+async function presaleStableAll(on){ // foundation-only: setExcluded(true/false) for every participant (grace period)
+  if(!signer){await connectWallet();if(!signer)return;}
+  if(!account||account.toLowerCase()!==CFG.foundation.toLowerCase()){toast("Only the foundation (token owner) can do this","warn");return;}
+  if(!_psWho.length){toast("No participants yet","warn");return;}
+  if(!confirm((on?"Make":"Stop keeping")+" all "+_psWho.length+" participant wallet(s) "+(on?"STABLE (no decay)":"DECAYING again")+"?\n\nThis sends ONE transaction per wallet — you sign each.")) return;
+  const wc=new E.Contract(CFG.mm,["function setExcluded(address,bool)"],signer);let done=0;
+  for(const addr of _psWho){
+    try{const tx=await wc.setExcluded(addr,on);await tx.wait();done++;toast((on?"stable":"decay")+" "+done+"/"+_psWho.length+" ✓");}
+    catch(e){toast("Stopped at "+short(addr)+": "+(e.shortMessage||e.message||e),"err");break;}
+  }
+  toast("Done — "+done+"/"+_psWho.length+" wallet(s) "+(on?"now stable":"now decaying"));
 }
 function renderBook(){
   const dist=CFG.presaleSupplyMM,total=_psRaised;
