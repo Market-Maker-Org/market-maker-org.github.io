@@ -217,6 +217,8 @@
   .pstable .sendb{background:var(--green);color:#00220a;border:0;border-radius:7px;padding:5px 8px;font-family:var(--disp);font-weight:700;font-size:11px;cursor:pointer}
   .pstable .sendb:disabled{background:var(--panel2);color:var(--faint);cursor:not-allowed}
   .pstable .sent{color:var(--green2);font-family:var(--mono);font-size:11px}
+  .pspct{background:var(--panel2);border:1px solid var(--line2);color:var(--soft);border-radius:7px;padding:4px 8px;font-family:var(--mono);font-size:11px;cursor:pointer;transition:.15s}
+  .pspct:hover{border-color:var(--orange);color:var(--orange2)}
   @media(max-width:640px){.pstable .hd,.pstable .rw{grid-template-columns:26px 1fr 70px 74px;font-size:11px}.pstable .col-pct,.pstable .hd .col-pct{display:none}}
   .postabs{margin-left:auto;display:inline-flex;gap:4px}
   .postab{font-family:var(--disp);font-weight:700;font-size:10px;padding:3px 9px;border-radius:100px;border:1px solid var(--line2);background:var(--panel2);color:var(--soft);cursor:pointer;transition:.15s}
@@ -970,7 +972,7 @@
     <span class="chip" id="ps_state"><span class="d"></span><span id="ps_statetxt">reading…</span></span>
   </div>
   <div class="docs-wrap">
-  <p class="muted" style="max-width:720px;font-size:13.5px;line-height:1.6">Deposit ETH and receive a <b style="color:var(--orange2)">pro-rata</b> share of <b>800M MM</b> — your share = your ETH ÷ total ETH raised. No fixed price: the more that's raised, the finer the split. Min deposit <b>0.01 ETH</b>. The rest of the supply stays with the foundation to seed liquidity. <b style="color:var(--orange2)">Once MM lands in your wallet it decays like every holder</b> — this is a live, elastic-supply token.</p>
+  <p class="muted" style="max-width:720px;font-size:13.5px;line-height:1.6">Deposit ETH and receive a <b style="color:var(--orange2)">pro-rata</b> share of <b>800M MM</b> — your share = your ETH ÷ total ETH raised. No fixed price: the more that's raised, the finer the split. Min deposit <b>0.0001 ETH</b>. The rest of the supply stays with the foundation to seed liquidity. <b style="color:var(--orange2)">Once MM lands in your wallet it decays like every holder</b> — this is a live, elastic-supply token.</p>
 
   <div class="psgrid" id="ps_stats"></div>
 
@@ -981,6 +983,12 @@
       <div class="psrow"><span class="l">Presale contract</span><span class="v mono" id="ps_addr">not deployed yet</span></div>
       <div class="psrow"><span class="l">You deposit</span>
         <span style="display:flex;gap:6px;align-items:center"><input class="mm" id="ps_amt" placeholder="0.10" style="width:110px;margin:0" inputmode="decimal" oninput="presaleQuote()"> ETH</span></div>
+      <div class="psrow"><span class="l muted" style="font-size:11px">Quick <span style="font-size:9px">(% of your ETH)</span></span>
+        <span style="display:flex;gap:5px">
+          <button class="pspct" onclick="presalePct(10)">10%</button><button class="pspct" onclick="presalePct(20)">20%</button>
+          <button class="pspct" onclick="presalePct(30)">30%</button><button class="pspct" onclick="presalePct(50)">50%</button>
+          <button class="pspct" onclick="presalePct(100)">Max</button>
+        </span></div>
       <div class="psrow"><span class="l muted">You'd receive now <span style="font-size:9.5px">(at the current split)</span></span><span class="v" id="ps_quote">—</span></div>
       <button class="wbtn" style="width:100%;margin-top:6px;background:rgba(255,122,24,.12);border-color:var(--orange)" id="ps_depbtn" onclick="presaleDeposit()">◎ Deposit ETH</button>
       <div class="muted" style="font-size:10px;margin-top:6px">Allocation is finalized when the sale closes; it dilutes as more ETH comes in. This is a foundation-run sale — you're trusting the team to distribute MM afterwards.</div>
@@ -1941,7 +1949,7 @@ async function renderPresale(){
   const ael=$("ps_addr");ael.textContent=deployed?short(CFG.presale):"not deployed yet";ael.title=deployed?CFG.presale:"";
   $("ps_depbtn").disabled=!deployed||closed;
   const card=(l,v,s)=>`<div class="c"><div class="l">${l}</div><div class="v">${v}</div>${s?`<div class="s">${s}</div>`:""}</div>`;
-  $("ps_stats").innerHTML=card("Raised",raised.toFixed(3)+" ETH",ethUsd?usd(raised*ethUsd):"")+card("Contributors",who.length,"")+card("For sale",fmt(dist,0)+" MM","pro-rata")+card("Min deposit","0.01 ETH","per deposit");
+  $("ps_stats").innerHTML=card("Raised",raised.toFixed(3)+" ETH",ethUsd?usd(raised*ethUsd):"")+card("Contributors",who.length,"")+card("For sale",fmt(dist,0)+" MM","pro-rata")+card("Min deposit","0.0001 ETH","per deposit");
   presaleQuote();
   const cap=CFG.cap,supply=(AN&&AN.sup)||cap,burned=Math.max(0,cap-supply),fkeep=Math.max(0,_psFoundBal-dist),circ=Math.max(0,supply-_psFoundBal);
   $("ps_tok").innerHTML=card("Total supply",fmt(supply,0),"cap "+fmt(cap,0))+card("Presale",fmt(dist,0),"→ buyers")+card("Foundation keeps",fmt(fkeep,0),"LP + reserve")+card("Circulating now",fmt(circ,0),"holders + pools")+card("Burned to date",fmt(burned,0),(burned/cap*100).toFixed(3)+"%")+card("Decay","50%/yr","on held MM");
@@ -1968,12 +1976,19 @@ function presaleQuote(){
   const after=_psRaised+amt,mm=after>0?amt/after*dist:0;
   $("ps_quote").innerHTML=fmt(mm,0)+" MM <span class='muted' style='font-size:10px'>("+(amt/after*100).toFixed(1)+"% of pool · dilutes as more join)</span>";
 }
+async function presalePct(p){ // fill the deposit input with p% of the connected wallet's ETH balance
+  if(!account){await connectWallet();if(!account)return;}
+  try{const bal=Number(E.formatEther(await ro.getBalance(account)));
+    let amt=bal*p/100; if(p>=100)amt=Math.max(0,bal-0.0005); // keep a little for gas on Max
+    $("ps_amt").value=amt>0?amt.toFixed(4):"0";presaleQuote();
+  }catch(e){toast("Couldn't read balance","warn");}
+}
 async function presaleDeposit(){
   if(!/^0x[a-fA-F0-9]{40}$/.test(CFG.presale)){toast("Presale isn't deployed yet","warn");return;}
   if(_psClosed){toast("Presale is closed","warn");return;}
   if(!signer){await connectWallet();if(!signer)return;}
   const amt=parseFloat($("ps_amt").value||"0")||0;
-  if(amt<0.01){toast("Minimum deposit is 0.01 ETH","warn");return;}
+  if(amt<0.0001){toast("Minimum deposit is 0.0001 ETH","warn");return;}
   try{const tx=await signer.sendTransaction({to:CFG.presale,value:E.parseEther(String(amt))});toast("Depositing "+amt+" ETH…");await tx.wait();toast("Deposited ✓");renderPresale();}
   catch(e){toast("Deposit failed: "+(e.shortMessage||e.message||e),"err");}
 }
