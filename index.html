@@ -1039,14 +1039,19 @@ let avgBlockMs=100; // Robinhood ~0.1s/block; refined from stats
 // or null while cooling down / on any failure — every caller treats null/empty as "keep the last
 // data", so the same data still shows and nothing ever goes blank or wrong. Same-origin dev
 // proxy URLs (/holders,/ethusd) never 429, so they pass straight through.
-let bsCoolUntil=0;
+let bsCoolUntil=0,_bsActive=0;const _bsQ=[],BS_MAX=3; // ≤3 concurrent Blockscout calls: parallel enough to stay fast, capped so a load never bursts into a 429
+function _bsNext(){if(_bsActive<BS_MAX&&_bsQ.length){_bsActive++;_bsQ.shift()();}}
 async function bsFetch(url){
   if(Date.now()<bsCoolUntil)return null;                 // in cooldown → skip this call
-  try{const r=await fetch(url);
-    if(r.status===429){bsCoolUntil=Date.now()+8000;return null;} // short breather, then retry (faster recovery on load)
+  await new Promise(res=>{_bsQ.push(res);_bsNext();});   // acquire a slot (waits if 3 already in flight)
+  try{
+    if(Date.now()<bsCoolUntil)return null;               // cooldown may have opened while we queued
+    const r=await fetch(url);
+    if(r.status===429){bsCoolUntil=Date.now()+8000;return null;}
     if(!r.ok)return null;
     return await r.json();
   }catch(e){return null;}
+  finally{_bsActive--;_bsNext();}
 }
 async function fetchEthUsd(){
   const urls=LOCAL?["/ethusd",BS+"/api/v2/stats"]:[BS+"/api/v2/stats"];
@@ -1272,7 +1277,9 @@ async function buildHistory(attempt=0){
     // Sync points we're done; otherwise fall through to the sequential RPC walk below.
     try{
       // sequential (not Promise.all) so the 429 breaker can engage between series instead of firing a burst
-      const sl=await bsLogs(CFG.ethPair,SYNC_TOPIC),wl=await bsLogs(CFG.ethPair,V2SWAP_TOPIC),dl=await bsLogs(CFG.mm,DECAY_TOPIC);
+      // Decay logs (1000+ rows, paginated) only feed the Reflection-index curve, which is OFF by
+      // default — skip them for a fast first paint; burn/deflation is anchored to real totalSupply anyway.
+      const sl=await bsLogs(CFG.ethPair,SYNC_TOPIC),wl=await bsLogs(CFG.ethPair,V2SWAP_TOPIC),dl=SERIES.index.on?await bsLogs(CFG.mm,DECAY_TOPIC):[];
       sl.forEach(l=>{const d=c.decode(["uint112","uint112"],l.data);const w=Number(E.formatUnits(d[0],18)),m=Number(E.formatUnits(d[1],18));if(m>0)sync.push({b:parseInt(l.blockNumber,16),price:w/m,pool:m});});
       wl.forEach(l=>{const d=c.decode(["uint256","uint256","uint256","uint256"],l.data);swaps.push({b:parseInt(l.blockNumber,16),vol:Number(E.formatUnits(d[1],18))+Number(E.formatUnits(d[3],18))});});
       dl.forEach(l=>{const d=c.decode(["uint256","uint256","uint256","uint256","uint256"],l.data);decays.push({b:parseInt(l.blockNumber,16),burn:Number(E.formatUnits(d[1],18)),idx:Number(E.formatUnits(d[4],18))});});
@@ -1879,7 +1886,8 @@ function buildChartTools(){
   box.innerHTML=chips+`<span class="crange">${barsBtn}${logBtn}${ranges}</span>`;
 }
 function toggleBars(){chartBars=!chartBars;buildChartTools();revealChart();savePrefs();}
-function toggleSeries(k){const on=Object.values(SERIES).filter(s=>s.on).length;if(SERIES[k].on&&on<=1)return;SERIES[k].on=!SERIES[k].on;buildChartTools();drawChart();savePrefs();}
+function toggleSeries(k){const on=Object.values(SERIES).filter(s=>s.on).length;if(SERIES[k].on&&on<=1)return;SERIES[k].on=!SERIES[k].on;buildChartTools();drawChart();savePrefs();
+  if(k==="index"&&SERIES.index.on&&SERIES.index.data.every(v=>v===SERIES.index.data[0]))buildHistory();} // Reflection turned on → fetch the decay/index history it needs
 function setRange(n){chartRange=n;buildChartTools();revealChart();savePrefs();}
 function toggleLog(){chartLog=!chartLog;buildChartTools();revealChart();savePrefs();}
 function sliceN(a){return chartRange>0?a.slice(-chartRange):a;}
