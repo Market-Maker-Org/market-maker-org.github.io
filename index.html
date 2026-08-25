@@ -1017,6 +1017,16 @@ function loadPrefs(){try{const p=JSON.parse(localStorage.getItem("mm_prefs")||"{
   // v3 migration: default-on set is now price+Liquidity+Deflation+Volume; Supply & Reflection
   // default OFF. Don't let an old stored state override the new defaults for those two keys.
   if(p.series)Object.entries(p.series).forEach(([k,v])=>{if(SERIES[k]&&!((k==="supply"||k==="index")&&p.v!==3))SERIES[k].on=!!v;});}catch(e){}}
+// Stale-while-revalidate: paint the LAST-seen feed/holders/chart instantly from localStorage so the
+// panels never look empty while Blockscout is slow/rate-limited; the live fetches refresh them.
+function restoreCache(){try{
+  const f=localStorage.getItem("mm_feed");if(f&&$("feed"))$("feed").innerHTML=f;
+  const h=localStorage.getItem("mm_holders");if(h&&$("holderList"))$("holderList").innerHTML=h;
+  const ch=localStorage.getItem("mm_chart");if(ch){const o=JSON.parse(ch);
+    if(o&&Array.isArray(o.ts)&&o.s){TS=o.ts.slice();
+      Object.keys(o.s).forEach(k=>{if(SERIES[k]&&Array.isArray(o.s[k]))SERIES[k].data=o.s[k].slice();});
+      const pv=SERIES.price.data.filter(x=>x>0);if(pv.length){priceHist.length=0;priceHist.push(...pv);price0=pv[0];histLoaded=true;buildChartTools();revealChart();}}}
+}catch(e){}}
 const gwei=p=>p*1e9; // ETH per MM -> gwei per MM
 let ethUsd=0;
 const BS="https://robinhoodchain.blockscout.com";
@@ -1033,7 +1043,7 @@ let bsCoolUntil=0;
 async function bsFetch(url){
   if(Date.now()<bsCoolUntil)return null;                 // in cooldown → skip this call
   try{const r=await fetch(url);
-    if(r.status===429){bsCoolUntil=Date.now()+20000;return null;} // 20s breather, then retry normally
+    if(r.status===429){bsCoolUntil=Date.now()+8000;return null;} // short breather, then retry (faster recovery on load)
     if(!r.ok)return null;
     return await r.json();
   }catch(e){return null;}
@@ -1052,14 +1062,15 @@ async function boot(){
   try{await ro.getBlockNumber();$("net").classList.add("ok");$("nettxt").textContent="Robinhood · live";}catch(e){$("nettxt").textContent="RPC error";}
   showSkeletons(); // polished first paint while data loads
   loadPrefs(); // restore saved chart series/range/log, slippage, watched wallet
+  restoreCache(); // paint last-seen feed/holders/chart instantly (refreshed by the live fetches)
   if(!watch&&CFG.defaultWatch)watch=CFG.defaultWatch;
   if(watch)$("p_addr").textContent=short(watch);
   buildPools();buildChartTools();fetchEthUsd();
   await fetchSlow();          // prime rarely-changing config first
   await refresh();            // then live state
   {const bb=$("bootbar");if(bb){bb.style.opacity="0";bb.style.transition="opacity .4s";setTimeout(()=>bb.remove(),450);}}
-  buildHistory();             // then load history (retries if RPC was busy)
-  setTimeout(getHolders,700); // stagger the heavy balanceOf sweep
+  setTimeout(buildHistory,600); // stagger Blockscout calls so the initial load doesn't burst → 429
+  setTimeout(getHolders,3200);  // holders after history's getLogs settle
   setTimeout(fetchPumpStats,1400);
   setTimeout(buildFlows,900);setTimeout(buildFlows,2500); // draw ecosystem flow lines once laid out
   // pause network polling while the tab is hidden (saves RPC + battery); UI ticks keep running cheaply
@@ -1233,6 +1244,8 @@ async function buildHistory(attempt=0){
         pPrice=sy.price;pPool=sy.pool;prevB=sy.b;
       }
       if(!rawPts.length)return false;
+      // don't let a throttled partial (few points) clobber an already-good chart (e.g. restored from cache)
+      if(rawPts.length<5&&SERIES.price.data.length>rawPts.length&&SERIES.price.data.length>2)return false;
       const CAP=760;let pts=rawPts;
       if(rawPts.length>CAP){const st=Math.ceil(rawPts.length/CAP);pts=rawPts.filter((_,i)=>i%st===0||i===rawPts.length-1);}
       const keptBlocks=pts.map(p=>p.b);
@@ -1250,7 +1263,9 @@ async function buildHistory(attempt=0){
       TS=keptBlocks.map(blk=>headTs-(cur-blk)*secPerBlock); // per-point time from block number
       anchorSettle(TS[TS.length-1]*1000); // newest swap/sync ≈ last settle (RPC-based, Blockscout-independent)
       committed?drawChart():revealChart(); // animate only the first paint
-      committed=true;return true;
+      committed=true;
+      if(TS.length>=8)try{localStorage.setItem("mm_chart",JSON.stringify({ts:TS,s:Object.fromEntries(Object.entries(SERIES).map(([k,s])=>[k,s.data]))}));}catch(e){} // cache only a real history
+      return true;
     };
     // FAST PATH — pull the entire history from Blockscout in 3 requests (Sync/Swap/Decay).
     // One shot, no throttling, works the same on GitHub Pages as locally. If it yields any
@@ -1614,6 +1629,7 @@ async function getFeed(){try{
     else if(t===mm||t===hk){k="treasury";cls="refl";lb="fee → treasury";}
     const tago=it.timeStamp?ago((now-Number(it.timeStamp)*1000)/1000):"";
     return `<a class="ev ${cls}" href="${EXPLORER}/tx/${it.hash}" target="_blank" title="View tx on explorer">${icon(k)}<span>${lb}</span><span class="evago">${tago}</span><span class="mono">${fmt(v,2)}</span></a>`;}).join("")||'<div class="muted">no recent activity</div>';
+  try{localStorage.setItem("mm_feed",$("feed").innerHTML);}catch(e){} // cache for instant paint next load
 }catch(e){}}
 
 const KNOWN={};
@@ -1678,6 +1694,7 @@ function renderHolders(){
     const ind=r.ex?'<span class="st">═ stable</span>':'<span class="dn">↓ live</span>';
     return `<div class="hrow" title="Click to watch this wallet" onclick="watchHolder('${r.a}')"><span class="rk">${i+1}</span><span class="ad">${short(r.a)}</span>${r.tag?`<span class="tg ${r.tc}">${r.tag}</span>`:""}<span class="bl ${r.ex?'':'dec'}" id="hb_${i}">${hbal(r.bal,r.ex)}</span>${ind}</div>`;
   }).join("");
+  try{localStorage.setItem("mm_holders",$("holderList").innerHTML);}catch(e){} // stale-while-revalidate: show instantly next load
 }
 function watchHolder(a){watch=a;$("p_addr").textContent=short(a);savePrefs();refresh();toast("Watching "+short(a));}
 // ===== Analytics: whole-system summary dashboard =====
