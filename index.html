@@ -975,7 +975,7 @@ const SERIES={
   vol   :{label:"Volume",  ab:"VOL", color:"#7a8a83",on:true, data:[],fmtV:v=>compactNum(v)+" MM"}};                         // grey
 let chartRange=0; // last N points; 0 = all (full history)
 let chartLog=true; // logarithmic Y (per-series normalized)
-let chartBars=false; // draw each series as bold candle-columns (behind the lines) as well
+let chartBars=true; // draw each series as bold candle-columns (behind the lines) as well — on by default
 let volYr=0,incSupply=0,reflBps=0,burnBps=0,recentBps=0,treBps=0,mirrorX=1,poolMMg=0,debtBase=0,debtBaseT=0,allPool0=0,refreshFails=0;
 let decTreBps=2000,decRewBps=3000; // decay split (bps): treasury / reward; burn = 10000 − these. Read live from chain.
 let gMirrorBps=10000,gBbOn=false,gPPool=null,AN={},TS=[];
@@ -1007,12 +1007,12 @@ function showSkeletons(){
   const pr=$("d_price");if(pr)pr.innerHTML='<span class="sk" style="width:200px;height:32px"></span>';
   const fe=$("feed");if(fe)fe.innerHTML='<div class="ev" style="pointer-events:none"><span class="sk" style="width:100%;height:15px"></span></div>'.repeat(4);
   const hl=$("holderList");if(hl)hl.innerHTML='<div class="hrow" style="pointer-events:none"><span class="sk" style="width:100%;height:15px"></span></div>'.repeat(6);}
-function savePrefs(){try{localStorage.setItem("mm_prefs",JSON.stringify({v:3,watch,range:chartRange,log:chartLog,bars:chartBars,slip:swSlip,series:Object.fromEntries(Object.entries(SERIES).map(([k,s])=>[k,s.on]))}));}catch(e){}}
+function savePrefs(){try{localStorage.setItem("mm_prefs",JSON.stringify({v:3,barsV:1,watch,range:chartRange,log:chartLog,bars:chartBars,slip:swSlip,series:Object.fromEntries(Object.entries(SERIES).map(([k,s])=>[k,s.on]))}));}catch(e){}}
 function loadPrefs(){try{const p=JSON.parse(localStorage.getItem("mm_prefs")||"{}");
   if(p.watch&&/^0x[a-fA-F0-9]{40}$/.test(p.watch))watch=p.watch;
   if(typeof p.range==="number")chartRange=p.range;
   if(typeof p.log==="boolean")chartLog=p.log;
-  if(typeof p.bars==="boolean")chartBars=p.bars;
+  if(typeof p.bars==="boolean"&&p.barsV===1)chartBars=p.bars; // honor an explicit choice made after bars became default-on; ignore stale pre-default values
   if(typeof p.slip==="number")swSlip=p.slip;
   // v3 migration: default-on set is now price+Liquidity+Deflation+Volume; Supply & Reflection
   // default OFF. Don't let an old stored state override the new defaults for those two keys.
