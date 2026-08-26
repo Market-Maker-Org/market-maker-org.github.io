@@ -1235,6 +1235,7 @@ const SERIES={
 let chartRange=0; // last N points; 0 = all (full history)
 let chartLog=true; // logarithmic Y (per-series normalized)
 let chartBars=true; // draw each series as bold candle-columns (behind the lines) as well — on by default
+let chartLanes=true; // each series in its own horizontal lane (Lanes) vs all overlaid on one band (Overlay)
 let volYr=0,incSupply=0,reflBps=0,burnBps=0,recentBps=0,treBps=0,mirrorX=1,poolMMg=0,debtBase=0,debtBaseT=0,allPool0=0,refreshFails=0;
 let circReal=0,excludedFloat=0; // circulating supply (total − foundation − LP pools) + the offset used for historical backfill
 let decTreBps=2000,decRewBps=3000; // decay split (bps): treasury / reward; burn = 10000 − these. Read live from chain.
@@ -1267,12 +1268,13 @@ function showSkeletons(){
   const pr=$("d_price");if(pr)pr.innerHTML='<span class="sk" style="width:200px;height:32px"></span>';
   const fe=$("feed");if(fe)fe.innerHTML='<div class="ev" style="pointer-events:none"><span class="sk" style="width:100%;height:15px"></span></div>'.repeat(4);
   const hl=$("holderList");if(hl)hl.innerHTML='<div class="hrow" style="pointer-events:none"><span class="sk" style="width:100%;height:15px"></span></div>'.repeat(6);}
-function savePrefs(){try{localStorage.setItem("mm_prefs",JSON.stringify({v:4,barsV:1,watch,range:chartRange,log:chartLog,bars:chartBars,slip:swSlip,series:Object.fromEntries(Object.entries(SERIES).map(([k,s])=>[k,s.on]))}));}catch(e){}}
+function savePrefs(){try{localStorage.setItem("mm_prefs",JSON.stringify({v:4,barsV:1,watch,range:chartRange,log:chartLog,bars:chartBars,lanes:chartLanes,slip:swSlip,series:Object.fromEntries(Object.entries(SERIES).map(([k,s])=>[k,s.on]))}));}catch(e){}}
 function loadPrefs(){try{const p=JSON.parse(localStorage.getItem("mm_prefs")||"{}");
   if(p.watch&&/^0x[a-fA-F0-9]{40}$/.test(p.watch))watch=p.watch;
   if(typeof p.range==="number")chartRange=p.range;
   if(typeof p.log==="boolean")chartLog=p.log;
   if(typeof p.bars==="boolean"&&p.barsV===1)chartBars=p.bars; // honor an explicit choice made after bars became default-on; ignore stale pre-default values
+  if(typeof p.lanes==="boolean")chartLanes=p.lanes;
   if(typeof p.slip==="number")swSlip=p.slip;
   // v3 migration: default-on set is now price+Liquidity+Deflation+Volume; Supply & Reflection
   // default OFF. Don't let an old stored state override the new defaults for those two keys.
@@ -2429,9 +2431,11 @@ function buildChartTools(){
     `<button class="cbtn ${chartRange==n?'on':''}" data-r="${n}" onclick="setRange(${n})">${l}</button>`).join("");
   const logBtn=`<button class="cbtn ${chartLog?'on':''}" onclick="toggleLog()" title="Logarithmic scale">${chartLog?'LOG':'LIN'}</button>`;
   const barsBtn=`<button class="cbtn ${chartBars?'on':''}" onclick="toggleBars()" title="Candle-column view">▊ Bars</button>`;
-  box.innerHTML=chips+`<span class="crange">${barsBtn}${logBtn}${ranges}</span>`;
+  const laneBtn=`<button class="cbtn ${chartLanes?'on':''}" onclick="toggleLanes()" title="${chartLanes?'Separate lanes — click to overlay all on one band':'Overlaid — click to split into separate lanes'}">${chartLanes?'▤ Lanes':'⌷ Overlay'}</button>`;
+  box.innerHTML=chips+`<span class="crange">${laneBtn}${barsBtn}${logBtn}${ranges}</span>`;
 }
 function toggleBars(){chartBars=!chartBars;buildChartTools();revealChart();savePrefs();}
+function toggleLanes(){chartLanes=!chartLanes;buildChartTools();revealChart();savePrefs();}
 function toggleSeries(k){const on=Object.values(SERIES).filter(s=>s.on).length;if(SERIES[k].on&&on<=1)return;SERIES[k].on=!SERIES[k].on;buildChartTools();drawChart();savePrefs();
   if(k==="index"&&SERIES.index.on&&SERIES.index.data.every(v=>v===SERIES.index.data[0]))buildHistory();} // Reflection turned on → fetch the decay/index history it needs
 function setRange(n){chartRange=n;buildChartTools();revealChart();savePrefs();}
@@ -2455,6 +2459,8 @@ function revealChart(){const ld=$("chartload");if(ld&&!ld.classList.contains("go
   const step=t=>{_reveal=Math.min(1,(t-s)/560);_reveal=1-Math.pow(1-_reveal,3);drawChart();if(_reveal<1)_revRaf=requestAnimationFrame(step);else _reveal=1;};
   _revRaf=requestAnimationFrame(step);}
 function roundRect(ctx,x,y,w,h,r){r=Math.min(r,w/2,h/2);ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();}
+// gentle moving-average so hard on-chain steps render as smooth curves (waves preserved) — half=window radius
+function smoothArr(a,half){if(!half||half<1||a.length<3)return a.slice();const r=new Array(a.length);for(let i=0;i<a.length;i++){let s=0,n=0;for(let j=Math.max(0,i-half);j<=Math.min(a.length-1,i+half);j++){s+=a[j];n++;}r[i]=s/n;}return r;}
 function drawChart(){
   const c=$("c_price"),ctx=c.getContext("2d");const dpr=devicePixelRatio||1,W=c.clientWidth,H=c.clientHeight;if(!W||!H)return;
   c.width=W*dpr;c.height=H*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,W,H);
@@ -2471,27 +2477,30 @@ function drawChart(){
     d.forEach((v,i)=>{const gi=off+i;if(gi>=lim)return;const x=X(gi),bh=(v/mx)*(volH-6)*_reveal;if(bh>0.3){const gr=ctx.createLinearGradient(0,H-14-bh,0,H-14);gr.addColorStop(0,"rgba(0,200,5,.55)");gr.addColorStop(1,"rgba(0,200,5,.05)");ctx.fillStyle=v>0?gr:"rgba(154,168,161,.16)";ctx.fillRect(x-bw/2,H-14-bh,bw,bh);}});
     ctx.fillStyle="#5f6b64";ctx.font="9px 'IBM Plex Mono'";ctx.textAlign="left";ctx.fillText("volume",plotL+2,H-volH-3);}
   const based=lines.map(([k,s])=>{const raw=sliceN(s.data);let lp2=0;const d=raw.map(v=>{if(v>0)lp2=v;return v>0?v:(lp2||0);});
-    let lo=Infinity,hi=-Infinity;d.forEach(v=>{const t=tf(v);if(t<lo)lo=t;if(t>hi)hi=t;});
-    return {k,s,d,lo,hi,off:maxLen-d.length};});
-  // EACH SERIES GETS ITS OWN HORIZONTAL LANE (shared time axis) → distinct shapes, no overlap/convergence
-  const NL=based.length,laneH=plotH/NL,LPAD=Math.min(13,laneH*0.17);
-  based.forEach((o,i)=>{o.lt=plotT+i*laneH+LPAD;o.lb=plotT+(i+1)*laneH-LPAD;o.lcy=plotT+(i+0.5)*laneH;});
+    const ds=smoothArr(d,k==="price"?2:4); // curve, not hard steps; price lightly (keep its detail)
+    let lo=Infinity,hi=-Infinity;ds.forEach(v=>{const t=tf(v);if(t<lo)lo=t;if(t>hi)hi=t;});
+    return {k,s,d,ds,lo,hi,off:maxLen-ds.length};});
+  // LANES: each series in its own horizontal band. OVERLAY: all share one band (toggle in the toolbar).
+  const NL=based.length,LANES=chartLanes&&NL>1,laneH=plotH/NL,LPAD=Math.min(13,laneH*0.17),PADf=0.08;
+  based.forEach((o,i)=>{if(LANES){o.lt=plotT+i*laneH+LPAD;o.lb=plotT+(i+1)*laneH-LPAD;o.lcy=plotT+(i+0.5)*laneH;}
+    else{o.lt=plotT+PADf*plotH;o.lb=plotB-PADf*plotH;o.lcy=plotT+laneH*(i+0.5);}});
   const Yof=o=>v=>{if(o.hi<=o.lo)return (o.lt+o.lb)/2;const t=(tf(v)-o.lo)/(o.hi-o.lo);return o.lb-t*(o.lb-o.lt);};
-  based.forEach((o,i)=>{const ly=plotT+i*laneH; // lane bg + separators + faint mid guide
+  if(LANES){based.forEach((o,i)=>{const ly=plotT+i*laneH; // lane bg + separators + faint mid guide
     ctx.fillStyle=o.s.color+"06";ctx.fillRect(plotL,ly+1,plotW,laneH-2);
     if(i>0){ctx.strokeStyle="rgba(255,255,255,.07)";ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(plotL,ly);ctx.lineTo(W-PADR,ly);ctx.stroke();}
-    ctx.strokeStyle="rgba(255,255,255,.04)";ctx.setLineDash([1,5]);ctx.beginPath();ctx.moveTo(plotL,o.lcy);ctx.lineTo(W-PADR,o.lcy);ctx.stroke();ctx.setLineDash([]);});
+    ctx.strokeStyle="rgba(255,255,255,.04)";ctx.setLineDash([1,5]);ctx.beginPath();ctx.moveTo(plotL,o.lcy);ctx.lineTo(W-PADR,o.lcy);ctx.stroke();ctx.setLineDash([]);});}
+  else{ctx.strokeStyle="rgba(255,255,255,.045)";ctx.lineWidth=1;for(let g=0;g<=4;g++){const y=plotT+g*plotH/4;ctx.beginPath();ctx.moveTo(plotL,y);ctx.lineTo(W-PADR,y);ctx.stroke();}}
   const meta=[];
   // candle-columns behind the lines — per series, translucent, from baseline up to value (static, no animation)
   if(chartBars){const COLS=Math.min(maxLen,46),bw=Math.max(3,plotW/COLS*0.6),lim=Math.ceil(maxLen*_reveal);
     for(let ci=0;ci<COLS;ci++){const gi=COLS<2?maxLen-1:Math.round(ci/(COLS-1)*(maxLen-1));if(gi>=lim)break;const gx=X(gi);
-      based.forEach(o=>{const Y=Yof(o),hero=o.k==="price",li=gi-o.off;if(li<0||li>=o.d.length)return;
-        const y=Y(o.d[li]),h=Math.max(1.5,o.lb-y);
+      based.forEach(o=>{const Y=Yof(o),hero=o.k==="price",li=gi-o.off;if(li<0||li>=o.ds.length)return;
+        const y=Y(o.ds[li]),h=Math.max(1.5,o.lb-y);
         const gr=ctx.createLinearGradient(0,y,0,o.lb);gr.addColorStop(0,o.s.color+(hero?'2a':'1c'));gr.addColorStop(1,o.s.color+'04');
         ctx.fillStyle=gr;ctx.fillRect(gx-bw/2,y,bw,h);
       });}}
-  based.forEach((o,oi)=>{const {k,s,d}=o,hero=k==="price",Y=Yof(o);meta.push({k,s,d,off:o.off,Y});
-    const pts=d.map((v,i)=>[X(o.off+i),Y(v)]);const rc=Math.max(2,Math.ceil(pts.length*_reveal)),rp=pts.slice(0,rc);
+  based.forEach((o,oi)=>{const {k,s,d,ds}=o,hero=k==="price",Y=Yof(o);meta.push({k,s,d,ds,off:o.off,Y});
+    const pts=ds.map((v,i)=>[X(o.off+i),Y(v)]);const rc=Math.max(2,Math.ceil(pts.length*_reveal)),rp=pts.slice(0,rc);
     ctx.lineJoin="round";ctx.lineCap="round";
     {ctx.beginPath();smoothLine(ctx,rp);ctx.lineTo(rp[rp.length-1][0],o.lb);ctx.lineTo(rp[0][0],o.lb);ctx.closePath();
       const gr=ctx.createLinearGradient(0,o.lt,0,o.lb);gr.addColorStop(0,s.color+(hero?"22":"16"));gr.addColorStop(1,s.color+"00");ctx.fillStyle=gr;ctx.fill();}
@@ -2505,12 +2514,12 @@ function drawChart(){
   {const rows=based.slice();const volRow=volOn?SERIES.vol:null;
    const hi=_hoverI==null?null:Math.max(0,Math.min(maxLen-1,_hoverI));
    const attachX=plotL+plotW*0.14,flow=(_flowPhase||0),midY=plotT+plotH/2;
-   rows.forEach((o,ri)=>{const {k,s,d,off}=o;const Y=Yof(o);const cy=o.lcy;
+   rows.forEach((o,ri)=>{const {k,s,d,ds,off}=o;const Y=Yof(o);const cy=o.lcy;
      let val;if(hi!=null){const idx=hi-off;val=(idx>=0&&idx<d.length)?d[idx]:d[d.length-1];}else val=d[d.length-1];
      const first=d.find(x=>x>0)||d[0]||1,chg=(val/first-1)*100,up=chg>=0;
      const chgTxt=Math.abs(chg)>=1000?("×"+compactNum(val/first)):((up?"▲":"▼")+Math.abs(chg).toFixed(1)+"%");
      const ai=Math.max(0,Math.round((attachX-plotL)/(plotW||1)*(maxLen-1))),lidx=ai-off;
-     const ay=(lidx>=0&&lidx<d.length)?Y(d[lidx]):midY;
+     const ay=(lidx>=0&&lidx<ds.length)?Y(ds[lidx]):midY;
      const x0=GUT-8,cx=(x0+attachX)/2;
      // flowing energy connector: card → a point on its own line
      ctx.save();ctx.strokeStyle=s.color;ctx.shadowColor=s.color;ctx.shadowBlur=7;ctx.globalAlpha=.5;ctx.lineWidth=1.4;
@@ -2538,7 +2547,7 @@ function drawChart(){
       ctx.fillStyle="#7c8a83";ctx.textAlign="center";ctx.fillText(lbl,x,H-2.5);});}
   if(_hoverI!=null&&meta.length){const hi=Math.max(0,Math.min(maxLen-1,_hoverI)),hx=X(hi);
     ctx.strokeStyle="rgba(255,255,255,.22)";ctx.setLineDash([3,4]);ctx.beginPath();ctx.moveTo(hx,plotT);ctx.lineTo(hx,plotB);ctx.stroke();ctx.setLineDash([]);
-    const rows=[];meta.forEach(m=>{const idx=hi-m.off;if(idx>=0&&idx<m.d.length){const v=m.d[idx],y=m.Y(v);ctx.fillStyle=m.s.color;ctx.shadowColor=m.s.color;ctx.shadowBlur=9;ctx.beginPath();ctx.arc(hx,y,4,0,7);ctx.fill();ctx.shadowBlur=0;rows.push({c:m.s.color,n:m.s.label,v:m.s.fmtV(v)});}});
+    const rows=[];meta.forEach(m=>{const idx=hi-m.off;if(idx>=0&&idx<m.d.length){const v=m.d[idx],y=m.Y(m.ds[idx]);ctx.fillStyle=m.s.color;ctx.shadowColor=m.s.color;ctx.shadowBlur=9;ctx.beginPath();ctx.arc(hx,y,4,0,7);ctx.fill();ctx.shadowBlur=0;rows.push({c:m.s.color,n:m.s.label,v:m.s.fmtV(v)});}});
     if(volOn){const vd=sliceN(SERIES.vol.data),vi=hi-(maxLen-vd.length);if(vi>=0&&vi<vd.length)rows.push({c:SERIES.vol.color,n:"Volume",v:SERIES.vol.fmtV(vd[vi]||0)});}
     ctx.font="11px 'IBM Plex Mono'";let tw=0;rows.forEach(r=>{tw=Math.max(tw,ctx.measureText(r.n).width+ctx.measureText(r.v).width);});
     let timeLbl="";if(TS.length>1){const ts=sliceN(TS),ti=hi-(maxLen-ts.length);if(ti>=0&&ti<ts.length){timeLbl=ago(Math.floor(Date.now()/1000)-ts[ti]);if(ti===ts.length-1)timeLbl="now";}}
