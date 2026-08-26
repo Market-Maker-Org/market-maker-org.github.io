@@ -1231,6 +1231,7 @@ const SERIES={
   supply:{label:"Circ. supply",ab:"CIRC",color:"#37e0c8",on:true, data:[],fmtV:v=>compactNum(v)},                            // teal · circulating = total − foundation − LP pools
   burn  :{label:"Deflation",ab:"DEFL",color:"#ff8c1a",on:true, data:[],fmtV:v=>compactNum(v)},                               // orange
   index :{label:"Reflection",ab:"REFL",color:"#e05cff",on:false,data:[],fmtV:v=>v.toFixed(5)},                               // magenta (off by default)
+  debt  :{label:"Pump debt",ab:"DEBT",color:"#c98bff",on:false,data:[],fmtV:v=>compactNum(v)+" MM"},                         // violet · accrued decay awaiting pump (off by default)
   vol   :{label:"Volume",  ab:"VOL", color:"#7a8a83",on:true, data:[],fmtV:v=>compactNum(v)+" MM"}};                         // grey
 let chartRange=0; // last N points; 0 = all (full history)
 let chartLog=true; // logarithmic Y (per-series normalized)
@@ -1540,7 +1541,7 @@ async function buildHistory(attempt=0){
       Object.values(SERIES).forEach(s=>s.data=[]);
       pts.forEach(p=>{const bch=p.burn*burnScale;SERIES.price.data.push(p.price);SERIES.pool.data.push(2*p.price*(p.pool+otherPoolMM));SERIES.index.data.push(p.idx);
         // circulating = total − (foundation + LP pools); excludedFloat ≈ constant over the window (excluded balances don't decay)
-        SERIES.burn.data.push(bch);SERIES.supply.data.push(Math.max(0,(capMM-bch)-excludedFloat));SERIES.vol.data.push(p.vol);});
+        SERIES.burn.data.push(bch);SERIES.supply.data.push(Math.max(0,(capMM-bch)-excludedFloat));SERIES.debt.data.push(0);SERIES.vol.data.push(p.vol);});
       priceHist.length=0;priceHist.push(...SERIES.price.data.filter(x=>x>0));
       if(priceHist.length){price0=priceHist[0];histLoaded=true;}
       const totVol=swc.reduce((a,s)=>a+s.vol,0),el=Math.max(1,(keptBlocks[keptBlocks.length-1]-keptBlocks[0])*secPerBlock);
@@ -1662,7 +1663,8 @@ async function refresh(){
       // snapshot for the Analytics dashboard
       AN={price,pUsd,sup:supN,burned:CFG.cap-supN,inc:incSupply,pool:pmN,allPool:allPoolN,tre:Number(E.formatUnits(tre,18)),pot:Number(E.formatUnits(pot,18)),idx:idxN,mcap:ethUsd?pUsd*supN:price*supN,liq:ethUsd?liqUsd:liqEth};
       // append a live point ONLY if something actually moved (pushLive returns false otherwise)
-      if(histLoaded&&pushLive({price,pool:liqEth,supply:circReal||supN,burn:CFG.cap-supN,index:idxN}))drawChart();
+      const pendDebt=(debtBase||0)+(incSupply>0&&decayR?incSupply*(1-Math.pow(1-decayR,(Date.now()-lastSettleWall)/1000))*mirrorX:0);
+      if(histLoaded&&pushLive({price,pool:liqEth,supply:circReal||supN,burn:CFG.cap-supN,index:idxN,debt:pendDebt}))drawChart();
     }
     if($("pv-analytics")&&getComputedStyle($("pv-analytics")).display!=="none")renderAnalytics();
     if(watch){const b=await mmRead.balanceOf(watch);excluded=await mmRead.isExcluded(watch);const cb=Number(E.formatUnits(b,18));
@@ -1809,7 +1811,7 @@ function pushLive(o){
   const lastP=pd[pd.length-1],lastPool=ld[ld.length-1];
   if(lastP!==undefined&&o.price===lastP&&o.pool===lastPool)return false; // nothing moved → skip
   SERIES.price.data.push(o.price);SERIES.pool.data.push(o.pool);SERIES.supply.data.push(o.supply);
-  SERIES.burn.data.push(o.burn);SERIES.index.data.push(o.index);SERIES.vol.data.push(0); // live move, no swap-volume sample
+  SERIES.burn.data.push(o.burn);SERIES.index.data.push(o.index);SERIES.debt.data.push(o.debt||0);SERIES.vol.data.push(0); // live move, no swap-volume sample
   TS.push(Math.floor(Date.now()/1000));
   const MX=1400;Object.values(SERIES).forEach(s=>{while(s.data.length>MX)s.data.shift();});while(TS.length>MX)TS.shift();
   return true;
@@ -2144,12 +2146,14 @@ function updatePumpPanel(pDebt,poolMM,mirror,pPool){
 }
 // Cumulative pump stats — total MM ever burned from the pool + approx total price lift.
 const PUMP_TOPIC=E.id("Pump(uint256,uint256,uint256)");
-let pumpCumMM=0;
+let pumpCumMM=0,pumpMarks=[]; // pumpMarks: {t:sec, amt:MM} for on-chart pump markers
 async function fetchPumpStats(){
-  try{const cur=await ro.getBlockNumber();const c=E.AbiCoder.defaultAbiCoder();const CH=45000,N=6;let removed=0,n=0;
+  try{const cur=await ro.getBlockNumber();const c=E.AbiCoder.defaultAbiCoder();const CH=45000,N=6;let removed=0,n=0;const marks=[],nowSec=Math.floor(Date.now()/1000),bms=avgBlockMs||100;
     for(let i=N-1;i>=0;i--){const to=cur-i*CH,from=Math.max(0,to-CH+1);if(to<=0)continue;
       try{const ls=await ro.getLogs({address:CFG.mm,topics:[PUMP_TOPIC],fromBlock:from,toBlock:to});
-        ls.forEach(l=>{const d=c.decode(["uint256","uint256","uint256"],l.data);removed+=Number(E.formatUnits(d[0],18))+Number(E.formatUnits(d[1],18));n++;});}catch(e){}}
+        ls.forEach(l=>{const d=c.decode(["uint256","uint256","uint256"],l.data);const amt=Number(E.formatUnits(d[0],18))+Number(E.formatUnits(d[1],18));removed+=amt;n++;
+          const bn=Number(l.blockNumber);marks.push({t:nowSec-(cur-bn)*bms/1000,amt});});}catch(e){}}
+    pumpMarks=marks.sort((a,b)=>a.t-b.t);
     if(pumpCumPrev>=0&&removed>pumpCumPrev+1e-9)anchorSettle(Date.now()); // a real burn happened → reset pending
     pumpCumPrev=removed;pumpCumMM=removed;
     const el=$("pm_cum");if(el)el.textContent=fmt(removed,2);
@@ -2485,6 +2489,7 @@ function drawChart(){
   based.forEach((o,i)=>{if(LANES){o.lt=plotT+i*laneH+LPAD;o.lb=plotT+(i+1)*laneH-LPAD;o.lcy=plotT+(i+0.5)*laneH;}
     else{o.lt=plotT+PADf*plotH;o.lb=plotB-PADf*plotH;o.lcy=plotT+laneH*(i+0.5);}});
   const Yof=o=>v=>{if(o.hi<=o.lo)return (o.lt+o.lb)/2;const t=(tf(v)-o.lo)/(o.hi-o.lo);return o.lb-t*(o.lb-o.lt);};
+  based.forEach(o=>o.Yf=Yof(o));
   if(LANES){based.forEach((o,i)=>{const ly=plotT+i*laneH; // lane bg + separators + faint mid guide
     ctx.fillStyle=o.s.color+"06";ctx.fillRect(plotL,ly+1,plotW,laneH-2);
     if(i>0){ctx.strokeStyle="rgba(255,255,255,.07)";ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(plotL,ly);ctx.lineTo(W-PADR,ly);ctx.stroke();}
@@ -2510,6 +2515,21 @@ function drawChart(){
     ctx.save();ctx.beginPath();smoothLine(ctx,rp);ctx.strokeStyle="#eafff4";ctx.globalAlpha=hero?.8:.5;ctx.lineWidth=hero?2.3:1.6;ctx.lineCap="round";
     ctx.setLineDash([22,168]);ctx.lineDashOffset=-((flow*1.5+oi*57)%190);ctx.shadowColor=s.color;ctx.shadowBlur=14;ctx.stroke();ctx.restore();ctx.shadowBlur=0;ctx.globalAlpha=1;
   });
+  // ===== CAUSAL BEAMS (Lanes mode) — animated energy from a driver line to the line it moves =====
+  if(LANES&&based.length>1){const byk={};based.forEach(o=>byk[o.k]=o);
+    const FLOWS=[["supply","burn","decay → burn"],["burn","price","burn → price"],["price","pool","price → TVL"],["debt","price","pump → price"]];
+    const act=FLOWS.filter(f=>byk[f[0]]&&byk[f[1]]);
+    act.forEach((f,fi)=>{const a=byk[f[0]],b=byk[f[1]];const bx=plotL+plotW*(0.30+fi*0.18);
+      const gi=Math.round((bx-plotL)/(plotW||1)*(maxLen-1)),ia=gi-a.off,ib=gi-b.off;
+      if(ia<0||ia>=a.ds.length||ib<0||ib>=b.ds.length)return;
+      const ay=a.Yf(a.ds[ia]),by=b.Yf(b.ds[ib]),bend=17*(fi%2?-1:1),dir=by>ay?1:-1;
+      ctx.save();ctx.strokeStyle=a.s.color;ctx.globalAlpha=.3;ctx.lineWidth=1.5;ctx.setLineDash([3,7]);ctx.lineDashOffset=-flow*1.3*dir;ctx.shadowColor=a.s.color;ctx.shadowBlur=6;
+      ctx.beginPath();ctx.moveTo(bx,ay);ctx.bezierCurveTo(bx+bend,ay,bx+bend,by,bx,by);ctx.stroke();ctx.setLineDash([]);
+      const t=((flow*0.8+fi*25)%100)/100,py=ay+(by-ay)*t,px=bx+bend*Math.sin(t*Math.PI); // particle rides a→b (causal)
+      ctx.globalAlpha=1;ctx.fillStyle="#ffffff";ctx.shadowColor=a.s.color;ctx.shadowBlur=9;ctx.beginPath();ctx.arc(px,py,2.4,0,7);ctx.fill();
+      ctx.fillStyle=a.s.color;ctx.shadowBlur=5;ctx.beginPath();ctx.moveTo(bx,by);ctx.lineTo(bx-3.2,by-5*dir);ctx.lineTo(bx+3.2,by-5*dir);ctx.closePath();ctx.fill();ctx.shadowBlur=0;
+      ctx.globalAlpha=.8;ctx.fillStyle=a.s.color;ctx.font="7.5px 'IBM Plex Mono'";ctx.textAlign="center";ctx.fillText(f[2],bx+bend*0.55,(ay+by)/2+2);
+      ctx.restore();ctx.globalAlpha=1;ctx.shadowBlur=0;});}
   // ===== LEFT stacked legend cards, each wired to its own line with a flowing neon connector =====
   {const rows=based.slice();const volRow=volOn?SERIES.vol:null;
    const hi=_hoverI==null?null:Math.max(0,Math.min(maxLen-1,_hoverI));
@@ -2545,6 +2565,12 @@ function drawChart(){
       let x=X(off+i);x=Math.max(PADL+tw/2+2,Math.min(W-PADR-tw/2-2,x));
       ctx.fillStyle="rgba(3,5,4,.75)";ctx.fillRect(x-tw/2-3,H-11,tw+6,11);
       ctx.fillStyle="#7c8a83";ctx.textAlign="center";ctx.fillText(lbl,x,H-2.5);});}
+  // ⚙ pump markers — one per realized pump() event, aligned by time
+  if(pumpMarks.length&&TS.length>1){const ts=sliceN(TS),tOff=maxLen-ts.length;
+    const tx=pt=>{if(pt<=ts[0])return 0;if(pt>=ts[ts.length-1])return ts.length-1;let lo=0,hi=ts.length-1;while(hi-lo>1){const m=(lo+hi)>>1;if(ts[m]<=pt)lo=m;else hi=m;}return lo+(pt-ts[lo])/((ts[hi]-ts[lo])||1);};
+    let lastX=-99;pumpMarks.forEach(pm=>{if(pm.t<ts[0]-3||pm.t>ts[ts.length-1]+3)return;const x=X(tOff+tx(pm.t));if(x-lastX<10)return;lastX=x; // de-clutter close marks
+      ctx.strokeStyle="rgba(201,139,255,.42)";ctx.setLineDash([2,3]);ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(x,plotT+11);ctx.lineTo(x,plotB);ctx.stroke();ctx.setLineDash([]);
+      ctx.fillStyle="#c98bff";ctx.shadowColor="#c98bff";ctx.shadowBlur=8;ctx.font="10px 'IBM Plex Mono'";ctx.textAlign="center";ctx.fillText("⚙",x,plotT+9);ctx.shadowBlur=0;});}
   if(_hoverI!=null&&meta.length){const hi=Math.max(0,Math.min(maxLen-1,_hoverI)),hx=X(hi);
     ctx.strokeStyle="rgba(255,255,255,.22)";ctx.setLineDash([3,4]);ctx.beginPath();ctx.moveTo(hx,plotT);ctx.lineTo(hx,plotB);ctx.stroke();ctx.setLineDash([]);
     const rows=[];meta.forEach(m=>{const idx=hi-m.off;if(idx>=0&&idx<m.d.length){const v=m.d[idx],y=m.Y(m.ds[idx]);ctx.fillStyle=m.s.color;ctx.shadowColor=m.s.color;ctx.shadowBlur=9;ctx.beginPath();ctx.arc(hx,y,4,0,7);ctx.fill();ctx.shadowBlur=0;rows.push({c:m.s.color,n:m.s.label,v:m.s.fmtV(v)});}});
