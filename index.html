@@ -102,7 +102,8 @@
   .hrow:nth-child(1) .rk{color:var(--green2);border-color:var(--greenDim);background:rgba(0,200,5,.08)}
   .hrow:nth-child(3) .rk{color:var(--orange2)}
   .hrow .ad{font-family:var(--mono);font-size:11.5px} .hrow .tg{font-family:var(--mono);font-size:8.5px;padding:1px 5px;border-radius:100px;border:1px solid var(--line2);color:var(--soft)}
-  .hrow .bl{margin-left:auto;font-family:var(--mono);font-size:12px;font-weight:600} .hrow .dn{color:var(--down);font-size:10px;margin-left:4px} .hrow .st{color:var(--green2);font-size:10px;margin-left:4px}
+  .hrow .bl{margin-left:auto;font-family:var(--mono);font-size:13.5px;font-weight:700;letter-spacing:-.01em;transition:color .3s} .hrow .dn{color:var(--down);font-size:10px;margin-left:4px} .hrow .st{color:var(--green2);font-size:10px;margin-left:4px}
+  .hrow .bl.dec{text-shadow:0 0 9px rgba(255,122,24,.28)}
   .tg.owner{color:var(--orange);border-color:#3a2a12} .tg.pool{color:var(--green2);border-color:var(--greenDim)} .tg.you{color:var(--white);border-color:var(--line2)}
   /* price hero */
   .phead{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
@@ -310,7 +311,7 @@
   .fwline{display:flex;align-items:stretch;gap:5px;margin-bottom:9px}
   .fwnode{flex:1;background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:7px 6px;text-align:center;transition:opacity .4s,border-color .4s}
   .fwnode .fl{font-size:8.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--faint);white-space:nowrap}
-  .fwnode .fv{font-size:13px;font-weight:700;margin-top:3px;color:var(--ink)}.fwnode .fv.up{color:var(--green2)}
+  .fwnode .fv{font-size:15px;font-weight:800;letter-spacing:-.01em;margin-top:3px;color:var(--ink)}.fwnode .fv.up{color:var(--green2)}
   .fwnode.dec{border-color:#3a2a12}.fwnode.dec .fl{color:var(--orange2)}
   .fwnode.debt{border-color:var(--line2)}
   .fwnode.burn{border-color:var(--greenDim)}.fwnode.burn .fl{color:var(--green2)}
@@ -322,7 +323,7 @@
   .pmgrid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
   .pmcell{background:#060908;border:1px solid var(--line);border-radius:8px;padding:6px 7px}
   .pmcell .l{font-size:8.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--faint)}
-  .pmcell .v{font-size:13px;font-weight:700;margin-top:2px}.pmcell .v.up{color:var(--green2)}
+  .pmcell .v{font-size:14.5px;font-weight:800;letter-spacing:-.01em;margin-top:2px}.pmcell .v.up{color:var(--green2)}
   .pmcum{display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding:8px 10px;border-radius:9px;
     background:linear-gradient(100deg,rgba(0,200,5,.08),rgba(255,122,24,.05));border:1px solid var(--greenDim);font-size:11px}
   .pmcum .lab{color:var(--soft);display:flex;align-items:center;gap:6px}
@@ -1684,7 +1685,7 @@ let _liveLast=0;
 function tickLive(){if(!watch||excluded||liveBal<=0){_liveLast=0;return;}const now=performance.now();
   const dt=_liveLast?(now-_liveLast)/1000:0;_liveLast=now;
   if(dt>0){const dk=Math.pow(1-decayR,dt);liveBal*=dk;if(liveBalTarget)liveBalTarget*=dk; // decay both (time-based)
-    if(liveBalTarget){const e=1-Math.pow(0.5,dt/0.5);liveBal+=(liveBalTarget-liveBal)*e;}} // slide toward chain value (0.5s half-life) — no hard snap
+    if(liveBalTarget){const e=1-Math.pow(0.5,dt/0.8);liveBal+=(liveBalTarget-liveBal)*e;}} // glide toward chain value (0.8s half-life) — no hard snap
   $("p_bal").textContent=liveBal.toLocaleString("en-US",{minimumFractionDigits:4,maximumFractionDigits:4});$("p_tick").textContent="↓ decaying live";}
 // ===== smooth neon stat counters =====
 // Each stat eases from its shown value to a fresh chain target, then (if it decays) keeps bleeding down
@@ -1692,7 +1693,7 @@ function tickLive(){if(!watch||excluded||liveBal<=0){_liveLast=0;return;}const n
 const _tw={};
 function tweenStat(id,target,fmt,dropPerSec){const el=$(id);if(!el)return;const s=_tw[id];
   const cur=(s&&isFinite(s.cur))?s.cur:target;
-  _tw[id]={from:cur,to:target,cur,t0:performance.now(),dur:cur===target?0:700,fmt,drop:dropPerSec||0,last:performance.now()};
+  _tw[id]={from:cur,to:target,cur,t0:performance.now(),dur:cur===target?0:950,fmt,drop:dropPerSec||0,last:performance.now()};
   if(Math.abs(cur-target)/Math.max(1,Math.abs(target))>0.0002){el.classList.add("flash");setTimeout(()=>{if(el)el.classList.remove("flash");},480);}}
 let _twLast=0;
 function tickStats(t){requestAnimationFrame(tickStats);if(document.hidden)return;if(t-_twLast<33)return;_twLast=t;
@@ -1924,7 +1925,7 @@ function tickDebt(){
   const dt=(Date.now()-lastSettleWall)/1000;
   const target=debtBase+incSupply*(1-Math.pow(1-decayR,dt))*mirrorX;
   if(_debtShown==null||_debtShown>target*20)_debtShown=target;      // init / recover from stale
-  _debtShown+=(target-_debtShown)*0.10;                             // slide toward target — a pump() drop glides down instead of snapping
+  _debtShown+=(target-_debtShown)*0.06;                             // glide toward target — a pump() drop slides down instead of snapping
   const pending=_debtShown;
   const set=id=>{const el=$(id);if(el)el.textContent=fmtDebt(pending);};
   set("pm_debt");set("d_pumpdebt");
@@ -2126,7 +2127,7 @@ function tickHolders(){
   holderRows.forEach((r,i)=>{
     const target=(!r.ex&&decayR)?r.bal*Math.pow(1-decayR,(now-r.t0)/1000):r.bal; // decaying rows bleed; stable rows hold
     if(r.shown==null)r.shown=target;
-    r.shown+=(target-r.shown)*0.12;                       // smooth slide — refresh never snaps, decay glides continuously
+    r.shown+=(target-r.shown)*0.07;                       // smooth glide — refresh never snaps, decay slides continuously
     const el=$("hb_"+i);if(el)el.textContent=hbal(r.shown,r.ex);
   });
 }
@@ -2459,7 +2460,7 @@ function drawChart(){
   c.width=W*dpr;c.height=H*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,W,H);
   const lines=Object.entries(SERIES).filter(([k,s])=>k!=="vol"&&s.on&&s.data.length>1);
   const volOn=SERIES.vol.on&&SERIES.vol.data.length>1;
-  const PADT=18,PADR=16,PADL=14,PADBx=18,volH=volOn?Math.round(H*0.16):0;
+  const PADT=18,PADR=16,GUT=Math.min(124,Math.max(88,W*0.15)),PADL=GUT,PADBx=18,volH=volOn?Math.round(H*0.16):0;
   const plotB=H-PADBx-volH,plotT=PADT,plotL=PADL,plotW=W-PADR-plotL,plotH=plotB-plotT;
   ctx.strokeStyle="rgba(255,255,255,.045)";ctx.lineWidth=1;
   for(let g=0;g<=4;g++){const y=plotT+g*plotH/4;ctx.beginPath();ctx.moveTo(plotL,y);ctx.lineTo(W-PADR,y);ctx.stroke();}
@@ -2492,20 +2493,38 @@ function drawChart(){
       const gr=ctx.createLinearGradient(0,plotT,0,plotB);gr.addColorStop(0,s.color+"22");gr.addColorStop(.6,s.color+"07");gr.addColorStop(1,s.color+"00");ctx.fillStyle=gr;ctx.fill();}
     ctx.beginPath();smoothLine(ctx,rp);ctx.strokeStyle=s.color;ctx.lineWidth=hero?2.4:1.7;ctx.globalAlpha=hero?1:.8;
     ctx.shadowColor=s.color;ctx.shadowBlur=hero?10:6;ctx.stroke();ctx.shadowBlur=0;ctx.globalAlpha=1;
-    ctx.save();ctx.beginPath();smoothLine(ctx,rp);ctx.strokeStyle="#ffffff";ctx.globalAlpha=hero?.85:.55;ctx.lineWidth=hero?2.1:1.4;
-    ctx.setLineDash([2,54]);ctx.lineDashOffset=-((flow*1.7+oi*19)%56);ctx.shadowColor=s.color;ctx.shadowBlur=13;ctx.stroke();ctx.restore();ctx.shadowBlur=0;ctx.globalAlpha=1;
-    const lp=rp[rp.length-1];ctx.fillStyle=s.color;ctx.shadowColor=s.color;ctx.shadowBlur=8;ctx.beginPath();ctx.arc(lp[0],lp[1],hero?3.6:2.7,0,7);ctx.fill();ctx.shadowBlur=0;
+    // 2–3 long light streaks gliding along the line like fluid (no dots)
+    ctx.save();ctx.beginPath();smoothLine(ctx,rp);ctx.strokeStyle="#eafff4";ctx.globalAlpha=hero?.8:.5;ctx.lineWidth=hero?2.3:1.6;ctx.lineCap="round";
+    ctx.setLineDash([22,168]);ctx.lineDashOffset=-((flow*1.5+oi*57)%190);ctx.shadowColor=s.color;ctx.shadowBlur=14;ctx.stroke();ctx.restore();ctx.shadowBlur=0;ctx.globalAlpha=1;
   });
-  // compact stacked legend, top-left — color + name + current value (updates on hover). No end-anchored labels.
-  {const hi=_hoverI==null?null:Math.max(0,Math.min(maxLen-1,_hoverI));
-   const rows=based.map(o=>{let val;if(hi!=null){const idx=hi-o.off;val=(idx>=0&&idx<o.d.length)?o.d[idx]:o.d[o.d.length-1];}else val=o.d[o.d.length-1];return {c:o.s.color,n:o.s.label,v:o.s.fmtV(val)};});
-   let wN=0,wV=0;rows.forEach(r=>{ctx.font="bold 9.5px 'IBM Plex Mono'";wN=Math.max(wN,ctx.measureText(r.n).width);ctx.font="9.5px 'IBM Plex Mono'";wV=Math.max(wV,ctx.measureText(r.v).width);});
-   const rh=14,padX=10,boxW=15+wN+14+wV+padX,boxH=rows.length*rh+8,bx=plotL+3,by=plotT+3;
-   ctx.fillStyle="rgba(3,6,4,.74)";ctx.strokeStyle="rgba(255,255,255,.06)";ctx.lineWidth=1;roundRect(ctx,bx,by,boxW,boxH,8);ctx.fill();ctx.stroke();
-   rows.forEach((r,i)=>{const cy=by+8+i*rh;
-     ctx.fillStyle=r.c;ctx.shadowColor=r.c;ctx.shadowBlur=5;ctx.beginPath();ctx.arc(bx+10,cy+2,3,0,7);ctx.fill();ctx.shadowBlur=0;
-     ctx.fillStyle=r.c;ctx.font="bold 9.5px 'IBM Plex Mono'";ctx.textAlign="left";ctx.fillText(r.n,bx+18,cy+5);
-     ctx.fillStyle="#dfeae4";ctx.font="9.5px 'IBM Plex Mono'";ctx.textAlign="right";ctx.fillText(r.v,bx+boxW-padX,cy+5);});}
+  // ===== LEFT stacked legend cards, each wired to its own line with a flowing neon connector =====
+  {const rows=based.slice();const volRow=volOn?SERIES.vol:null;const N=rows.length+(volRow?1:0);
+   const top=plotT+4,bot=plotB-4,rh=(bot-top)/Math.max(N,1);
+   const hi=_hoverI==null?null:Math.max(0,Math.min(maxLen-1,_hoverI));
+   const attachX=plotL+plotW*0.17,flow=(_flowPhase||0),midY=plotT+plotH/2;
+   rows.forEach((o,ri)=>{const {k,s,d,off}=o;const Y=Yof(o);const cy=top+rh*(ri+0.5);
+     let val;if(hi!=null){const idx=hi-off;val=(idx>=0&&idx<d.length)?d[idx]:d[d.length-1];}else val=d[d.length-1];
+     const first=d.find(x=>x>0)||d[0]||1,chg=(val/first-1)*100,up=chg>=0;
+     const chgTxt=Math.abs(chg)>=1000?("×"+compactNum(val/first)):((up?"▲":"▼")+Math.abs(chg).toFixed(1)+"%");
+     const ai=Math.max(0,Math.round((attachX-plotL)/(plotW||1)*(maxLen-1))),lidx=ai-off;
+     const ay=(lidx>=0&&lidx<d.length)?Y(d[lidx]):midY;
+     const x0=GUT-8,cx=(x0+attachX)/2;
+     // flowing energy connector: card → a point on its own line
+     ctx.save();ctx.strokeStyle=s.color;ctx.shadowColor=s.color;ctx.shadowBlur=7;ctx.globalAlpha=.5;ctx.lineWidth=1.4;
+     ctx.setLineDash([5,7]);ctx.lineDashOffset=-flow*(ri%2?1:1.4);
+     ctx.beginPath();ctx.moveTo(x0,cy);ctx.bezierCurveTo(cx,cy,cx,ay,attachX,ay);ctx.stroke();
+     ctx.setLineDash([]);ctx.globalAlpha=1;ctx.fillStyle=s.color;ctx.beginPath();ctx.arc(attachX,ay,2.3,0,7);ctx.fill();ctx.restore();
+     // card: dot + name + value + %chg
+     ctx.textAlign="left";
+     ctx.fillStyle=s.color;ctx.shadowColor=s.color;ctx.shadowBlur=6;ctx.beginPath();ctx.arc(6,cy,3,0,7);ctx.fill();ctx.shadowBlur=0;
+     ctx.font="bold 10px 'IBM Plex Mono'";ctx.fillStyle=s.color;ctx.fillText(s.ab||s.label,14,cy-3);
+     ctx.font="10.5px 'IBM Plex Mono'";ctx.fillStyle="#d7ded9";ctx.fillText(s.fmtV(val),14,cy+9);
+     ctx.font="8px 'IBM Plex Mono'";ctx.fillStyle=up?"#39d353":"#ff5a4d";ctx.textAlign="right";ctx.fillText(chgTxt,GUT-4,cy-3);
+   });
+   if(volRow){const cy=top+rh*(rows.length+0.5);const vd=sliceN(volRow.data);let val=hi!=null?(vd[hi-(maxLen-vd.length)]??vd[vd.length-1]):vd[vd.length-1];
+     ctx.textAlign="left";ctx.fillStyle=volRow.color;ctx.beginPath();ctx.arc(6,cy,3,0,7);ctx.fill();
+     ctx.font="bold 10px 'IBM Plex Mono'";ctx.fillStyle=volRow.color;ctx.fillText(volRow.ab||volRow.label,14,cy-3);
+     ctx.font="10.5px 'IBM Plex Mono'";ctx.fillStyle="#d7ded9";ctx.fillText(volRow.fmtV(val||0),14,cy+9);}}
   ctx.fillStyle="#3f4a44";ctx.font="8px 'IBM Plex Mono'";ctx.textAlign="left";ctx.fillText((LOGon?"log · ":"")+"normalized · each line spans its own range",plotL+2,plotT-6);
   if(TS.length>1){const ts=sliceN(TS),now=Math.floor(Date.now()/1000),off=maxLen-ts.length;
     ctx.font="8.5px 'IBM Plex Mono'";
