@@ -1683,6 +1683,7 @@ async function refresh(){
     if($("pos-calc")&&$("pos-calc").style.display!=="none")posCalc();  // same for the compact one in Your Position
     if($("presale")&&$("presale").classList.contains("on")&&feedTick%2===0)renderPresale(); // keep the presale book live while open
     if($("analytics")&&$("analytics").classList.contains("on"))renderAnalyticsPage(); // keep the analytics dashboard live while open
+    if(!document.hidden)buildFlows(); // refresh inter-panel flows + pump-engine → chart beams
     refreshFails=0;$("net").classList.add("ok");$("nettxt").textContent="Robinhood · live";
     ro.getBlockNumber().then(b=>{const el=$("netblk");if(el)el.textContent="#"+b.toLocaleString("en-US");}).catch(()=>{});
   }catch(e){refreshFails++;if(refreshFails>=2){$("net").classList.remove("ok");$("nettxt").textContent="reconnecting…";}}
@@ -2450,6 +2451,17 @@ function buildFlows(){
     h+=`<path d="${d}" fill="none" stroke="${f[4]}" stroke-width="1" opacity=".16" stroke-dasharray="3 9"><animate attributeName="stroke-dashoffset" values="0;-24" dur="1.3s" repeatCount="indefinite"/></path>`;
     h+=`<circle r="2.4" fill="${f[4]}" opacity=".85"><animateMotion dur="${2.4+i*0.5}s" repeatCount="indefinite" path="${d}" rotate="auto"/></circle>`;
   });
+  // PUMP BEAMS — fired FROM the Pump Engine card (.c-pools) to each green pump point on the price line.
+  const canvas=$("c_price"),card=q(".c-pools");
+  if(canvas&&card&&_pumpPts&&_pumpPts.length){
+    const tr=term.getBoundingClientRect(),cr=canvas.getBoundingClientRect(),pr=card.getBoundingClientRect();
+    const ox=cr.left-tr.left,oy=cr.top-tr.top,sx=pr.left-tr.left+pr.width*0.5,sy=pr.top-tr.top+4;
+    h+=`<circle cx="${sx}" cy="${sy}" r="3.4" fill="#38ff7e" opacity=".92"><animate attributeName="r" values="3;4.6;3" dur="1.4s" repeatCount="indefinite"/></circle>`;
+    _pumpPts.forEach(p=>{const tx2=(ox+p.x).toFixed(1),ty2=(oy+p.y).toFixed(1),r=p.r,mx=((sx+ox+p.x)/2).toFixed(1),my=(Math.min(sy,oy+p.y)-24).toFixed(1);
+      const dash=(3+r*4).toFixed(1),gap=(24-r*16).toFixed(1),dur=(2.6-r*1.9).toFixed(2),period=(3+r*4+24-r*16).toFixed(1);
+      h+=`<path d="M${sx.toFixed(1)},${sy.toFixed(1)} Q${mx},${my} ${tx2},${ty2}" fill="none" stroke="#38ff7e" stroke-width="${(1+r*0.7).toFixed(1)}" opacity="${(0.08+r*0.4).toFixed(2)}" stroke-dasharray="${dash} ${gap}"><animate attributeName="stroke-dashoffset" values="0;-${period}" dur="${dur}s" repeatCount="indefinite"/></path>`;
+    });
+  }
   svg.innerHTML=h;
 }
 let _flowT;window.addEventListener("resize",()=>{clearTimeout(_flowT);_flowT=setTimeout(buildFlows,200);});
@@ -2476,6 +2488,7 @@ function compactNum(v){const a=Math.abs(v);if(a>=1e9)return (v/1e9).toFixed(2)+"
 function usdAxis(u){if(u>=1)return "$"+u.toFixed(2);if(u>=0.01)return "$"+u.toFixed(4);if(u<=0)return "$0";return "$"+u.toFixed(9).replace(/0+$/,"");}
 function axisFmt(k,v){return k==="price"?(ethUsd?usdAxis(v*ethUsd):gwei(v).toFixed(2)+"g"):k==="index"?v.toFixed(4):compactNum(v);}
 let _chart=null,_hoverI=null,_hoverPy=null,_reveal=1,_revRaf=0,_flowPhase=0,_flowLast=0;
+let _pumpPts=[]; // pump points on the price line (canvas px) — the Pump Engine card fires beams to these
 // gentle flowing-neon animation for the legend connectors (throttled, only when chart visible)
 function flowTick(t){requestAnimationFrame(flowTick);
   if(document.hidden)return;const c=$("c_price");if(!c||!c.offsetParent)return;
@@ -2563,6 +2576,16 @@ function drawChart(){
       ctx.fillStyle=a.s.color;ctx.shadowBlur=5;ctx.beginPath();ctx.moveTo(bx,by);ctx.lineTo(bx-3.2,by-5*dir);ctx.lineTo(bx+3.2,by-5*dir);ctx.closePath();ctx.fill();ctx.shadowBlur=0;
       ctx.globalAlpha=.8;ctx.fillStyle=a.s.color;ctx.font="7.5px 'IBM Plex Mono'";ctx.textAlign="center";ctx.fillText(f[2],bx+bend*0.55,(ay+by)/2+2);
       ctx.restore();ctx.globalAlpha=1;ctx.shadowBlur=0;});}
+  // ===== PUMP POINTS on the PRICE line — green ⚙ dots; the animated beams to them are fired from the
+  //       Pump Engine CARD via the flow overlay (renderPumpBeams). Here we just mark the points + store them.
+  {_pumpPts=[];const po=based.find(o=>o.k==="price");
+   if(po&&pumpMarks.length&&TS.length>1){const ts=sliceN(TS),tOff=maxLen-ts.length,t0=ts[0],t1=ts[ts.length-1],span=Math.max(1,t1-t0);
+     const tx=pt=>{if(pt<=ts[0])return 0;if(pt>=ts[ts.length-1])return ts.length-1;let lo=0,hi=ts.length-1;while(hi-lo>1){const m=(lo+hi)>>1;if(ts[m]<=pt)lo=m;else hi=m;}return lo+(pt-ts[lo])/((ts[hi]-ts[lo])||1);};
+     const vis=pumpMarks.filter(pm=>pm.t>=t0-3&&pm.t<=t1+3).slice(-26);let lastX=-99;
+     vis.forEach(pm=>{const gi=tOff+tx(pm.t),x=X(gi);if(x-lastX<12)return;lastX=x;const di=Math.round(gi)-po.off;if(di<0||di>=po.ds.length)return;
+       const y=po.Yf(po.ds[di]),r=(pm.t-t0)/span;_pumpPts.push({x,y,r});
+       ctx.fillStyle="#38ff7e";ctx.shadowColor="#38ff7e";ctx.shadowBlur=6;ctx.globalAlpha=Math.min(1,0.45+r*0.55);ctx.beginPath();ctx.arc(x,y,2+r*1.4,0,7);ctx.fill();ctx.shadowBlur=0;ctx.globalAlpha=1;});}
+  }
   // ===== LEFT stacked legend cards, each wired to its own line with a flowing neon connector =====
   {const rows=based.slice();const volRow=volOn?SERIES.vol:null;
    const hi=_hoverI==null?null:Math.max(0,Math.min(maxLen-1,_hoverI));
