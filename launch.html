@@ -221,15 +221,15 @@ async function loadList(){
   for(let i=n-1;i>=start;i--){
     try{
       const lk=await factoryRead.launches(i);
-      const meta=await readLaunch(lk.token,lk.curve,Number(lk.curveType));
+      const meta=await readLaunch(lk.token,lk.curve,Number(lk.curveType),lk.logoURI);
       list.appendChild(card(i,meta));
     }catch(e){}
   }
 }
-async function readLaunch(tokenAddr,curveAddr,curveType){
+async function readLaunch(tokenAddr,curveAddr,curveType,logo){
   const tok=new E.Contract(tokenAddr,L.launchToken.abi,ro);
   const cur=new E.Contract(curveAddr,L.curve.abi,ro);
-  const [name,symbol,logo]=await Promise.all([tok.name(),tok.symbol(),tok.logoURI().catch(()=>"")]);
+  const [name,symbol]=await Promise.all([tok.name(),tok.symbol()]);
   const [netRaised,targetMM,tokensSold,curveSupply,graduated,pair]=await Promise.all([
     cur.netRaised(),cur.targetMM(),cur.tokensSold(),cur.curveSupply(),cur.graduated(),cur.pair().catch(()=>E.ZeroAddress)]);
   return {tokenAddr,curveAddr,curveType,name,symbol,logo,netRaised,targetMM,tokensSold,curveSupply,graduated,pair};
@@ -257,7 +257,7 @@ async function openDetail(i){
   showView('detail');
   $("detailPanel").innerHTML='<div class="empty">loading…</div>';
   const lk=await factoryRead.launches(i);
-  const m=await readLaunch(lk.token,lk.curve,Number(lk.curveType));
+  const m=await readLaunch(lk.token,lk.curve,Number(lk.curveType),lk.logoURI);
   cur={i,m};
   renderDetail();
 }
