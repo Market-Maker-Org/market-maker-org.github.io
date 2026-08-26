@@ -1231,7 +1231,7 @@ const SERIES={
   supply:{label:"Circ. supply",ab:"CIRC",color:"#37e0c8",on:true, data:[],fmtV:v=>compactNum(v)},                            // teal · circulating = total − foundation − LP pools
   burn  :{label:"Deflation",ab:"DEFL",color:"#ff8c1a",on:true, data:[],fmtV:v=>compactNum(v)},                               // orange
   index :{label:"Reflection",ab:"REFL",color:"#e05cff",on:false,data:[],fmtV:v=>v.toFixed(5)},                               // magenta (off by default)
-  debt  :{label:"Pump debt",ab:"DEBT",color:"#c98bff",on:false,data:[],fmtV:v=>compactNum(v)+" MM"},                         // violet · accrued decay awaiting pump (off by default)
+  debt  :{label:"Pump debt",ab:"DEBT",color:"#c98bff",on:true, data:[],fmtV:v=>compactNum(v)+" MM"},                         // violet · cumulative pumped-to-date (monotonic)
   vol   :{label:"Volume",  ab:"VOL", color:"#7a8a83",on:true, data:[],fmtV:v=>compactNum(v)+" MM"}};                         // grey
 let chartRange=0; // last N points; 0 = all (full history)
 let chartLog=true; // logarithmic Y (per-series normalized)
@@ -1547,6 +1547,7 @@ async function buildHistory(attempt=0){
       const totVol=swc.reduce((a,s)=>a+s.vol,0),el=Math.max(1,(keptBlocks[keptBlocks.length-1]-keptBlocks[0])*secPerBlock);
       volYr=totVol*(31536000/el);
       TS=keptBlocks.map(blk=>headTs-(cur-blk)*secPerBlock); // per-point time from block number
+      rebuildDebtSeries(); // cumulative pumped-to-date aligned to this timeline
       anchorSettle(TS[TS.length-1]*1000); // newest swap/sync ≈ last settle (RPC-based, Blockscout-independent)
       committed?drawChart():revealChart(); // animate only the first paint
       committed=true;
@@ -1663,8 +1664,7 @@ async function refresh(){
       // snapshot for the Analytics dashboard
       AN={price,pUsd,sup:supN,burned:CFG.cap-supN,inc:incSupply,pool:pmN,allPool:allPoolN,tre:Number(E.formatUnits(tre,18)),pot:Number(E.formatUnits(pot,18)),idx:idxN,mcap:ethUsd?pUsd*supN:price*supN,liq:ethUsd?liqUsd:liqEth};
       // append a live point ONLY if something actually moved (pushLive returns false otherwise)
-      const pendDebt=(debtBase||0)+(incSupply>0&&decayR?incSupply*(1-Math.pow(1-decayR,(Date.now()-lastSettleWall)/1000))*mirrorX:0);
-      if(histLoaded&&pushLive({price,pool:liqEth,supply:circReal||supN,burn:CFG.cap-supN,index:idxN,debt:pendDebt}))drawChart();
+      if(histLoaded&&pushLive({price,pool:liqEth,supply:circReal||supN,burn:CFG.cap-supN,index:idxN,debt:pumpCumMM||0}))drawChart();
     }
     if($("pv-analytics")&&getComputedStyle($("pv-analytics")).display!=="none")renderAnalytics();
     if(watch){const b=await mmRead.balanceOf(watch);excluded=await mmRead.isExcluded(watch);const cb=Number(E.formatUnits(b,18));
@@ -1806,6 +1806,12 @@ function paintDecaySplit(){
 }
 // Append a live point ONLY when price or liquidity actually moved — no change, no new point,
 // so the chart never scrolls right on empty ticks. Keeps every series + TS length-aligned.
+// Rebuild the cumulative Pump-debt series (total MM pumped up to each chart point) from the pump events, aligned to TS.
+function rebuildDebtSeries(){
+  if(!TS.length){SERIES.debt.data=[];return;}
+  const sorted=(pumpMarks||[]).slice().sort((a,b)=>a.t-b.t);let pi=0,cum=0;
+  SERIES.debt.data=TS.map(t=>{while(pi<sorted.length&&sorted[pi].t<=t){cum+=sorted[pi].amt;pi++;}return cum;});
+}
 function pushLive(o){
   const pd=SERIES.price.data,ld=SERIES.pool.data;
   const lastP=pd[pd.length-1],lastPool=ld[ld.length-1];
@@ -2156,6 +2162,7 @@ async function fetchPumpStats(){
     pumpMarks=marks.sort((a,b)=>a.t-b.t);
     if(pumpCumPrev>=0&&removed>pumpCumPrev+1e-9)anchorSettle(Date.now()); // a real burn happened → reset pending
     pumpCumPrev=removed;pumpCumMM=removed;
+    rebuildDebtSeries();if(histLoaded)drawChart(); // refresh the cumulative pump-debt line + markers
     const el=$("pm_cum");if(el)el.textContent=fmt(removed,2);
     const pct=poolMMg>0?removed/(poolMMg+removed)*100:0; // removed as % of what the pool would hold w/o pumps
     const e2=$("pm_cumpct");if(e2)e2.textContent="+"+pct.toFixed(3)+"%";
@@ -2493,7 +2500,8 @@ function drawChart(){
   if(LANES){based.forEach((o,i)=>{const ly=plotT+i*laneH; // lane bg + separators + faint mid guide
     ctx.fillStyle=o.s.color+"06";ctx.fillRect(plotL,ly+1,plotW,laneH-2);
     if(i>0){ctx.strokeStyle="rgba(255,255,255,.07)";ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(plotL,ly);ctx.lineTo(W-PADR,ly);ctx.stroke();}
-    ctx.strokeStyle="rgba(255,255,255,.04)";ctx.setLineDash([1,5]);ctx.beginPath();ctx.moveTo(plotL,o.lcy);ctx.lineTo(W-PADR,o.lcy);ctx.stroke();ctx.setLineDash([]);});}
+    ctx.strokeStyle="rgba(255,255,255,.04)";ctx.setLineDash([1,5]);ctx.beginPath();ctx.moveTo(plotL,o.lcy);ctx.lineTo(W-PADR,o.lcy);ctx.stroke();ctx.setLineDash([]);
+    if(o.k==="debt"){ctx.setLineDash([]);ctx.fillStyle=o.s.color+"cc";ctx.font="8px 'IBM Plex Mono'";ctx.textAlign="left";ctx.fillText("⚙ pump debt · cumulative",plotL+5,o.lt+8);}});}
   else{ctx.strokeStyle="rgba(255,255,255,.045)";ctx.lineWidth=1;for(let g=0;g<=4;g++){const y=plotT+g*plotH/4;ctx.beginPath();ctx.moveTo(plotL,y);ctx.lineTo(W-PADR,y);ctx.stroke();}}
   const meta=[];
   // candle-columns behind the lines — per series, translucent, from baseline up to value (static, no animation)
@@ -2565,12 +2573,12 @@ function drawChart(){
       let x=X(off+i);x=Math.max(PADL+tw/2+2,Math.min(W-PADR-tw/2-2,x));
       ctx.fillStyle="rgba(3,5,4,.75)";ctx.fillRect(x-tw/2-3,H-11,tw+6,11);
       ctx.fillStyle="#7c8a83";ctx.textAlign="center";ctx.fillText(lbl,x,H-2.5);});}
-  // ⚙ pump markers — one per realized pump() event, aligned by time
-  if(pumpMarks.length&&TS.length>1){const ts=sliceN(TS),tOff=maxLen-ts.length;
+  // ⚙ pump markers — one per realized pump(), sitting ON the Pump-debt line (no vertical lines)
+  if(pumpMarks.length&&TS.length>1){const ts=sliceN(TS),tOff=maxLen-ts.length,debtO=based.find(o=>o.k==="debt");
     const tx=pt=>{if(pt<=ts[0])return 0;if(pt>=ts[ts.length-1])return ts.length-1;let lo=0,hi=ts.length-1;while(hi-lo>1){const m=(lo+hi)>>1;if(ts[m]<=pt)lo=m;else hi=m;}return lo+(pt-ts[lo])/((ts[hi]-ts[lo])||1);};
-    let lastX=-99;pumpMarks.forEach(pm=>{if(pm.t<ts[0]-3||pm.t>ts[ts.length-1]+3)return;const x=X(tOff+tx(pm.t));if(x-lastX<10)return;lastX=x; // de-clutter close marks
-      ctx.strokeStyle="rgba(201,139,255,.42)";ctx.setLineDash([2,3]);ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(x,plotT+11);ctx.lineTo(x,plotB);ctx.stroke();ctx.setLineDash([]);
-      ctx.fillStyle="#c98bff";ctx.shadowColor="#c98bff";ctx.shadowBlur=8;ctx.font="10px 'IBM Plex Mono'";ctx.textAlign="center";ctx.fillText("⚙",x,plotT+9);ctx.shadowBlur=0;});}
+    let lastX=-99;pumpMarks.forEach(pm=>{if(pm.t<ts[0]-3||pm.t>ts[ts.length-1]+3)return;const gi=tOff+tx(pm.t),x=X(gi);if(x-lastX<9)return;lastX=x; // de-clutter close marks
+      let y=debtO?debtO.lt-2:plotT+9;if(debtO){const di=Math.round(gi)-debtO.off;if(di>=0&&di<debtO.ds.length)y=debtO.Yf(debtO.ds[di])-6;}
+      ctx.fillStyle="#c98bff";ctx.shadowColor="#c98bff";ctx.shadowBlur=7;ctx.font="9px 'IBM Plex Mono'";ctx.textAlign="center";ctx.fillText("⚙",x,y);ctx.shadowBlur=0;});}
   if(_hoverI!=null&&meta.length){const hi=Math.max(0,Math.min(maxLen-1,_hoverI)),hx=X(hi);
     ctx.strokeStyle="rgba(255,255,255,.22)";ctx.setLineDash([3,4]);ctx.beginPath();ctx.moveTo(hx,plotT);ctx.lineTo(hx,plotB);ctx.stroke();ctx.setLineDash([]);
     const rows=[];meta.forEach(m=>{const idx=hi-m.off;if(idx>=0&&idx<m.d.length){const v=m.d[idx],y=m.Y(m.ds[idx]);ctx.fillStyle=m.s.color;ctx.shadowColor=m.s.color;ctx.shadowBlur=9;ctx.beginPath();ctx.arc(hx,y,4,0,7);ctx.fill();ctx.shadowBlur=0;rows.push({c:m.s.color,n:m.s.label,v:m.s.fmtV(v)});}});
