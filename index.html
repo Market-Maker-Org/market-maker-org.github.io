@@ -1332,6 +1332,7 @@ async function boot(){
   showSkeletons(); // polished first paint while data loads
   initBrand();  // animated fragment/reunite "Market Maker" wordmark
   loadPrefs(); // restore saved chart series/range/log, slippage, watched wallet
+  try{const pm=JSON.parse(localStorage.getItem("mm_pumps")||"[]");if(pm.length){pumpMarks=pm;pumpCumMM=pm.reduce((a,m)=>a+m.amt,0);}}catch(e){} // persisted pump history → debt shows instantly
   restoreCache(); // paint last-seen feed/holders/chart instantly (refreshed by the live fetches)
   if(!watch&&CFG.defaultWatch)watch=CFG.defaultWatch;
   if(watch)$("p_addr").textContent=short(watch);
@@ -1664,7 +1665,8 @@ async function refresh(){
       // snapshot for the Analytics dashboard
       AN={price,pUsd,sup:supN,burned:CFG.cap-supN,inc:incSupply,pool:pmN,allPool:allPoolN,tre:Number(E.formatUnits(tre,18)),pot:Number(E.formatUnits(pot,18)),idx:idxN,mcap:ethUsd?pUsd*supN:price*supN,liq:ethUsd?liqUsd:liqEth};
       // append a live point ONLY if something actually moved (pushLive returns false otherwise)
-      if(histLoaded&&pushLive({price,pool:liqEth,supply:circReal||supN,burn:CFG.cap-supN,index:idxN,debt:pumpCumMM||0}))drawChart();
+      const pendDebt=(debtBase||0)+(incSupply>0&&decayR?incSupply*(1-Math.pow(1-decayR,(Date.now()-lastSettleWall)/1000))*mirrorX:0);
+      if(histLoaded&&pushLive({price,pool:liqEth,supply:circReal||supN,burn:CFG.cap-supN,index:idxN,debt:pendDebt}))drawChart();
     }
     if($("pv-analytics")&&getComputedStyle($("pv-analytics")).display!=="none")renderAnalytics();
     if(watch){const b=await mmRead.balanceOf(watch);excluded=await mmRead.isExcluded(watch);const cb=Number(E.formatUnits(b,18));
@@ -1806,11 +1808,15 @@ function paintDecaySplit(){
 }
 // Append a live point ONLY when price or liquidity actually moved — no change, no new point,
 // so the chart never scrolls right on empty ticks. Keeps every series + TS length-aligned.
-// Rebuild the cumulative Pump-debt series (total MM pumped up to each chart point) from the pump events, aligned to TS.
+// Rebuild the PENDING pump-debt series over the timeline: decay accrues the debt smoothly (gradual slope),
+// and every pump() resets it toward 0 — a lively sawtooth that ramps up and drops, never a sudden jump.
 function rebuildDebtSeries(){
   if(!TS.length){SERIES.debt.data=[];return;}
-  const sorted=(pumpMarks||[]).slice().sort((a,b)=>a.t-b.t);let pi=0,cum=0;
-  SERIES.debt.data=TS.map(t=>{while(pi<sorted.length&&sorted[pi].t<=t){cum+=sorted[pi].amt;pi++;}return cum;});
+  const rate=decayR||1.6e-8,inc=incSupply||3e6,mir=mirrorX||1;
+  const pumps=(pumpMarks||[]).map(m=>m.t).sort((a,b)=>a-b);let pi=0;
+  SERIES.debt.data=TS.map(t=>{while(pi<pumps.length&&pumps[pi]<=t)pi++;
+    const lastPump=pi>0?pumps[pi-1]:(TS[0]-3600);const dt=Math.max(0,t-lastPump);
+    return inc*(1-Math.pow(1-rate,dt))*mir;});
 }
 function pushLive(o){
   const pd=SERIES.price.data,ld=SERIES.pool.data;
@@ -2154,17 +2160,18 @@ function updatePumpPanel(pDebt,poolMM,mirror,pPool){
 const PUMP_TOPIC=E.id("Pump(uint256,uint256,uint256)");
 let pumpCumMM=0,pumpMarks=[]; // pumpMarks: {t:sec, amt:MM} for on-chart pump markers
 async function fetchPumpStats(){
-  // ALL-TIME pump events from Blockscout (indexed, with real timeStamps) → full-history cumulative debt,
-  // just like the other series. Falls back silently if Blockscout is unavailable.
-  try{const ls=await bsLogs(CFG.mm,PUMP_TOPIC);const c=E.AbiCoder.defaultAbiCoder();let removed=0;const marks=[];
-    ls.forEach(l=>{try{const d=c.decode(["uint256","uint256","uint256"],l.data);const amt=Number(E.formatUnits(d[0],18))+Number(E.formatUnits(d[1],18));removed+=amt;const t=parseInt(l.timeStamp,16)||0;if(t>0)marks.push({t,amt});}catch(e){}});
-    if(marks.length){pumpMarks=marks.sort((a,b)=>a.t-b.t);}
-    if(pumpCumPrev>=0&&removed>pumpCumPrev+1e-9)anchorSettle(Date.now()); // a real burn happened → reset pending
-    pumpCumPrev=removed;pumpCumMM=removed;
-    rebuildDebtSeries();if(histLoaded)drawChart(); // refresh the cumulative pump-debt line + markers
-    const el=$("pm_cum");if(el)el.textContent=fmt(removed,2);
-    const pct=poolMMg>0?removed/(poolMMg+removed)*100:0; // removed as % of what the pool would hold w/o pumps
-    const e2=$("pm_cumpct");if(e2)e2.textContent="+"+pct.toFixed(3)+"%";
+  // Recent pump()s via a light RPC scan → pump-times for the ⚙ markers + sawtooth resets. The pending-debt
+  // line accrues smoothly on its own between pumps, so this doesn't need exhaustive (rate-limited) history.
+  try{const cur=await ro.getBlockNumber();const c=E.AbiCoder.defaultAbiCoder();const CH=45000,N=8,nowSec=Math.floor(Date.now()/1000),bms=avgBlockMs||100;let removed=0,marks=[];
+    for(let i=N-1;i>=0;i--){const to=cur-i*CH,from=Math.max(0,to-CH+1);if(to<=0)continue;
+      try{const rl=await ro.getLogs({address:CFG.mm,topics:[PUMP_TOPIC],fromBlock:from,toBlock:to});
+        rl.forEach(l=>{const d=c.decode(["uint256","uint256","uint256"],l.data);const amt=Number(E.formatUnits(d[0],18))+Number(E.formatUnits(d[1],18));removed+=amt;marks.push({t:nowSec-(cur-Number(l.blockNumber))*bms/1000,amt});});}catch(e){}}
+    if(marks.length){pumpMarks=marks.sort((a,b)=>a.t-b.t);try{localStorage.setItem("mm_pumps",JSON.stringify(marks.slice(-3000)));}catch(e){}}
+    else{try{const cached=JSON.parse(localStorage.getItem("mm_pumps")||"[]");if(cached.length)pumpMarks=cached;}catch(e){}}
+    if(pumpCumPrev>=0&&removed>pumpCumPrev+1e-9)anchorSettle(Date.now()); // a real pump happened → reset pending
+    if(removed>0){pumpCumPrev=removed;pumpCumMM=removed;const el=$("pm_cum");if(el)el.textContent=fmt(removed,2);
+      const pct=poolMMg>0?removed/(poolMMg+removed)*100:0;const e2=$("pm_cumpct");if(e2)e2.textContent="+"+pct.toFixed(3)+"%";}
+    rebuildDebtSeries();if(histLoaded)drawChart(); // refresh the pending pump-debt line + markers
   }catch(e){}
 }
 async function pubPump(){if(!signer)return connectWallet();if(!await ensureChain())return;try{const mm=new E.Contract(CFG.mm,A.token.abi,signer);toast("Pump sent…");const tx=await mm.pump();await tx.wait();anchorSettle(Date.now());toast("⚙ Pump confirmed — pool burned, price re-synced");refresh();fetchPumpStats();}catch(e){toast("Pump failed: "+(e.shortMessage||e.message||e).slice(0,80),"err");}}
@@ -2487,7 +2494,7 @@ function drawChart(){
     d.forEach((v,i)=>{const gi=off+i;if(gi>=lim)return;const x=X(gi),bh=(v/mx)*(volH-6)*_reveal;if(bh>0.3){const gr=ctx.createLinearGradient(0,H-14-bh,0,H-14);gr.addColorStop(0,"rgba(0,200,5,.55)");gr.addColorStop(1,"rgba(0,200,5,.05)");ctx.fillStyle=v>0?gr:"rgba(154,168,161,.16)";ctx.fillRect(x-bw/2,H-14-bh,bw,bh);}});
     ctx.fillStyle="#5f6b64";ctx.font="9px 'IBM Plex Mono'";ctx.textAlign="left";ctx.fillText("volume",plotL+2,H-volH-3);}
   const based=lines.map(([k,s])=>{const raw=sliceN(s.data);let lp2=0;const d=raw.map(v=>{if(v>0)lp2=v;return v>0?v:(lp2||0);});
-    const ds=smoothArr(d,k==="price"?2:4); // curve, not hard steps; price lightly (keep its detail)
+    const ds=smoothArr(d,k==="price"?3:6); // gradual sloped curves (waves preserved)
     let lo=Infinity,hi=-Infinity;ds.forEach(v=>{const t=tf(v);if(t<lo)lo=t;if(t>hi)hi=t;});
     return {k,s,d,ds,lo,hi,off:maxLen-ds.length};});
   // LANES: each series in its own band. OVERLAY: all share one band — both min-max normalized (rising series
@@ -2501,7 +2508,7 @@ function drawChart(){
     ctx.fillStyle=o.s.color+"06";ctx.fillRect(plotL,ly+1,plotW,laneH-2);
     if(i>0){ctx.strokeStyle="rgba(255,255,255,.07)";ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(plotL,ly);ctx.lineTo(W-PADR,ly);ctx.stroke();}
     ctx.strokeStyle="rgba(255,255,255,.04)";ctx.setLineDash([1,5]);ctx.beginPath();ctx.moveTo(plotL,o.lcy);ctx.lineTo(W-PADR,o.lcy);ctx.stroke();ctx.setLineDash([]);
-    if(o.k==="debt"){ctx.setLineDash([]);ctx.fillStyle=o.s.color+"cc";ctx.font="8px 'IBM Plex Mono'";ctx.textAlign="left";ctx.fillText("⚙ pump debt · cumulative",plotL+5,o.lt+8);}});}
+    if(o.k==="debt"){ctx.setLineDash([]);ctx.fillStyle=o.s.color+"cc";ctx.font="8px 'IBM Plex Mono'";ctx.textAlign="left";ctx.fillText("⚙ pump debt · accrues → pumps",plotL+5,o.lt+8);}});}
   else{ctx.strokeStyle="rgba(255,255,255,.045)";ctx.lineWidth=1;for(let g=0;g<=4;g++){const y=plotT+g*plotH/4;ctx.beginPath();ctx.moveTo(plotL,y);ctx.lineTo(W-PADR,y);ctx.stroke();}}
   const meta=[];
   // candle-columns behind the lines — per series, translucent, from baseline up to value (static, no animation)
