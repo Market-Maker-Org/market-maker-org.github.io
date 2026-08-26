@@ -2154,12 +2154,11 @@ function updatePumpPanel(pDebt,poolMM,mirror,pPool){
 const PUMP_TOPIC=E.id("Pump(uint256,uint256,uint256)");
 let pumpCumMM=0,pumpMarks=[]; // pumpMarks: {t:sec, amt:MM} for on-chart pump markers
 async function fetchPumpStats(){
-  try{const cur=await ro.getBlockNumber();const c=E.AbiCoder.defaultAbiCoder();const CH=45000,N=6;let removed=0,n=0;const marks=[],nowSec=Math.floor(Date.now()/1000),bms=avgBlockMs||100;
-    for(let i=N-1;i>=0;i--){const to=cur-i*CH,from=Math.max(0,to-CH+1);if(to<=0)continue;
-      try{const ls=await ro.getLogs({address:CFG.mm,topics:[PUMP_TOPIC],fromBlock:from,toBlock:to});
-        ls.forEach(l=>{const d=c.decode(["uint256","uint256","uint256"],l.data);const amt=Number(E.formatUnits(d[0],18))+Number(E.formatUnits(d[1],18));removed+=amt;n++;
-          const bn=Number(l.blockNumber);marks.push({t:nowSec-(cur-bn)*bms/1000,amt});});}catch(e){}}
-    pumpMarks=marks.sort((a,b)=>a.t-b.t);
+  // ALL-TIME pump events from Blockscout (indexed, with real timeStamps) → full-history cumulative debt,
+  // just like the other series. Falls back silently if Blockscout is unavailable.
+  try{const ls=await bsLogs(CFG.mm,PUMP_TOPIC);const c=E.AbiCoder.defaultAbiCoder();let removed=0;const marks=[];
+    ls.forEach(l=>{try{const d=c.decode(["uint256","uint256","uint256"],l.data);const amt=Number(E.formatUnits(d[0],18))+Number(E.formatUnits(d[1],18));removed+=amt;const t=parseInt(l.timeStamp,16)||0;if(t>0)marks.push({t,amt});}catch(e){}});
+    if(marks.length){pumpMarks=marks.sort((a,b)=>a.t-b.t);}
     if(pumpCumPrev>=0&&removed>pumpCumPrev+1e-9)anchorSettle(Date.now()); // a real burn happened → reset pending
     pumpCumPrev=removed;pumpCumMM=removed;
     rebuildDebtSeries();if(histLoaded)drawChart(); // refresh the cumulative pump-debt line + markers
@@ -2491,10 +2490,11 @@ function drawChart(){
     const ds=smoothArr(d,k==="price"?2:4); // curve, not hard steps; price lightly (keep its detail)
     let lo=Infinity,hi=-Infinity;ds.forEach(v=>{const t=tf(v);if(t<lo)lo=t;if(t>hi)hi=t;});
     return {k,s,d,ds,lo,hi,off:maxLen-ds.length};});
-  // LANES: each series in its own horizontal band. OVERLAY: all share one band (toggle in the toolbar).
+  // LANES: each series in its own band. OVERLAY: all share one band — both min-max normalized (rising series
+  // sit close near the right, fallers like Circ cross through them — that's the intended overlay).
   const NL=based.length,LANES=chartLanes&&NL>1,laneH=plotH/NL,LPAD=Math.min(13,laneH*0.17),PADf=0.08;
   based.forEach((o,i)=>{if(LANES){o.lt=plotT+i*laneH+LPAD;o.lb=plotT+(i+1)*laneH-LPAD;o.lcy=plotT+(i+0.5)*laneH;}
-    else{o.lt=plotT+PADf*plotH;o.lb=plotB-PADf*plotH;o.lcy=plotT+laneH*(i+0.5);}});
+    else{o.lt=plotT+PADf*plotH;o.lb=plotB-PADf*plotH;o.lcy=plotT+laneH*(i+0.5);}o.base=o.lb;});
   const Yof=o=>v=>{if(o.hi<=o.lo)return (o.lt+o.lb)/2;const t=(tf(v)-o.lo)/(o.hi-o.lo);return o.lb-t*(o.lb-o.lt);};
   based.forEach(o=>o.Yf=Yof(o));
   if(LANES){based.forEach((o,i)=>{const ly=plotT+i*laneH; // lane bg + separators + faint mid guide
@@ -2507,15 +2507,15 @@ function drawChart(){
   // candle-columns behind the lines — per series, translucent, from baseline up to value (static, no animation)
   if(chartBars){const COLS=Math.min(maxLen,46),bw=Math.max(3,plotW/COLS*0.6),lim=Math.ceil(maxLen*_reveal);
     for(let ci=0;ci<COLS;ci++){const gi=COLS<2?maxLen-1:Math.round(ci/(COLS-1)*(maxLen-1));if(gi>=lim)break;const gx=X(gi);
-      based.forEach(o=>{const Y=Yof(o),hero=o.k==="price",li=gi-o.off;if(li<0||li>=o.ds.length)return;
-        const y=Y(o.ds[li]),h=Math.max(1.5,o.lb-y);
-        const gr=ctx.createLinearGradient(0,y,0,o.lb);gr.addColorStop(0,o.s.color+(hero?'2a':'1c'));gr.addColorStop(1,o.s.color+'04');
-        ctx.fillStyle=gr;ctx.fillRect(gx-bw/2,y,bw,h);
+      based.forEach(o=>{const hero=o.k==="price",li=gi-o.off;if(li<0||li>=o.ds.length)return;
+        const y=o.Yf(o.ds[li]),y0=Math.min(y,o.base),h=Math.max(1.5,Math.abs(o.base-y));
+        const gr=ctx.createLinearGradient(0,y,0,o.base);gr.addColorStop(0,o.s.color+(hero?'2a':'1c'));gr.addColorStop(1,o.s.color+'04');
+        ctx.fillStyle=gr;ctx.fillRect(gx-bw/2,y0,bw,h);
       });}}
   based.forEach((o,oi)=>{const {k,s,d,ds}=o,hero=k==="price",Y=Yof(o);meta.push({k,s,d,ds,off:o.off,Y});
     const pts=ds.map((v,i)=>[X(o.off+i),Y(v)]);const rc=Math.max(2,Math.ceil(pts.length*_reveal)),rp=pts.slice(0,rc);
     ctx.lineJoin="round";ctx.lineCap="round";
-    {ctx.beginPath();smoothLine(ctx,rp);ctx.lineTo(rp[rp.length-1][0],o.lb);ctx.lineTo(rp[0][0],o.lb);ctx.closePath();
+    if(LANES){ctx.beginPath();smoothLine(ctx,rp);ctx.lineTo(rp[rp.length-1][0],o.lb);ctx.lineTo(rp[0][0],o.lb);ctx.closePath();
       const gr=ctx.createLinearGradient(0,o.lt,0,o.lb);gr.addColorStop(0,s.color+(hero?"22":"16"));gr.addColorStop(1,s.color+"00");ctx.fillStyle=gr;ctx.fill();}
     ctx.beginPath();smoothLine(ctx,rp);ctx.strokeStyle=s.color;ctx.lineWidth=hero?2.4:1.7;ctx.globalAlpha=hero?1:.8;
     ctx.shadowColor=s.color;ctx.shadowBlur=hero?10:6;ctx.stroke();ctx.shadowBlur=0;ctx.globalAlpha=1;
