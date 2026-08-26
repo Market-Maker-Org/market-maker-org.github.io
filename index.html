@@ -728,10 +728,10 @@
         <span class="pct" data-p="25" onclick="setSwPct(25)">25%</span>
         <span class="pct" data-p="50" onclick="setSwPct(50)">50%</span>
         <span class="pct" data-p="75" onclick="setSwPct(75)">75%</span>
-        <span class="pct" data-p="100" onclick="setSwPct(100)">MAX</span>
+        <span class="pct" data-p="100" onclick="setSwPct(100)">MAX 99%</span>
       </div>
       <div class="slips"><span class="muted" style="font-size:10.5px">Slippage</span>
-        <span class="slip" onclick="setSlip(1,this)">1%</span><span class="slip on" onclick="setSlip(5,this)">5%</span><span class="slip" onclick="setSlip(10,this)">10%</span>
+        <span class="slip" onclick="setSlip(1,this)">1%</span><span class="slip on" onclick="setSlip(5,this)">5%</span><span class="slip" onclick="setSlip(10,this)">10%</span><span class="slip" onclick="setSlip(20,this)">20%</span><span class="slip" onclick="setSlip(35,this)">35%</span>
       </div>
       <div class="swinfo">
         <div class="r"><span>Rate</span><span class="v" id="sw_rate">—</span></div>
@@ -2209,7 +2209,9 @@ async function updateSwapBalances(){
 // quick-fill the pay amount as a % of balance (on 100% ETH, keep a little for gas)
 function setSwPct(p){if(!account){toast("Connect a wallet first");return;}
   let amt=swPayBal*p/100;
-  if(swBuy&&p>=100)amt=Math.max(0,swPayBal-0.0003); // reserve gas
+  // At MAX: ETH keeps a little for gas; MM sells 99% — MM decays continuously, so a 100% amount can drop below
+  // the live balance between quote and execution and REVERT. The 1% buffer keeps the sell safely fillable.
+  if(p>=100)amt=swBuy?Math.max(0,swPayBal-0.0003):swPayBal*0.99;
   if(amt<=0){toast("No balance");return;}
   $("sw_in").value=swBuy?amt.toFixed(6):amt.toFixed(3);
   document.querySelectorAll(".pct").forEach(x=>x.classList.toggle("on",+x.dataset.p===p));
@@ -2243,6 +2245,14 @@ async function quoteSwap(){
   }catch(e){if(my!==_swSeq)return;swQuote=null;$("sw_out").textContent="—";$("sw_rate").textContent="no aggregator route right now";
     $("sw_note").textContent="Open the pair on the DEX to swap manually.";setSwBtn(inv,true);}
 }
+// Robust send: on a nonce collision (fast Robinhood blocks / stale wallet cache) retry once with a fresh nonce.
+const _isNonceErr=m=>/nonce|already known|already been used|replacement transaction underpriced/i.test((m||"")+"");
+async function _sendTx(req){
+  try{return await signer.sendTransaction(req);}
+  catch(e){const m=(e&&(e.shortMessage||e.message))||"";
+    if(_isNonceErr(m)){try{const n=await signer.getNonce("pending");return await signer.sendTransaction({...req,nonce:n});}catch(_){}}
+    throw e;}
+}
 async function doSwap(){
   if(!signer)return connectWallet();
   if(!swQuote){window.open("https://dexscreener.com/robinhood/"+CFG.ethPair,"_blank");return;}
@@ -2252,10 +2262,14 @@ async function doSwap(){
     if(!swBuy){ // approve MM to LI.FI's spender
       const spender=swQuote.estimate.approvalAddress,need=BigInt(swQuote.action.fromAmount);
       if(spender){const mm=new E.Contract(CFG.mm,ERC20_ABI2,signer);
-        if((await mm.allowance(account,spender))<need){$("sw_note").textContent="⏳ approving MM…";await (await mm.approve(spender,need)).wait();}}
+        if((await mm.allowance(account,spender))<need){$("sw_note").textContent="⏳ approving MM…";
+          try{await (await mm.approve(spender,need)).wait();}
+          catch(ae){if(_isNonceErr(ae.shortMessage||ae.message)){const n=await signer.getNonce("pending");await (await mm.approve(spender,need,{nonce:n})).wait();}else throw ae;}
+        }}
     }
     const tr=swQuote.transactionRequest;$("sw_note").textContent="⏳ swapping…";
-    const tx=await signer.sendTransaction({to:tr.to,data:tr.data,value:tr.value||"0x0",...(tr.gasLimit?{gasLimit:tr.gasLimit}:{}),...(tr.gasPrice?{gasPrice:tr.gasPrice}:{})});
+    const gl=tr.gasLimit?(BigInt(tr.gasLimit)*13n/10n):undefined; // +30% headroom so fee-on-transfer + live decay never out-of-gas
+    const tx=await _sendTx({to:tr.to,data:tr.data,value:tr.value||"0x0",...(gl?{gasLimit:gl}:{})}); // let the wallet price gas (avoids stale gasPrice/underpriced)
     await tx.wait();
     $("sw_note").textContent="✓ Swap complete.";$("sw_in").value="";swQuote=null;quoteSwap();updateSwapBalances();refresh();
   }catch(e){$("sw_note").textContent="Swap failed: "+((e.shortMessage||e.message||e)+"").slice(0,130);}
@@ -2493,17 +2507,22 @@ function drawChart(){
   if(volOn){const d=sliceN(SERIES.vol.data),mx=Math.max(...d,1e-9),off=maxLen-d.length,bw=Math.max(1.5,plotW/maxLen*0.6),lim=Math.ceil(maxLen*_reveal);
     d.forEach((v,i)=>{const gi=off+i;if(gi>=lim)return;const x=X(gi),bh=(v/mx)*(volH-6)*_reveal;if(bh>0.3){const gr=ctx.createLinearGradient(0,H-14-bh,0,H-14);gr.addColorStop(0,"rgba(0,200,5,.55)");gr.addColorStop(1,"rgba(0,200,5,.05)");ctx.fillStyle=v>0?gr:"rgba(154,168,161,.16)";ctx.fillRect(x-bw/2,H-14-bh,bw,bh);}});
     ctx.fillStyle="#5f6b64";ctx.font="9px 'IBM Plex Mono'";ctx.textAlign="left";ctx.fillText("volume",plotL+2,H-volH-3);}
-  const based=lines.map(([k,s])=>{const raw=sliceN(s.data);let lp2=0;const d=raw.map(v=>{if(v>0)lp2=v;return v>0?v:(lp2||0);});
-    const ds=smoothArr(d,k==="price"?3:6); // gradual sloped curves (waves preserved)
-    let lo=Infinity,hi=-Infinity;ds.forEach(v=>{const t=tf(v);if(t<lo)lo=t;if(t>hi)hi=t;});
-    return {k,s,d,ds,lo,hi,off:maxLen-ds.length};});
+  // PERF: the forward-fill + smoothing + min/max only change when the DATA changes, not on every animation
+  // frame. Cache them per series so flow-animation redraws (~20fps) are pure drawing, no recompute.
+  const based=lines.map(([k,s])=>{const half=k==="price"?3:6,rawLen=s.data.length,lastV=rawLen?s.data[rawLen-1]:0;
+    const sig=rawLen+":"+chartRange+":"+(LOGon?1:0)+":"+half+":"+lastV;
+    if(s._csig!==sig){const raw=sliceN(s.data);let lp2=0;const d=raw.map(v=>{if(v>0)lp2=v;return v>0?v:(lp2||0);});
+      const ds=smoothArr(d,half);let lo=Infinity,hi=-Infinity;ds.forEach(v=>{const t=tf(v);if(t<lo)lo=t;if(t>hi)hi=t;});
+      s._csig=sig;s._cd=d;s._cds=ds;s._clo=lo;s._chi=hi;}
+    return {k,s,d:s._cd,ds:s._cds,lo:s._clo,hi:s._chi,off:maxLen-s._cds.length};});
   // LANES: each series in its own band. OVERLAY: all share one band — both min-max normalized (rising series
   // sit close near the right, fallers like Circ cross through them — that's the intended overlay).
   const NL=based.length,LANES=chartLanes&&NL>1,laneH=plotH/NL,LPAD=Math.min(13,laneH*0.17),PADf=0.08;
   based.forEach((o,i)=>{if(LANES){o.lt=plotT+i*laneH+LPAD;o.lb=plotT+(i+1)*laneH-LPAD;o.lcy=plotT+(i+0.5)*laneH;}
     else{o.lt=plotT+PADf*plotH;o.lb=plotB-PADf*plotH;o.lcy=plotT+laneH*(i+0.5);}o.base=o.lb;});
   const Yof=o=>v=>{if(o.hi<=o.lo)return (o.lt+o.lb)/2;const t=(tf(v)-o.lo)/(o.hi-o.lo);return o.lb-t*(o.lb-o.lt);};
-  based.forEach(o=>o.Yf=Yof(o));
+  based.forEach(o=>{o.Yf=Yof(o); // one reusable candle gradient per series (was one per column → big perf win)
+    o.cg=ctx.createLinearGradient(0,o.lt,0,o.base);o.cg.addColorStop(0,o.s.color+(o.k==="price"?"2a":"1c"));o.cg.addColorStop(1,o.s.color+"04");});
   if(LANES){based.forEach((o,i)=>{const ly=plotT+i*laneH; // lane bg + separators + faint mid guide
     ctx.fillStyle=o.s.color+"06";ctx.fillRect(plotL,ly+1,plotW,laneH-2);
     if(i>0){ctx.strokeStyle="rgba(255,255,255,.07)";ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(plotL,ly);ctx.lineTo(W-PADR,ly);ctx.stroke();}
@@ -2514,10 +2533,9 @@ function drawChart(){
   // candle-columns behind the lines — per series, translucent, from baseline up to value (static, no animation)
   if(chartBars){const COLS=Math.min(maxLen,46),bw=Math.max(3,plotW/COLS*0.6),lim=Math.ceil(maxLen*_reveal);
     for(let ci=0;ci<COLS;ci++){const gi=COLS<2?maxLen-1:Math.round(ci/(COLS-1)*(maxLen-1));if(gi>=lim)break;const gx=X(gi);
-      based.forEach(o=>{const hero=o.k==="price",li=gi-o.off;if(li<0||li>=o.ds.length)return;
+      based.forEach(o=>{const li=gi-o.off;if(li<0||li>=o.ds.length)return;
         const y=o.Yf(o.ds[li]),y0=Math.min(y,o.base),h=Math.max(1.5,Math.abs(o.base-y));
-        const gr=ctx.createLinearGradient(0,y,0,o.base);gr.addColorStop(0,o.s.color+(hero?'2a':'1c'));gr.addColorStop(1,o.s.color+'04');
-        ctx.fillStyle=gr;ctx.fillRect(gx-bw/2,y0,bw,h);
+        ctx.fillStyle=o.cg;ctx.fillRect(gx-bw/2,y0,bw,h);
       });}}
   based.forEach((o,oi)=>{const {k,s,d,ds}=o,hero=k==="price",Y=Yof(o);meta.push({k,s,d,ds,off:o.off,Y});
     const pts=ds.map((v,i)=>[X(o.off+i),Y(v)]);const rc=Math.max(2,Math.ceil(pts.length*_reveal)),rp=pts.slice(0,rc);
