@@ -2477,21 +2477,14 @@ function drawChart(){
   const PADf=0.08;
   const Yof=o=>v=>{if(o.hi<=o.lo)return plotT+plotH*0.5;const t=(tf(v)-o.lo)/(o.hi-o.lo);return plotB-(PADf+t*(1-2*PADf))*plotH;};
   const meta=[];
-  // normal price candlesticks behind the lines (bucketed OHLC, classic green/red bodies + wicks)
-  if(chartBars){const po=based.find(o=>o.k==="price");
-    if(po){const Yp=Yof(po),d=po.d,off=po.off,n=d.length,lim=Math.ceil(n*_reveal);
-      const COLS=Math.max(6,Math.min(48,n,Math.floor(plotW/12))),perCol=n/COLS,bw=Math.max(3,Math.min(15,plotW/COLS*0.62));
-      for(let ci=0;ci<COLS;ci++){
-        let s0=Math.floor(ci*perCol),s1=Math.min(n-1,Math.floor((ci+1)*perCol)-1);if(s1<s0)s1=s0;if(s0>=lim)break;const e=Math.min(s1,lim-1);
-        const op=d[s0],cl=d[e];let hi=-Infinity,lo=Infinity;for(let j=s0;j<=e;j++){if(d[j]>hi)hi=d[j];if(d[j]<lo)lo=d[j];}
-        const cx=X(off+Math.round((s0+s1)/2)),up=cl>=op,col=up?"#00c805":"#ff5a2c";
-        const yH=Yp(hi),yL=Yp(lo),yO=Yp(op),yC=Yp(cl);
-        ctx.strokeStyle=col;ctx.globalAlpha=.45;ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(cx,yH);ctx.lineTo(cx,yL);ctx.stroke();
-        const bt=Math.min(yO,yC),bh=Math.max(1.4,Math.abs(yC-yO));
-        ctx.globalAlpha=1;ctx.fillStyle=up?"rgba(0,200,5,.16)":"rgba(255,90,44,.14)";ctx.fillRect(cx-bw/2,bt,bw,bh);
-        ctx.strokeStyle=col;ctx.globalAlpha=.5;ctx.strokeRect(cx-bw/2,bt,bw,bh);ctx.globalAlpha=1;
-      }
-    }}
+  // candle-columns behind the lines — per series, translucent, from baseline up to value (static, no animation)
+  if(chartBars){const COLS=Math.min(maxLen,46),bw=Math.max(3,plotW/COLS*0.6),lim=Math.ceil(maxLen*_reveal);
+    for(let ci=0;ci<COLS;ci++){const gi=COLS<2?maxLen-1:Math.round(ci/(COLS-1)*(maxLen-1));if(gi>=lim)break;const gx=X(gi);
+      based.forEach(o=>{const Y=Yof(o),hero=o.k==="price",li=gi-o.off;if(li<0||li>=o.d.length)return;
+        const y=Y(o.d[li]),h=Math.max(1.5,plotB-y);
+        const gr=ctx.createLinearGradient(0,y,0,plotB);gr.addColorStop(0,o.s.color+(hero?'2a':'1c'));gr.addColorStop(1,o.s.color+'04');
+        ctx.fillStyle=gr;ctx.fillRect(gx-bw/2,y,bw,h);
+      });}}
   based.forEach((o,oi)=>{const {k,s,d}=o,hero=k==="price",Y=Yof(o);meta.push({k,s,d,off:o.off,Y});
     const pts=d.map((v,i)=>[X(o.off+i),Y(v)]);const rc=Math.max(2,Math.ceil(pts.length*_reveal)),rp=pts.slice(0,rc);
     ctx.lineJoin="round";ctx.lineCap="round";
@@ -2503,19 +2496,16 @@ function drawChart(){
     ctx.setLineDash([2,54]);ctx.lineDashOffset=-((flow*1.7+oi*19)%56);ctx.shadowColor=s.color;ctx.shadowBlur=13;ctx.stroke();ctx.restore();ctx.shadowBlur=0;ctx.globalAlpha=1;
     const lp=rp[rp.length-1];ctx.fillStyle=s.color;ctx.shadowColor=s.color;ctx.shadowBlur=8;ctx.beginPath();ctx.arc(lp[0],lp[1],hero?3.6:2.7,0,7);ctx.fill();ctx.shadowBlur=0;
   });
+  // compact stacked legend, top-left — color + name + current value (updates on hover). No end-anchored labels.
   {const hi=_hoverI==null?null:Math.max(0,Math.min(maxLen-1,_hoverI));
-   const labels=based.map(o=>{const Y=Yof(o);let val;if(hi!=null){const idx=hi-o.off;val=(idx>=0&&idx<o.d.length)?o.d[idx]:o.d[o.d.length-1];}else val=o.d[o.d.length-1];
-     return {o,y:Y(val),val};});
-   labels.sort((a,b)=>a.y-b.y);const minGap=21;
-   for(let i=1;i<labels.length;i++){if(labels[i].y-labels[i-1].y<minGap)labels[i].y=labels[i-1].y+minGap;}
-   const maxY=plotB-2;if(labels.length){const overflow=labels[labels.length-1].y-maxY;if(overflow>0)labels.forEach(l=>l.y-=overflow);}
-   ctx.textAlign="left";
-   labels.forEach(l=>{const name=l.o.s.label,val=l.o.s.fmtV(l.val);ctx.font="bold 9px 'IBM Plex Mono'";const tw=ctx.measureText(name).width;ctx.font="9.5px 'IBM Plex Mono'";const vw=ctx.measureText(val).width;
-     const bw2=Math.max(tw,vw)+16,bx=W-PADR-bw2,by=Math.max(plotT+9,Math.min(maxY-9,l.y));
-     ctx.fillStyle="rgba(3,6,4,.62)";roundRect(ctx,bx-2,by-10,bw2+2,21,5);ctx.fill();
-     ctx.fillStyle=l.o.s.color;ctx.beginPath();ctx.arc(bx+4,by,2.6,0,7);ctx.fill();
-     ctx.fillStyle=l.o.s.color;ctx.font="bold 9px 'IBM Plex Mono'";ctx.fillText(name,bx+11,by-2);
-     ctx.fillStyle="#e6efe9";ctx.font="9.5px 'IBM Plex Mono'";ctx.fillText(val,bx+11,by+8);});}
+   const rows=based.map(o=>{let val;if(hi!=null){const idx=hi-o.off;val=(idx>=0&&idx<o.d.length)?o.d[idx]:o.d[o.d.length-1];}else val=o.d[o.d.length-1];return {c:o.s.color,n:o.s.label,v:o.s.fmtV(val)};});
+   let wN=0,wV=0;rows.forEach(r=>{ctx.font="bold 9.5px 'IBM Plex Mono'";wN=Math.max(wN,ctx.measureText(r.n).width);ctx.font="9.5px 'IBM Plex Mono'";wV=Math.max(wV,ctx.measureText(r.v).width);});
+   const rh=14,padX=10,boxW=15+wN+14+wV+padX,boxH=rows.length*rh+8,bx=plotL+3,by=plotT+3;
+   ctx.fillStyle="rgba(3,6,4,.74)";ctx.strokeStyle="rgba(255,255,255,.06)";ctx.lineWidth=1;roundRect(ctx,bx,by,boxW,boxH,8);ctx.fill();ctx.stroke();
+   rows.forEach((r,i)=>{const cy=by+8+i*rh;
+     ctx.fillStyle=r.c;ctx.shadowColor=r.c;ctx.shadowBlur=5;ctx.beginPath();ctx.arc(bx+10,cy+2,3,0,7);ctx.fill();ctx.shadowBlur=0;
+     ctx.fillStyle=r.c;ctx.font="bold 9.5px 'IBM Plex Mono'";ctx.textAlign="left";ctx.fillText(r.n,bx+18,cy+5);
+     ctx.fillStyle="#dfeae4";ctx.font="9.5px 'IBM Plex Mono'";ctx.textAlign="right";ctx.fillText(r.v,bx+boxW-padX,cy+5);});}
   ctx.fillStyle="#3f4a44";ctx.font="8px 'IBM Plex Mono'";ctx.textAlign="left";ctx.fillText((LOGon?"log · ":"")+"normalized · each line spans its own range",plotL+2,plotT-6);
   if(TS.length>1){const ts=sliceN(TS),now=Math.floor(Date.now()/1000),off=maxLen-ts.length;
     ctx.font="8.5px 'IBM Plex Mono'";
