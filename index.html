@@ -5,6 +5,12 @@
 <title>Market Maker Terminal</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="icon" href="mm.png">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="mm.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="Market Maker">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#000000">
 <meta name="description" content="Market Maker (MM) — live on-chain terminal for the decay-mirror-pump token on Robinhood Chain. Real-time price, liquidity, supply, reflection, and a payoff calculator.">
 <meta property="og:type" content="website">
@@ -57,6 +63,21 @@
     background:linear-gradient(90deg,#00C805 0%,#8dffb0 25%,#ffffff 50%,#8dffb0 75%,#00C805 100%);background-size:220% auto;
     -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent;animation:shimmer 3.2s linear infinite}
   @keyframes shimmer{to{background-position:-220% center}}
+  /* animated "Market Maker" brand — self-moving, flickering, fragments & reunites */
+  .mmword{font-family:var(--disp);font-weight:900;font-size:18px;letter-spacing:-.02em;display:inline-flex;position:relative;white-space:pre;line-height:1}
+  .mmword .ch{display:inline-block;position:relative;color:var(--ink);will-change:transform,opacity,filter;
+    transform:translate3d(0,0,0);animation:mmshatter var(--mmdur,7.2s) cubic-bezier(.55,.06,.3,.96) infinite both}
+  .mmword .ch.g{color:var(--green);text-shadow:0 0 10px rgba(0,200,5,.55),0 0 22px rgba(0,200,5,.25)}
+  .mmword .ch::after{content:attr(data-c);position:absolute;left:0;top:0;color:var(--green2);opacity:0;pointer-events:none;
+    text-shadow:1.5px 0 rgba(255,60,60,.6),-1.5px 0 rgba(60,180,255,.6);animation:mmchroma var(--mmdur,7.2s) steps(1) infinite}
+  @keyframes mmshatter{
+    0%,55%{transform:translate3d(0,0,0) rotate(0);opacity:1;filter:none}
+    62%{transform:translate3d(var(--sx,0),var(--sy,0),0) rotate(var(--sr,0deg));opacity:.12;filter:blur(1.4px)}
+    68%{opacity:.04}
+    72%{transform:translate3d(calc(var(--sx,0)*.55),calc(var(--sy,0)*.6),0) rotate(calc(var(--sr,0deg)*.5));opacity:.35;filter:blur(.6px)}
+    84%{transform:translate3d(0,0,0) rotate(0);opacity:1;filter:none}
+    88%{opacity:.55}91%{opacity:1}94%{opacity:.7}100%{transform:none;opacity:1}}
+  @keyframes mmchroma{0%,58%{opacity:0}63%{opacity:.85}70%{opacity:.5}80%{opacity:.9}86%{opacity:0}100%{opacity:0}}
   .spacer{flex:1}
   .chip{font-family:var(--mono);font-size:11px;color:var(--soft);border:1px solid var(--line2);border-radius:100px;padding:5px 10px;display:flex;gap:6px;align-items:center}
   .chip .d{width:7px;height:7px;border-radius:50%;background:var(--orange)}.chip.ok .d{background:var(--green);box-shadow:0 0 8px var(--green);animation:pulse 1.6s infinite}
@@ -98,6 +119,12 @@
   .srow{display:flex;justify-content:space-between;align-items:center;padding:7px 2px;border-bottom:1px solid var(--line)}
   .srow:last-child{border-bottom:0}
   .srow .l{font-size:11px;color:var(--soft)} .srow .v{font-family:var(--mono);font-size:14px;font-weight:600;transition:color .4s} .srow .v.flash{color:var(--green2)}
+  /* Live panel — bigger neon counters that animate down */
+  #pv-proto .srow{padding:8px 6px}
+  #pv-proto .srow .v{font-size:15.5px;font-weight:700;letter-spacing:-.01em;color:#eafff1;text-shadow:0 0 10px rgba(56,255,126,.14)}
+  #pv-proto .srow:nth-child(-n+2) .v{font-size:17px}
+  #pv-proto #d_supply,#pv-proto #d_circ{color:var(--green2);text-shadow:0 0 12px rgba(56,255,126,.4),0 0 24px rgba(56,255,126,.15)}
+  #pv-proto .srow .v.flash{text-shadow:0 0 16px rgba(56,255,126,.7)}
   /* feed */
   .feed{display:flex;flex-direction:column;gap:5px;overflow-y:auto;overflow-x:hidden}
   .ev{display:flex;gap:8px;align-items:center;padding:6px 8px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;font-size:12px;animation:sl .3s ease;color:var(--ink);text-decoration:none}
@@ -210,8 +237,9 @@
   .psrow{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:7px 0;border-top:1px dashed var(--line);font-size:12.5px}
   .psrow:first-child{border-top:none}.psrow .l{color:var(--soft)}.psrow .v{font-family:var(--mono);font-weight:600}
   .pstable{border:1px solid var(--line);border-radius:12px;overflow-x:auto}
-  .pstable .hd,.pstable .rw{min-width:560px}
-  .pstable .hd,.pstable .rw{display:grid;grid-template-columns:30px 1fr 78px 54px 1fr 158px;gap:8px;align-items:center;padding:9px 12px;font-size:12px}
+  .pstable .hd,.pstable .rw{min-width:660px}
+  .pstable .hd,.pstable .rw{display:grid;grid-template-columns:28px 1.25fr 70px 48px 1fr 236px;gap:8px;align-items:center;padding:9px 12px;font-size:12px}
+  .pstable .rw .mono[title]{display:flex;align-items:center}
   .pstable .hd{background:var(--panel2);color:var(--faint);font-size:10px;text-transform:uppercase;letter-spacing:.06em}
   .pstable .rw{border-top:1px solid var(--line)}
   .pstable .rw .mono,.pstable .hd .mono{font-family:var(--mono)}
@@ -373,6 +401,14 @@
   .wal-card .mono{font-size:11.5px;word-break:break-all;flex:1;color:var(--ink)}
   .wal-card input.mm{margin-top:0}
   .walsel{width:auto;flex:0 0 auto;padding:7px 8px}
+  .waltok{display:flex;gap:6px}
+  .wtk{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;background:var(--panel2);border:1px solid var(--line2);color:var(--soft);border-radius:9px;padding:7px;font-family:var(--disp);font-weight:800;font-size:13px;cursor:pointer;transition:.15s}
+  .wtk img,.wtk .wlogo svg{width:18px;height:18px;border-radius:50%;object-fit:cover}
+  .wtk.on{background:linear-gradient(180deg,#0d1a11,#0a140d);border-color:var(--greenDim);color:var(--green2);box-shadow:0 0 0 1px rgba(0,200,5,.1) inset}
+  .wtk:hover{border-color:var(--faint)}
+  .wsub{font-size:10px;color:var(--faint);font-family:var(--mono);margin-top:2px}
+  .wal-b .l .wlogo{display:inline-flex;vertical-align:-3px;margin-right:3px}
+  .wal-b .l .wlogo svg{width:15px;height:15px;border-radius:50%}
   .wal-bals{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
   .wal-b{background:#060908;border:1px solid var(--line);border-radius:10px;padding:9px}
   .wal-b .l{font-size:10px;color:var(--faint);display:flex;align-items:center;gap:5px}
@@ -411,6 +447,7 @@
     .fwline{flex-wrap:wrap;gap:6px}.fwarrow{display:none}.fwnode{flex:1 1 40%}
     .pmcum{flex-direction:column;gap:4px;align-items:flex-start}
     .feed,.slist,.poolstrip{max-height:260px}
+    #pv-proto .srow .v,#pv-proto .srow:nth-child(-n+2) .v{font-size:13.5px}
     #holderList,#poolList{max-height:280px}
     .modal{padding:0}.modal-in{border-radius:0;max-height:100vh;padding:16px}
     .lnav{overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch}.lnb{flex:0 0 auto}
@@ -493,21 +530,126 @@
   .toast.out{animation:toastOut .3s ease forwards}
   @keyframes toastIn{from{opacity:0;transform:translateX(20px)}to{opacity:1}}
   @keyframes toastOut{to{opacity:0;transform:translateX(20px)}}
+  /* ambient aurora — sits behind all in-flow content (negative z), pure black stays dominant */
+  #aurora{position:fixed;inset:-20%;z-index:-1;pointer-events:none;opacity:.55;
+    background:radial-gradient(38% 42% at 18% 12%,rgba(0,200,5,.10),transparent 60%),
+      radial-gradient(34% 40% at 82% 8%,rgba(255,122,24,.07),transparent 60%),
+      radial-gradient(46% 50% at 70% 92%,rgba(0,200,5,.06),transparent 62%);
+    filter:blur(30px);animation:aurora 26s ease-in-out infinite alternate}
+  @keyframes aurora{0%{transform:translate3d(-2%,-1%,0) scale(1)}50%{transform:translate3d(2%,1.5%,0) scale(1.06)}100%{transform:translate3d(-1%,2%,0) scale(1.02)}}
+  /* PWA install banner */
+  .pwa-banner{position:fixed;left:50%;bottom:16px;transform:translate(-50%,150%);z-index:210;display:flex;align-items:center;gap:12px;
+    max-width:min(420px,94vw);width:max-content;padding:11px 12px 11px 14px;border-radius:16px;
+    background:linear-gradient(180deg,#0c110e,#060807);border:1px solid var(--line2);box-shadow:0 18px 50px -18px #000,0 0 0 1px rgba(0,200,5,.08);
+    opacity:0;transition:transform .5s cubic-bezier(.2,.9,.3,1.2),opacity .4s;pointer-events:none}
+  .pwa-banner.show{transform:translate(-50%,0);opacity:1;pointer-events:auto}
+  .pwa-banner img{width:38px;height:38px;border-radius:10px;border:1px solid var(--line2);box-shadow:0 0 14px -2px rgba(0,200,5,.4)}
+  .pwa-banner .pt{display:flex;flex-direction:column;gap:1px;min-width:0}
+  .pwa-banner .pt b{font-family:var(--disp);font-weight:800;font-size:13.5px}
+  .pwa-banner .pt span{font-size:11px;color:var(--soft);line-height:1.35}
+  .pwa-go{background:linear-gradient(180deg,var(--green),#00a504);color:#00220a;border:0;border-radius:10px;padding:9px 15px;font-family:var(--disp);font-weight:800;font-size:13px;cursor:pointer;white-space:nowrap;transition:filter .15s}
+  .pwa-go:hover{filter:brightness(1.08)}
+  .pwa-x{background:transparent;border:0;color:var(--faint);font-size:15px;cursor:pointer;padding:4px;line-height:1}
+  .pwa-x:hover{color:var(--ink)}
+  @media(max-width:520px){.pwa-banner{left:8px;right:8px;transform:translateY(150%);max-width:none;width:auto}.pwa-banner.show{transform:translateY(0)}}
   .cpy{cursor:pointer;transition:color .12s}.cpy:hover{color:var(--green2)}
   [title]{cursor:help}
   .hrow{cursor:pointer}
+  /* ===== presale — compact single-panel dashboard ===== */
+  .ps-wrap{max-width:1080px;display:flex;flex-direction:column;gap:11px;height:calc(100vh - 52px);padding-top:14px;padding-bottom:14px;overflow:hidden}
+  .ps-hero.psgrid{grid-template-columns:repeat(4,1fr);margin:0}
+  .ps-hero .c{padding:11px 13px}.ps-hero .c .v{font-size:20px;text-shadow:0 0 14px rgba(255,122,24,.18)}
+  #ps_timer:empty{display:none}
+  .ps-two{display:grid;grid-template-columns:1fr 1.15fr;gap:11px}
+  .ps-panel{background:linear-gradient(180deg,var(--panel2),#050505);border:1px solid var(--line);border-radius:15px;padding:14px;display:flex;flex-direction:column;min-height:0}
+  .ps-hd{font-family:var(--disp);font-weight:800;font-size:12.5px;letter-spacing:.02em;display:flex;align-items:center;gap:7px;margin-bottom:11px}
+  .ps-inp{display:flex;align-items:center;gap:8px;background:#060908;border:1px solid var(--line2);border-radius:12px;padding:10px 12px}
+  .ps-inp input{flex:1;background:transparent;border:0;outline:none;color:var(--ink);font-family:var(--mono);font-size:24px;font-weight:700;width:100%;min-width:0}
+  .ps-unit{display:flex;align-items:center;gap:6px;font-family:var(--disp);font-weight:800;font-size:14px;color:var(--soft);white-space:nowrap}
+  .ps-pcts{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-top:9px}
+  .ps-pcts .pspct{text-align:center;padding:6px 0}
+  .ps-quote{display:flex;justify-content:space-between;align-items:center;margin-top:11px;padding-top:10px;border-top:1px dashed var(--line)}
+  .ps-quote b{font-family:var(--mono);font-size:15px;color:var(--orange2)}
+  .ps-chartrow{display:flex;align-items:center;gap:14px}
+  #ps_ring{width:132px;height:132px;flex:0 0 132px;border-radius:50%;position:relative;
+    -webkit-mask:radial-gradient(circle 38px at 50% 50%,transparent 98%,#000 100%);mask:radial-gradient(circle 38px at 50% 50%,transparent 98%,#000 100%);transition:background .6s ease;background:#111}
+  #ps_ring::after{content:attr(data-c);position:absolute;inset:0;display:grid;place-items:center;-webkit-mask:none;mask:none;font-family:var(--disp);font-weight:800;font-size:11px;color:var(--soft);text-align:center;line-height:1.3}
+  .ps-splitleg{flex:1;display:flex;flex-direction:column;gap:5px;font-size:11.5px;min-width:0}
+  .ps-splitleg span{display:flex;align-items:center;gap:6px}
+  .ps-splitleg span i{width:9px;height:9px;border-radius:2px;flex:0 0 auto}
+  .ps-splitleg span b{margin-left:auto;font-family:var(--mono);color:var(--ink)}
+  .ps-splitbar{display:flex;height:12px;border-radius:7px;overflow:hidden;border:1px solid var(--line);margin-top:12px}
+  .ps-toknote{font-size:10.5px;margin-top:9px;line-height:1.5}
+  .ps-bookpanel{flex:1;min-height:0}
+  .ps-bookpanel .pstable{flex:1;min-height:0;overflow-y:auto;overflow-x:auto}
+  .pstable .cpb{background:var(--panel2);border:1px solid var(--line2);color:var(--soft);border-radius:6px;padding:3px 6px;font-size:10px;cursor:pointer;margin-left:4px}
+  .pstable .cpb:hover{border-color:var(--green);color:var(--green2)}
+  .pstable .refb{background:var(--panel2);border:1px solid var(--down);color:#ff8a66;border-radius:7px;padding:5px 8px;font-family:var(--disp);font-weight:700;font-size:10.5px;cursor:pointer;white-space:nowrap}
+  .pstable .refb:hover{background:rgba(255,90,44,.12)}
+  .ps-help{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:9px 13px;font-size:11.5px}
+  .ps-help summary{cursor:pointer;font-family:var(--disp);font-weight:700;color:var(--soft);list-style:none}
+  .ps-help summary::-webkit-details-marker{display:none}
+  .ps-help summary::before{content:"▸ ";color:var(--orange2)}
+  .ps-help[open] summary::before{content:"▾ "}
+  .ps-helpgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px 16px;margin-top:9px;color:var(--soft);font-size:11px;line-height:1.5}
+  .ps-helpgrid b{color:var(--ink)}
+  @media(max-width:820px){.ps-wrap{height:auto;overflow:visible}.ps-hero.psgrid{grid-template-columns:1fr 1fr}.ps-two{grid-template-columns:1fr}.ps-helpgrid{grid-template-columns:1fr}.ps-chartrow{flex-direction:column}#ps_ring{margin:0 auto}}
+  /* custom animated Analytics glyph (on-theme, no emoji) */
+  .anbtn{display:inline-flex;align-items:center;gap:6px}
+  .an-ico{width:15px;height:15px;flex:0 0 auto;overflow:visible}
+  .an-ico .b1{fill:#00C805}.an-ico .b2{fill:#38ff7e}.an-ico .b3{fill:#00C805}
+  .an-ico rect{transform-box:fill-box;transform-origin:bottom;animation:anbar 2.4s ease-in-out infinite}
+  .an-ico .b2{animation-delay:.28s}.an-ico .b3{animation-delay:.56s}
+  .an-ico .pl{stroke:#eafff1;opacity:.9;filter:drop-shadow(0 0 2px rgba(56,255,126,.85))}
+  @keyframes anbar{0%,100%{transform:scaleY(.7)}50%{transform:scaleY(1)}}
+  .anbtn:hover .an-ico .pl{stroke:var(--green2)}
+  .an-ico.big{width:22px;height:22px}
+  /* ===== analytics dashboard page ===== */
+  .an-wrap{max-width:1120px}
+  .an-hero{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:12px}
+  .an-kpi{background:linear-gradient(180deg,#0b0f0c,#050505);border:1px solid var(--line);border-radius:14px;padding:13px 14px;position:relative;overflow:hidden;
+    box-shadow:0 1px 0 rgba(255,255,255,.03) inset,0 10px 26px -20px #000;animation:anrise .5s ease both}
+  .an-kpi::after{content:"";position:absolute;left:0;right:0;bottom:0;height:2px;background:linear-gradient(90deg,transparent,var(--kc,var(--green)),transparent);opacity:.55}
+  .an-kpi .l{font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--faint);display:flex;align-items:center;gap:5px}
+  .an-kpi .v{font-family:var(--mono);font-size:22px;font-weight:800;letter-spacing:-.02em;margin-top:5px;color:#eafff1;text-shadow:0 0 14px rgba(56,255,126,.18)}
+  .an-kpi .s{font-family:var(--mono);font-size:10.5px;margin-top:3px;color:var(--soft)}
+  .an-kpi .s.up{color:var(--green2)}.an-kpi .s.down{color:var(--down)}
+  @keyframes anrise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  .an-two{display:grid;grid-template-columns:1.55fr 1fr;gap:12px;margin-bottom:12px}
+  .an-chartcard,.an-splitcard{background:linear-gradient(180deg,var(--panel2),#050505);border:1px solid var(--line);border-radius:16px;padding:14px}
+  .an-cardhd{display:flex;justify-content:space-between;align-items:center;font-family:var(--disp);font-weight:800;font-size:12.5px;letter-spacing:.02em;margin-bottom:10px}
+  .an-canvaswrap{position:relative;height:280px}
+  #an_canvas{width:100%;height:100%;display:block}
+  .an-leg{display:flex;flex-wrap:wrap;gap:12px;margin-top:9px;font-size:11px}
+  .an-leg span{display:flex;align-items:center;gap:5px;color:var(--soft)}
+  .an-leg i{width:11px;height:3px;border-radius:2px;display:inline-block}
+  .an-leg b{font-family:var(--mono);color:var(--ink)}
+  .an-seg,.an-segbtn{display:inline-flex;gap:4px}
+  .an-segbtn{font-family:var(--mono);font-size:10px;padding:3px 8px;border-radius:100px;border:1px solid var(--line2);background:var(--panel2);color:var(--soft);cursor:pointer}
+  .an-segbtn.on{background:var(--green);color:#00220a;border-color:transparent}
+  #an_ring{width:170px;height:170px;margin:6px auto 4px;border-radius:50%;position:relative;
+    -webkit-mask:radial-gradient(circle 47px at 50% 50%,transparent 98%,#000 100%);mask:radial-gradient(circle 47px at 50% 50%,transparent 98%,#000 100%);transition:background .6s ease}
+  #an_ring::after{content:attr(data-c);position:absolute;inset:0;display:grid;place-items:center;-webkit-mask:none;mask:none;font-family:var(--disp);font-weight:800;font-size:12px;color:var(--soft);text-align:center;line-height:1.3}
+  .an-splitleg{display:flex;flex-direction:column;gap:6px;margin-top:8px;font-size:11.5px}
+  .an-splitleg .r{display:flex;align-items:center;gap:7px}
+  .an-splitleg .r i{width:10px;height:10px;border-radius:3px;flex:0 0 auto}
+  .an-splitleg .r b{margin-left:auto;font-family:var(--mono);color:var(--ink)}
+  .an-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  .an-foot{margin-top:14px;text-align:center;font-size:10.5px}
+  @media(max-width:900px){.an-hero{grid-template-columns:repeat(2,1fr)}.an-two{grid-template-columns:1fr}.an-grid{grid-template-columns:1fr}.an-canvaswrap{height:230px}}
   @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
 <body>
+<div id="aurora" aria-hidden="true"></div>
 <div id="bootbar"></div>
 <header>
-  <div class="brand"><img src="mm.png" class="mmlogo" style="width:26px;height:26px" alt="MM">Market <b>Maker</b><span class="rh-wrap"><svg class="feather" viewBox="0 0 32 32" aria-hidden="true"><path d="M27 4.5c-9.4.6-17 6.8-20.4 17.2-.5 1.5 1 2.8 2.4 2 1-.6 1.4-1.8 1.8-2.9C13.6 14.4 19 9.4 27 8.2c.7-.1 1.1-.8.9-1.5-.2-.6-.8-.9-1.4-.8.7-.2 1.1-.9.9-1.5-.2-.6-.8-1-1.4-.9z" fill="#00C805"/><path d="M8.5 25.5l3.2-6.4" stroke="#00C805" stroke-width="1.7" stroke-linecap="round"/></svg><span class="rh2">ROBINHOOD</span></span></div>
+  <div class="brand"><img src="mm.png" class="mmlogo" style="width:26px;height:26px" alt="MM"><span class="mmword" id="mmword" data-text="Market Maker" aria-label="Market Maker">Market Maker</span><span class="rh-wrap"><svg class="feather" viewBox="0 0 32 32" aria-hidden="true"><path d="M27 4.5c-9.4.6-17 6.8-20.4 17.2-.5 1.5 1 2.8 2.4 2 1-.6 1.4-1.8 1.8-2.9C13.6 14.4 19 9.4 27 8.2c.7-.1 1.1-.8.9-1.5-.2-.6-.8-.9-1.4-.8.7-.2 1.1-.9.9-1.5-.2-.6-.8-1-1.4-.9z" fill="#00C805"/><path d="M8.5 25.5l3.2-6.4" stroke="#00C805" stroke-width="1.7" stroke-linecap="round"/></svg><span class="rh2">ROBINHOOD</span></span></div>
   <div class="spacer"></div>
   <span class="chip" id="net"><span class="d"></span><span id="nettxt">connecting…</span><span id="netblk" class="mono"></span></span>
   <button class="hbtn" onclick="openLearn()">How it works</button>
+  <button class="hbtn anbtn" onclick="openAnalytics()" style="border-color:#123a24;color:var(--green2)"><svg class="an-ico" viewBox="0 0 24 24" aria-hidden="true"><rect class="b1" x="3" y="13" width="3.4" height="7" rx="1.2"/><rect class="b2" x="10.3" y="9" width="3.4" height="11" rx="1.2"/><rect class="b3" x="17.6" y="5" width="3.4" height="15" rx="1.2"/><path class="pl" d="M3 8 L9 6 L14 9 L21 3" fill="none" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Analytics</button>
   <button class="hbtn" onclick="openPresale()" style="border-color:#3a2a12;color:var(--orange2)">◎ Presale</button>
-  <button class="hbtn" onclick="location.href='launch.html'" style="border-color:var(--greenDim);color:var(--green2)">🚀 Launchpad</button>
   <button class="hbtn green" id="connectBtn" onclick="connectWallet()">Connect</button>
   <span class="chip" id="acct" style="display:none"></span>
   <button class="hbtn" id="adminBtn" style="display:none" onclick="window.open('admin.html','_blank')">Admin</button>
@@ -611,15 +753,19 @@
         </div>
         <div class="wal-fund" id="wal_fund"></div>
         <div class="wal-bals">
-          <div class="wal-b"><div class="l"><img src="mm.png" class="mmtag" alt="">MM</div><div class="v mono" id="wal_mm">—</div></div>
-          <div class="wal-b"><div class="l">ETH <span class="muted">· gas</span></div><div class="v mono" id="wal_eth">—</div></div>
+          <div class="wal-b"><div class="l"><img src="mm.png" class="mmtag" alt="">MM</div><div class="v mono" id="wal_mm">—</div><div class="wsub" id="wal_mmusd"></div></div>
+          <div class="wal-b"><div class="l"><span class="wlogo"><svg viewBox="0 0 24 24"><rect width="24" height="24" rx="12" fill="#0a0f16"/><path d="M12 3.2 L12 9.9 L17.6 12.3 Z" fill="#8ab4ff"/><path d="M12 3.2 L6.4 12.3 L12 9.9 Z" fill="#dbe6ff"/><path d="M12 13.3 L12 20.8 L17.7 13.5 Z" fill="#8ab4ff"/><path d="M12 20.8 L12 13.3 L6.4 13.5 Z" fill="#dbe6ff"/></svg></span>ETH <span class="muted">· gas</span></div><div class="v mono" id="wal_eth">—</div><div class="wsub" id="wal_ethusd"></div></div>
         </div>
         <div class="wal-card">
           <div class="l">Withdraw / Send</div>
-          <input class="mm" id="wal_to" placeholder="0x… recipient" autocomplete="off">
+          <div class="waltok" id="wal_toksel">
+            <button type="button" class="wtk on" data-t="MM" onclick="setWalTok('MM')"><img src="mm.png" alt="">MM</button>
+            <button type="button" class="wtk" data-t="ETH" onclick="setWalTok('ETH')"><span class="wlogo"><svg viewBox="0 0 24 24"><rect width="24" height="24" rx="12" fill="#0a0f16"/><path d="M12 3.2 L12 9.9 L17.6 12.3 Z" fill="#8ab4ff"/><path d="M12 3.2 L6.4 12.3 L12 9.9 Z" fill="#dbe6ff"/><path d="M12 13.3 L12 20.8 L17.7 13.5 Z" fill="#8ab4ff"/><path d="M12 20.8 L12 13.3 L6.4 13.5 Z" fill="#dbe6ff"/></svg></span>ETH</button>
+          </div>
+          <input class="mm" id="wal_to" placeholder="0x… recipient" autocomplete="off" style="margin-top:8px">
           <div class="wal-row" style="margin-top:6px"><input class="mm" id="wal_amt" placeholder="amount" inputmode="decimal" autocomplete="off">
             <button class="wbtn walmax" onclick="setMax()">Max</button>
-            <select class="mm walsel" id="wal_tok" onchange="renderWallet()"><option value="MM">MM</option><option value="ETH">ETH</option></select></div>
+            <input type="hidden" id="wal_tok" value="MM"></div>
           <button class="swexec" onclick="sendAsset()" style="margin-top:8px">Send</button>
           <div class="swnote" id="wal_note"></div>
           <div class="swnote" style="opacity:.7">MM &amp; ETH sent directly on Robinhood Chain — no token list needed.</div>
@@ -658,8 +804,8 @@
         <input type="range" class="neon" id="pcBuy" min="10" max="10000" step="10" value="100" oninput="posCalc()"></div>
       <div class="ctl"><div class="lh"><span>Hold for</span><b id="pcYearsV">1 year</b></div>
         <input type="range" class="neon" id="pcYears" min="1" max="24" step="1" value="12" oninput="posCalc()"></div>
-      <div class="ctl"><div class="lh"><span>Trading activity <small style="color:var(--faint)">vs now</small></span><b id="pcActV">100%</b></div>
-        <input type="range" class="neon" id="pcAct" min="0" max="200" step="5" value="100" oninput="posCalc()"></div>
+      <div class="ctl"><div class="lh"><span>Trading activity <small style="color:var(--faint)">auto · vs break-even</small></span><b id="pcActV">100%</b></div>
+        <input type="range" class="neon" id="pcAct" min="0" max="200" step="5" value="100" oninput="_actUserSet=true;posCalc()"></div>
       <div class="hero"><div class="big" id="pcHero" style="font-size:23px">—</div><div class="sub" id="pcSub"></div></div>
       <div class="brk" id="pcBrk"></div>
       <div class="calcnote" id="pcNote"></div>
@@ -906,8 +1052,8 @@
           <input type="range" class="neon" id="calcBuy" min="10" max="10000" step="10" value="100" oninput="calcEconomy()"></div>
         <div class="ctl"><div class="lh"><span>Hold for</span><b id="calcYearsV">1 year</b></div>
           <input type="range" class="neon" id="calcYears" min="1" max="24" step="1" value="12" oninput="calcEconomy()"></div>
-        <div class="ctl"><div class="lh"><span>Trading activity <small style="color:var(--faint)">vs now</small></span><b id="calcActV">100%</b></div>
-          <input type="range" class="neon" id="calcAct" min="0" max="200" step="5" value="100" oninput="calcEconomy()"></div>
+        <div class="ctl"><div class="lh"><span>Trading activity <small style="color:var(--faint)">auto · vs break-even</small></span><b id="calcActV">100%</b></div>
+          <input type="range" class="neon" id="calcAct" min="0" max="200" step="5" value="100" oninput="_actUserSet=true;calcEconomy()"></div>
         <div class="hero"><div class="big" id="calcHero">—</div><div class="sub" id="calcHeroSub"></div></div>
       </div>
       <div class="calccard">
@@ -971,74 +1117,83 @@
 <div class="docs" id="presale"><div class="docs-bar">
     <button class="back" onclick="closePresale()">← Terminal</button>
     <img src="mm.png" class="mmlogo" style="width:22px;height:22px" alt="">
-    <span class="dt">Presale — pro-rata ETH deposit</span>
+    <span class="dt">Presale</span>
     <span style="flex:1"></span>
     <span class="chip" id="ps_state"><span class="d"></span><span id="ps_statetxt">reading…</span></span>
     <button class="hbtn green" id="ps_connectbtn" onclick="presaleConnectToggle()" style="margin-left:8px">Connect</button>
   </div>
-  <div class="docs-wrap">
-  <p class="muted" style="max-width:720px;font-size:13.5px;line-height:1.6">Deposit ETH and receive a <b style="color:var(--orange2)">pro-rata</b> share of <b>800M MM</b> — your share = your ETH ÷ total ETH raised. No fixed price: the more that's raised, the finer the split. Min deposit <b>0.0001 ETH</b>. The rest of the supply stays with the foundation to seed liquidity. <b style="color:var(--orange2)">Once MM lands in your wallet it decays like every holder</b> — this is a live, elastic-supply token.</p>
-
-  <div class="psgrid" id="ps_stats"></div>
-  <div id="ps_timer" style="margin:4px 0 2px"></div>
-
-  <div class="lsec">
-    <h3>How the presale works</h3>
-    <div class="lkey">
-      <div class="k"><div class="t">① Deposit</div><div class="d">Send ETH (min 0.0001) to the presale contract. It forwards straight to the foundation and records your share on-chain. Top up anytime before it closes.</div></div>
-      <div class="k"><div class="t">② Pro-rata share</div><div class="d">No fixed price. Your MM = your ETH ÷ total ETH raised × <b>800M</b>. As more ETH comes in, the split gets finer — your % dilutes, but the pool of buyers grows.</div></div>
-      <div class="k"><div class="t">③ Distribution</div><div class="d">When the sale closes, the foundation sends each wallet its MM from the 800M pool. The remaining ~192M stays with the foundation to seed the first liquidity + reserve.</div></div>
-      <div class="k"><div class="t">④ Grace period</div><div class="d">Right after distribution, every participant is set <b style="color:var(--green2)">stable</b> — no decay — for a grace window (~7 days), so your fresh MM doesn't erode before you can act.</div></div>
-      <div class="k"><div class="t">⑤ Decay resumes</div><div class="d">After the grace window the foundation flips it off and your MM decays ~50%/yr like every holder — but that decay feeds burn, treasury, reflection and the <b style="color:var(--green2)">pump</b> that lifts price. See <b>How it works</b>.</div></div>
-      <div class="k"><div class="t">⑥ Liquidity</div><div class="d">The ETH you deposited funds a deep MM/ETH pool — real, exitable liquidity — paired with the foundation's reserved MM. Deep liquidity is what makes the price and the pump real.</div></div>
+  <div class="docs-wrap ps-wrap">
+    <div class="psgrid ps-hero" id="ps_stats"></div>
+    <div id="ps_timer"></div>
+    <div class="ps-two">
+      <div class="ps-panel ps-deposit">
+        <div class="ps-hd">◎ Deposit ETH <span class="mono" id="ps_addr" style="margin-left:auto;font-size:10px;font-weight:400">—</span></div>
+        <div class="ps-inp"><input id="ps_amt" inputmode="decimal" placeholder="0.10" oninput="presaleQuote()" autocomplete="off"><span class="ps-unit"><svg viewBox="0 0 24 24" style="width:18px;height:18px"><rect width="24" height="24" rx="12" fill="#0a0f16"/><path d="M12 3.2 L12 9.9 L17.6 12.3 Z" fill="#8ab4ff"/><path d="M12 3.2 L6.4 12.3 L12 9.9 Z" fill="#dbe6ff"/><path d="M12 13.3 L12 20.8 L17.7 13.5 Z" fill="#8ab4ff"/><path d="M12 20.8 L12 13.3 L6.4 13.5 Z" fill="#dbe6ff"/></svg>ETH</span></div>
+        <div class="ps-pcts"><button class="pspct" onclick="presalePct(10)">10%</button><button class="pspct" onclick="presalePct(20)">20%</button><button class="pspct" onclick="presalePct(30)">30%</button><button class="pspct" onclick="presalePct(50)">50%</button><button class="pspct" onclick="presalePct(100)">Max</button></div>
+        <div class="ps-quote"><span>You receive <span class="muted" style="font-size:9.5px">at current split</span></span><b id="ps_quote">—</b></div>
+        <button class="swexec" id="ps_depbtn" style="background:linear-gradient(180deg,var(--orange),#d95e00);color:#1a0d00;margin-top:10px" onclick="presaleDeposit()">◎ Deposit ETH</button>
+        <div class="muted" style="font-size:10px;margin-top:8px;line-height:1.5">Pro-rata: your MM = your ETH ÷ total raised × <b>800M</b>. Foundation-run sale — you trust the team to distribute afterwards. Once in your wallet, MM decays ~50%/yr.</div>
+      </div>
+      <div class="ps-panel ps-alloc">
+        <div class="ps-hd">Allocation <span class="muted" style="margin-left:auto;font-size:10px;font-weight:400">live · 1B cap</span></div>
+        <div class="ps-chartrow">
+          <div id="ps_ring" data-c=""></div>
+          <div class="ps-splitleg" id="ps_barleg"></div>
+        </div>
+        <div id="ps_bar" class="ps-splitbar"></div>
+        <div class="ps-toknote muted" id="ps_toknote"></div>
+      </div>
     </div>
-  </div>
-
-  <div class="lsec" id="ps-deposit">
-    <h3>Deposit</h3>
-    <p>Send ETH to the presale contract; it forwards straight to the foundation and records your share on-chain. You can top up anytime before it closes.</p>
-    <div class="psbox">
-      <div class="psrow"><span class="l">Presale contract</span><span class="v mono" id="ps_addr">not deployed yet</span></div>
-      <div class="psrow"><span class="l">You deposit</span>
-        <span style="display:flex;gap:6px;align-items:center"><input class="mm" id="ps_amt" placeholder="0.10" style="width:110px;margin:0" inputmode="decimal" oninput="presaleQuote()"> ETH</span></div>
-      <div class="psrow"><span class="l muted" style="font-size:11px">Quick <span style="font-size:9px">(% of your ETH)</span></span>
-        <span style="display:flex;gap:5px">
-          <button class="pspct" onclick="presalePct(10)">10%</button><button class="pspct" onclick="presalePct(20)">20%</button>
-          <button class="pspct" onclick="presalePct(30)">30%</button><button class="pspct" onclick="presalePct(50)">50%</button>
-          <button class="pspct" onclick="presalePct(100)">Max</button>
-        </span></div>
-      <div class="psrow"><span class="l muted">You'd receive now <span style="font-size:9.5px">(at the current split)</span></span><span class="v" id="ps_quote">—</span></div>
-      <button class="wbtn" style="width:100%;margin-top:6px;background:rgba(255,122,24,.12);border-color:var(--orange)" id="ps_depbtn" onclick="presaleDeposit()">◎ Deposit ETH</button>
-      <div class="muted" style="font-size:10px;margin-top:6px">Allocation is finalized when the sale closes; it dilutes as more ETH comes in. This is a foundation-run sale — you're trusting the team to distribute MM afterwards.</div>
+    <div class="ps-panel ps-bookpanel">
+      <div class="ps-hd">Contributors <span class="muted" id="ps_bookcount" style="font-weight:400;font-size:11px"></span><span id="ps_roles" class="muted" style="margin-left:auto;font-size:10px;font-weight:400"></span></div>
+      <div class="pstable" id="ps_book"><div class="muted" style="padding:14px">No deposits yet.</div></div>
     </div>
+    <details class="ps-help">
+      <summary>How it works · admin plan</summary>
+      <div class="ps-helpgrid">
+        <div><b>① Deposit</b> ETH (min 0.0001) → forwarded to the foundation, share recorded on-chain. Top up anytime.</div>
+        <div><b>② Pro-rata</b> — no fixed price. More ETH in = finer split; your % dilutes but the buyer pool grows.</div>
+        <div><b>③ Distribution</b> — on close, the foundation Sends each wallet its MM from the 800M pool.</div>
+        <div><b>④ Grace</b> — everyone set 🛡 stable (no decay) for ~7 days so fresh MM doesn't erode.</div>
+        <div><b>⑤ Decay</b> resumes ~50%/yr — feeding burn, treasury, reflection and the pump.</div>
+        <div><b>Admin</b> — foundation (<span class="mono" id="ps_ownershort2">0x91b5…167f</span>) Sends MM; owner (<span class="mono" id="ps_ownershort">0x…</span>) toggles stable/decay, closes deposits, and can ↩ refund ETH.</div>
+      </div>
+    </details>
   </div>
+</div>
 
-  <div class="lsec" id="ps-tok">
-    <h3>Tokenomics — live</h3>
-    <p>The whole supply picture, reflecting what has already happened (burn, decay, circulating) and the presale split going forward. Everything below reads live from the chain.</p>
-    <div class="psgrid" id="ps_tok"></div>
-    <div class="ldiag" style="margin-top:10px"><div id="ps_bar" style="display:flex;height:26px;border-radius:8px;overflow:hidden;border:1px solid var(--line)"></div>
-      <div id="ps_barleg" style="display:flex;flex-wrap:wrap;gap:12px;margin-top:8px;font-size:11px"></div></div>
-    <div class="calcnote" id="ps_toknote" style="margin-top:8px"></div>
+<!-- ANALYTICS — full-page live protocol dashboard -->
+<div class="docs" id="analytics"><div class="docs-bar">
+    <button class="back" onclick="closeAnalytics()">← Terminal</button>
+    <svg class="an-ico big" viewBox="0 0 24 24" aria-hidden="true"><rect class="b1" x="3" y="13" width="3.4" height="7" rx="1.2"/><rect class="b2" x="10.3" y="9" width="3.4" height="11" rx="1.2"/><rect class="b3" x="17.6" y="5" width="3.4" height="15" rx="1.2"/><path class="pl" d="M3 8 L9 6 L14 9 L21 3" fill="none" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <span class="dt">Analytics</span>
+    <span style="flex:1"></span>
+    <span class="chip" id="an_state"><span class="d"></span><span id="an_statetxt">live</span></span>
   </div>
+  <div class="docs-wrap an-wrap">
+    <div class="an-hero" id="an_hero"></div>
+    <div class="an-two">
+      <div class="an-chartcard">
+        <div class="an-cardhd"><span>Protocol history</span><span class="an-seg" id="an_chartseg"></span></div>
+        <div class="an-canvaswrap"><canvas id="an_canvas"></canvas></div>
+        <div class="an-leg" id="an_leg"></div>
+      </div>
+      <div class="an-splitcard">
+        <div class="an-cardhd"><span>Supply distribution</span><span class="muted" style="font-size:10px">live · 1B cap</span></div>
+        <div id="an_ring"></div>
+        <div class="an-splitleg" id="an_splitleg"></div>
+      </div>
+    </div>
+    <div class="an-grid" id="an_grid"></div>
+    <div class="an-foot muted">Everything reads live from Robinhood Chain · MM <span class="mono">0xA6FA…8271</span>. Metrics recompute every few seconds.</div>
+  </div>
+</div>
 
-  <div class="lsec" id="ps-book">
-    <h3>Contributors <span class="muted" id="ps_bookcount" style="font-weight:400;font-size:12px"></span></h3>
-    <p>Every deposit, live, with its current pro-rata MM allocation. The <b>Send</b> button (foundation wallet only) transfers the allocated MM to that address.</p>
-    <div class="pstable" id="ps_book"><div class="muted" style="padding:14px">No deposits yet.</div></div>
-  </div>
-
-  <div class="lsec" id="ps-admin" style="display:none">
-    <h3>◎ Admin <span class="muted" style="font-weight:400;font-size:12px">· owner / foundation</span></h3>
-    <div class="calcnote" id="ps_roles" style="margin-bottom:10px"></div>
-    <p style="margin-top:0">Two roles — the buttons on each row show for whichever you connect:</p>
-    <ul style="color:var(--soft);font-size:12.5px;line-height:1.7;margin:4px 0 0;padding-left:18px">
-      <li><b>Foundation</b> (<span class="mono">0x91b5…167f</span>, holds the MM) → <b class="up">Send</b> each wallet its pro-rata MM. Sent rows show <b class="up">paid ✓</b>.</li>
-      <li><b>Owner</b> (<span class="mono" id="ps_ownershort">0x…</span>, token owner) → per-wallet <b style="color:var(--green2)">🛡 stable</b> / <b style="color:var(--orange2)">⌁ decay</b> toggle, and <b class="down">Close deposits</b>. Stable freezes each balance at its current value — no jump, no loss (verified).</li>
-    </ul>
-    <p class="muted" style="font-size:11px;margin-top:8px">Plan: close deposits → Send MM to everyone → 🛡 make each stable (grace) → after ~7 days ⌁ start decay. Each action is one transaction you sign.</p>
-  </div>
-  </div>
+<div id="pwaBanner" class="pwa-banner">
+  <img src="mm.png" alt="">
+  <div class="pt"><b>Install Market Maker</b><span id="pwaHint">Add it to your home screen for a full-screen app.</span></div>
+  <button id="pwaInstall" class="pwa-go" onclick="pwaInstall()">Install</button>
+  <button class="pwa-x" onclick="dismissPwa(true)" aria-label="Dismiss">✕</button>
 </div>
 
 <div id="toasts"></div>
@@ -1051,6 +1206,7 @@ const CFG={rpc:(LOCAL?location.origin+"/rpc":"https://rpc.mainnet.chain.robinhoo
   hook:"0xbc1a927A61fe72a52E046afce0817771C3BB0044",pm:"0x8366a39CC670B4001A1121B8F6A443A643e40951",cap:1e9,
   defaultWatch:"0x87A7A3D8f13f92795e2Ce5016B36E15893439B4F",
   foundation:"0x91b5965e81DAC2687D0dAD000bd6ef207D2D167f", // holds the presale MM + receives ETH
+  owner:"0x85228f9817798E97c599ec4B2BEd0F1104b51273", // token owner + treasuryWallet
   presale:"0x85C46a570F9770Fe1a6a9d411731c02AB31BDa19", // MarketMakerPresale — live
   presaleSupplyMM:8e8,   // 800M MM sold pro-rata in the presale; the rest stays with the foundation (LP + reserve)
   presaleEnd:"2026-09-24T00:00:00Z", // 30-day countdown target (informational; owner can close early)
@@ -1061,7 +1217,7 @@ const CFG={rpc:(LOCAL?location.origin+"/rpc":"https://rpc.mainnet.chain.robinhoo
 const A=window.MM_ARTIFACTS,E=ethers,$=id=>document.getElementById(id);
 const PM_ABI=["function extsload(bytes32) view returns (bytes32)"];
 let ro,signer,account,mmRead,poolMgr,poolId,price0=0,feedTick=0,histLoaded=false;
-let watch=null,decayR=0,liveBal=0,excluded=false,holderRows=[];
+let watch=null,decayR=0,liveBal=0,liveBalTarget=0,excluded=false,holderRows=[];
 const priceHist=[];
 // ---- MM icon set (our own consistent themed glyph set) ----
 const IC={buy:{g:"▲",c:"#00C805"},sell:{g:"▼",c:"#ff5a2c"},burn:{g:"✷",c:"#ff7a18"},pump:{g:"⚙",c:"#38ff7e"},
@@ -1071,7 +1227,7 @@ const icon=k=>{const o=IC[k]||IC.transfer;return `<span class="ico" style="color
 const SERIES={
   price :{label:"Price",   ab:"PRICE",color:"#00e676",on:true, data:[],fmtV:v=>ethUsd?usd(v*ethUsd):gwei(v).toFixed(4)+"g"},   // green
   pool  :{label:"Liquidity",ab:"LIQ", color:"#ffffff",on:true, data:[],fmtV:v=>ethUsd?usd(v*ethUsd):v.toFixed(4)+" ETH"},     // white · $ TVL across all AMM pools (stored as ETH-denominated TVL)
-  supply:{label:"Supply",  ab:"SUPPLY",color:"#4d9bff",on:false,data:[],fmtV:v=>compactNum(v)},                              // blue (off by default)
+  supply:{label:"Circ. supply",ab:"CIRC",color:"#37e0c8",on:true, data:[],fmtV:v=>compactNum(v)},                            // teal · circulating = total − foundation − LP pools
   burn  :{label:"Deflation",ab:"DEFL",color:"#ff8c1a",on:true, data:[],fmtV:v=>compactNum(v)},                               // orange
   index :{label:"Reflection",ab:"REFL",color:"#e05cff",on:false,data:[],fmtV:v=>v.toFixed(5)},                               // magenta (off by default)
   vol   :{label:"Volume",  ab:"VOL", color:"#7a8a83",on:true, data:[],fmtV:v=>compactNum(v)+" MM"}};                         // grey
@@ -1079,6 +1235,7 @@ let chartRange=0; // last N points; 0 = all (full history)
 let chartLog=true; // logarithmic Y (per-series normalized)
 let chartBars=true; // draw each series as bold candle-columns (behind the lines) as well — on by default
 let volYr=0,incSupply=0,reflBps=0,burnBps=0,recentBps=0,treBps=0,mirrorX=1,poolMMg=0,debtBase=0,debtBaseT=0,allPool0=0,refreshFails=0;
+let circReal=0,excludedFloat=0; // circulating supply (total − foundation − LP pools) + the offset used for historical backfill
 let decTreBps=2000,decRewBps=3000; // decay split (bps): treasury / reward; burn = 10000 − these. Read live from chain.
 let gMirrorBps=10000,gBbOn=false,gPPool=null,AN={},TS=[];
 let lastSettleWall=Date.now(),pumpCumPrev=-1; // pending pump accrues from last realized burn
@@ -1109,7 +1266,7 @@ function showSkeletons(){
   const pr=$("d_price");if(pr)pr.innerHTML='<span class="sk" style="width:200px;height:32px"></span>';
   const fe=$("feed");if(fe)fe.innerHTML='<div class="ev" style="pointer-events:none"><span class="sk" style="width:100%;height:15px"></span></div>'.repeat(4);
   const hl=$("holderList");if(hl)hl.innerHTML='<div class="hrow" style="pointer-events:none"><span class="sk" style="width:100%;height:15px"></span></div>'.repeat(6);}
-function savePrefs(){try{localStorage.setItem("mm_prefs",JSON.stringify({v:3,barsV:1,watch,range:chartRange,log:chartLog,bars:chartBars,slip:swSlip,series:Object.fromEntries(Object.entries(SERIES).map(([k,s])=>[k,s.on]))}));}catch(e){}}
+function savePrefs(){try{localStorage.setItem("mm_prefs",JSON.stringify({v:4,barsV:1,watch,range:chartRange,log:chartLog,bars:chartBars,slip:swSlip,series:Object.fromEntries(Object.entries(SERIES).map(([k,s])=>[k,s.on]))}));}catch(e){}}
 function loadPrefs(){try{const p=JSON.parse(localStorage.getItem("mm_prefs")||"{}");
   if(p.watch&&/^0x[a-fA-F0-9]{40}$/.test(p.watch))watch=p.watch;
   if(typeof p.range==="number")chartRange=p.range;
@@ -1118,7 +1275,8 @@ function loadPrefs(){try{const p=JSON.parse(localStorage.getItem("mm_prefs")||"{
   if(typeof p.slip==="number")swSlip=p.slip;
   // v3 migration: default-on set is now price+Liquidity+Deflation+Volume; Supply & Reflection
   // default OFF. Don't let an old stored state override the new defaults for those two keys.
-  if(p.series)Object.entries(p.series).forEach(([k,v])=>{if(SERIES[k]&&!((k==="supply"||k==="index")&&p.v!==3))SERIES[k].on=!!v;});}catch(e){}}
+  // "supply" (now Circ. supply) defaults ON at v4; "index" defaults OFF at v3+ — don't let older stored state override those defaults.
+  if(p.series)Object.entries(p.series).forEach(([k,v])=>{if(SERIES[k]&&!(k==="supply"&&(p.v||0)<4)&&!(k==="index"&&(p.v||0)<3))SERIES[k].on=!!v;});}catch(e){}}
 // Stale-while-revalidate: paint the LAST-seen feed/holders/chart instantly from localStorage so the
 // panels never look empty while Blockscout is slow/rate-limited; the live fetches refresh them.
 function restoreCache(){try{
@@ -1168,6 +1326,7 @@ async function boot(){
   ro=new E.JsonRpcProvider(CFG.rpc);mmRead=new E.Contract(CFG.mm,A.token.abi,ro);poolMgr=new E.Contract(CFG.pm,PM_ABI,ro);poolId=computePoolId();
   try{await ro.getBlockNumber();$("net").classList.add("ok");$("nettxt").textContent="Robinhood · live";}catch(e){$("nettxt").textContent="RPC error";}
   showSkeletons(); // polished first paint while data loads
+  initBrand();  // animated fragment/reunite "Market Maker" wordmark
   loadPrefs(); // restore saved chart series/range/log, slippage, watched wallet
   restoreCache(); // paint last-seen feed/holders/chart instantly (refreshed by the live fetches)
   if(!watch&&CFG.defaultWatch)watch=CFG.defaultWatch;
@@ -1183,9 +1342,20 @@ async function boot(){
   // pause network polling while the tab is hidden (saves RPC + battery); UI ticks keep running cheaply
   const vis=fn=>()=>{if(!document.hidden)fn();};
   setInterval(vis(refresh),5000);setInterval(vis(fetchSlow),30000);setInterval(vis(fetchEthUsd),90000);setInterval(vis(getHolders),45000);setInterval(vis(fetchPumpStats),60000);
-  // one consolidated UI ticker (was 3 timers) — lighter, pauses when hidden
-  setInterval(()=>{if(document.hidden)return;tickLive();tickHolders();tickDebt();},250);
+  // position/holder/debt bleeds are driven by the tickStats rAF loop (~30fps, pauses when hidden) — no interval needed
   document.addEventListener("visibilitychange",()=>{if(!document.hidden){refresh();fetchSlow();}});
+}
+// Build the animated wordmark: each letter scatters on its own vector then reunites, staggered.
+function initBrand(){const el=$("mmword");if(!el)return;const word=el.getAttribute("data-text")||"Market Maker";
+  const greenFrom=word.indexOf(" ")+1; // "Maker" glows green
+  el.innerHTML=[...word].map((c,i)=>{
+    if(c===" ")return '<span class="ch" style="width:.32em">&nbsp;</span>';
+    const ang=(i*49)%360,rad=ang*Math.PI/180,dist=9+((i*7)%8);
+    const sx=(Math.cos(rad)*dist).toFixed(1)+"px",sy=(Math.sin(rad)*dist-6).toFixed(1)+"px",sr=(((i*37)%24)-12)+"deg";
+    const dur=(6.6+((i*0.13)%1.4)).toFixed(2)+"s",delay=(-(i*0.11)).toFixed(2)+"s";
+    const g=i>=greenFrom?" g":"";
+    return `<span class="ch${g}" data-c="${c==="&"?"&amp;":c}" style="--sx:${sx};--sy:${sy};--sr:${sr};--mmdur:${dur};animation-delay:${delay}">${c}</span>`;
+  }).join("");
 }
 let walletEip=null;
 const RH_HEX="0x1237"; // 4663
@@ -1261,11 +1431,15 @@ function renderWallet(){
     walBalETH=Number(E.formatUnits(e,18));walBalMM=Number(E.formatUnits(m,18));
     if($("wal_eth"))$("wal_eth").textContent=fmt(walBalETH,5);
     if($("wal_mm"))$("wal_mm").textContent=fmt(walBalMM,2);
+    const pUsd=(AN&&AN.pUsd)||0;
+    if($("wal_mmusd"))$("wal_mmusd").textContent=pUsd>0?"≈ "+usd(walBalMM*pUsd):"";
+    if($("wal_ethusd"))$("wal_ethusd").textContent=ethUsd>0?"≈ "+usdBig(walBalETH*ethUsd):"";
     const fund=$("wal_fund");
     if(fund){if(walBalETH<=0){fund.style.display="";fund.innerHTML="⛽ This wallet has <b>0 ETH</b> — you need a little ETH for gas before sending or swapping. Deposit ETH to the address above, or tap <b>Buy ETH</b>.";}
       else fund.style.display="none";}
   }).catch(()=>{});
 }
+function setWalTok(t){const h=$("wal_tok");if(h)h.value=t;document.querySelectorAll('#wal_toksel .wtk').forEach(b=>b.classList.toggle('on',b.dataset.t===t));}
 function setMax(){const tok=$("wal_tok").value;
   const v=tok==="ETH"?Math.max(0,walBalETH-0.0002):walBalMM; // leave a little ETH for gas
   $("wal_amt").value=v>0?String(v):"";}
@@ -1362,7 +1536,8 @@ async function buildHistory(attempt=0){
       else if(realBurned>0&&winBurn<=1e-9)pts.forEach((p,i)=>p.burn=realBurned*(i/(pts.length-1||1)));
       Object.values(SERIES).forEach(s=>s.data=[]);
       pts.forEach(p=>{const bch=p.burn*burnScale;SERIES.price.data.push(p.price);SERIES.pool.data.push(2*p.price*(p.pool+otherPoolMM));SERIES.index.data.push(p.idx);
-        SERIES.burn.data.push(bch);SERIES.supply.data.push(capMM-bch);SERIES.vol.data.push(p.vol);});
+        // circulating = total − (foundation + LP pools); excludedFloat ≈ constant over the window (excluded balances don't decay)
+        SERIES.burn.data.push(bch);SERIES.supply.data.push(Math.max(0,(capMM-bch)-excludedFloat));SERIES.vol.data.push(p.vol);});
       priceHist.length=0;priceHist.push(...SERIES.price.data.filter(x=>x>0));
       if(priceHist.length){price0=priceHist[0];histLoaded=true;}
       const totVol=swc.reduce((a,s)=>a+s.vol,0),el=Math.max(1,(keptBlocks[keptBlocks.length-1]-keptBlocks[0])*secPerBlock);
@@ -1444,16 +1619,24 @@ async function refresh(){
       ["currentIndex"],["excludedSupply"],["balanceOf",CFG.ethPair],["pumpDebt"],["balanceOf",CFG.pools[1].id],["balanceOf",CFG.pools[2].id]]);
     updatePumpPanel(pDebt,poolMM,gMirrorBps,gPPool);
     const yr=(1-Math.pow(1-decayR,31536000))*100;
-    const sv=(id,v)=>{const el=$(id);if(el&&el.textContent!==v){el.textContent=v;el.classList.add("flash");setTimeout(()=>el.classList.remove("flash"),450);}};
-    sv("d_supply",fmt(sup,2));sv("d_circ",fmt(sup-exc,0));sv("d_burn",fmt((10n**18n)*BigInt(CFG.cap)-sup,2));
-    sv("d_tre",fmt(tre,2));sv("d_pot",fmt(pot,2));sv("d_pool",fmt(poolMM,0));
-    // all-pool MM aggregate + live decrease + decay:pool ratio (pump-strength gauge)
-    const allPoolN=Number(E.formatUnits(poolMM,18))+Number(E.formatUnits(pThrob,18))+Number(E.formatUnits(pPack,18));
+    const nSup=Number(E.formatUnits(sup,18)),nExc=Number(E.formatUnits(exc,18)),nTre=Number(E.formatUnits(tre,18)),nPot=Number(E.formatUnits(pot,18)),nPool=Number(E.formatUnits(poolMM,18));
+    const allPoolN=nPool+Number(E.formatUnits(pThrob,18))+Number(E.formatUnits(pPack,18));
+    // circulating (real) supply = total − excludedSupply. excludedSupply already covers every wallet tagged in
+    // Top holders (foundation, owner, treasury, hook, all LP pools) — the true retail float that actually decays.
+    circReal=Math.max(0,nSup-nExc);
+    excludedFloat=nSup-circReal; // ≈ excludedSupply; used to backfill the historical circ line
     if(!allPool0)allPool0=allPoolN;
-    $("d_allpool").textContent=fmt(allPoolN,0);
+    // smooth neon counters — supply & circulating bleed DOWN continuously between refreshes (like pump debt),
+    // then re-sync to the exact chain value each refresh; the rest ease into their new value.
+    const burnFrac=(1e4-decTreBps-decRewBps)/1e4, f2=v=>fmt(v,2), f0=v=>fmt(v,0);
+    tweenStat("d_supply",nSup,f2,circReal*decayR*burnFrac);
+    tweenStat("d_circ",circReal,f2,circReal*decayR); // 2dp so the slow real decay is a visible smooth bleed
+    tweenStat("d_burn",(CFG.cap-nSup),f2,0);
+    tweenStat("d_tre",nTre,f2,0);tweenStat("d_pot",nPot,f2,0);tweenStat("d_pool",nPool,f0,0);
+    tweenStat("d_allpool",allPoolN,f0,0);
     const dP=allPoolN-allPool0,dE=$("d_allpoolD");
     if(dE&&Math.abs(dP)>=0.5){dE.textContent=(dP<0?"▼ ":"▲ ")+fmt(Math.abs(dP),0);dE.className="pooldelta "+(dP<0?"down":"up");}
-    $("d_idx").textContent=Number(E.formatUnits(idx,18)).toFixed(6);
+    tweenStat("d_idx",Number(E.formatUnits(idx,18)),v=>v.toFixed(6),0);
     // live values for PnL + debt ticking (fee/decay/mirror come from fetchSlow)
     const supN0=Number(E.formatUnits(sup,18)),excN0=Number(E.formatUnits(exc,18)),idxN=Number(E.formatUnits(idx,18));
     incSupply=supN0-excN0;
@@ -1476,10 +1659,12 @@ async function refresh(){
       // snapshot for the Analytics dashboard
       AN={price,pUsd,sup:supN,burned:CFG.cap-supN,inc:incSupply,pool:pmN,allPool:allPoolN,tre:Number(E.formatUnits(tre,18)),pot:Number(E.formatUnits(pot,18)),idx:idxN,mcap:ethUsd?pUsd*supN:price*supN,liq:ethUsd?liqUsd:liqEth};
       // append a live point ONLY if something actually moved (pushLive returns false otherwise)
-      if(histLoaded&&pushLive({price,pool:liqEth,supply:supN,burn:CFG.cap-supN,index:idxN}))drawChart();
+      if(histLoaded&&pushLive({price,pool:liqEth,supply:circReal||supN,burn:CFG.cap-supN,index:idxN}))drawChart();
     }
     if($("pv-analytics")&&getComputedStyle($("pv-analytics")).display!=="none")renderAnalytics();
-    if(watch){const b=await mmRead.balanceOf(watch);excluded=await mmRead.isExcluded(watch);liveBal=Number(E.formatUnits(b,18));
+    if(watch){const b=await mmRead.balanceOf(watch);excluded=await mmRead.isExcluded(watch);const cb=Number(E.formatUnits(b,18));
+      liveBalTarget=cb;if(!liveBal||Math.abs(cb-liveBal)/Math.max(1,cb)>0.5)liveBal=cb; // ease toward chain value; snap only on first load / huge change
+      if(excluded){liveBal=cb;$("p_bal").textContent=cb.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});$("p_tick").textContent="═ stable · no decay";}
       $("p_badge").textContent=excluded?"EXCLUDED":"INCLUDED · decaying";$("p_badge").className="badge "+(excluded?"exc":"inc");
       const ex=$("p_expl");if(ex){ex.href=EXPLORER+"/address/"+watch;ex.target="_blank";}
       ensureEntry(watch); // fire-and-forget: real entry point, no await → never blocks refresh
@@ -1490,26 +1675,56 @@ async function refresh(){
     if($("learn")&&$("learn").classList.contains("on"))calcEconomy(); // keep the payoff calculator on live rates while it's open
     if($("pos-calc")&&$("pos-calc").style.display!=="none")posCalc();  // same for the compact one in Your Position
     if($("presale")&&$("presale").classList.contains("on")&&feedTick%2===0)renderPresale(); // keep the presale book live while open
+    if($("analytics")&&$("analytics").classList.contains("on"))renderAnalyticsPage(); // keep the analytics dashboard live while open
     refreshFails=0;$("net").classList.add("ok");$("nettxt").textContent="Robinhood · live";
     ro.getBlockNumber().then(b=>{const el=$("netblk");if(el)el.textContent="#"+b.toLocaleString("en-US");}).catch(()=>{});
   }catch(e){refreshFails++;if(refreshFails>=2){$("net").classList.remove("ok");$("nettxt").textContent="reconnecting…";}}
 }
-function tickLive(){if(!watch||excluded||liveBal<=0)return;liveBal*=Math.pow(1-decayR,0.12);
+let _liveLast=0;
+function tickLive(){if(!watch||excluded||liveBal<=0){_liveLast=0;return;}const now=performance.now();
+  const dt=_liveLast?(now-_liveLast)/1000:0;_liveLast=now;
+  if(dt>0){const dk=Math.pow(1-decayR,dt);liveBal*=dk;if(liveBalTarget)liveBalTarget*=dk; // decay both (time-based)
+    if(liveBalTarget){const e=1-Math.pow(0.5,dt/0.5);liveBal+=(liveBalTarget-liveBal)*e;}} // slide toward chain value (0.5s half-life) — no hard snap
   $("p_bal").textContent=liveBal.toLocaleString("en-US",{minimumFractionDigits:4,maximumFractionDigits:4});$("p_tick").textContent="↓ decaying live";}
+// ===== smooth neon stat counters =====
+// Each stat eases from its shown value to a fresh chain target, then (if it decays) keeps bleeding down
+// continuously between refreshes — the "pump-debt-style" animated fall the Live panel asks for.
+const _tw={};
+function tweenStat(id,target,fmt,dropPerSec){const el=$(id);if(!el)return;const s=_tw[id];
+  const cur=(s&&isFinite(s.cur))?s.cur:target;
+  _tw[id]={from:cur,to:target,cur,t0:performance.now(),dur:cur===target?0:700,fmt,drop:dropPerSec||0,last:performance.now()};
+  if(Math.abs(cur-target)/Math.max(1,Math.abs(target))>0.0002){el.classList.add("flash");setTimeout(()=>{if(el)el.classList.remove("flash");},480);}}
+let _twLast=0;
+function tickStats(t){requestAnimationFrame(tickStats);if(document.hidden)return;if(t-_twLast<33)return;_twLast=t;
+  for(const id in _tw){const s=_tw[id],el=$(id);if(!el)continue;
+    if(s.t0!=null){let p=(t-s.t0)/(s.dur||1);if(s.dur<=0||p>=1){p=1;s.cur=s.to;s.t0=null;s.last=t;}
+      else{const e=1-Math.pow(1-p,3);s.cur=s.from+(s.to-s.from)*e;}el.textContent=s.fmt(s.cur);}
+    else if(s.drop>0){const dt=(t-s.last)/1000;s.last=t;s.cur=Math.max(0,s.cur-s.drop*dt);el.textContent=s.fmt(s.cur);}}
+  tickLive();tickHolders();tickDebt();}                    // drive the position/holder/debt bleeds at 30fps too
+requestAnimationFrame(tickStats);
 function projFor(bal){const r=[["1h",3600],["1d",86400],["1w",604800],["1mo",2592000],["1y",31536000]];
   $("p_proj").innerHTML=r.map(([l,s])=>{const v=bal*Math.pow(1-decayR,s);return `<tr><td class="muted">${l}</td><td>${fmt(v,2)} <span class="muted">(${((v/bal-1)*100).toFixed(1)}%)</span></td></tr>`;}).join("");}
 // Shared payoff model — live-seeded from chain. Decay compounds (time-based); reflection scales with
 // trading activity; pump is the REAL V2 price lift as decay burns LP, capped at 50% of the pool and
 // gated by activity (a quiet chain barely pumps → low activity = net loss). Feeds both the
 // How-it-works calculator and the compact one in the Your-Position panel.
+// Auto-seed the activity slider to the market's REAL current level = current volume ÷ break-even volume
+// (break-even = 50 × circulating supply). Only until the user drags it. Returns the fraction to use.
+let curActPct=100,_actUserSet=false;
+function autoAct(id){const el=$(id);if(!el)return 1;
+  if(!_actUserSet&&incSupply>0){curActPct=Math.max(0,Math.min(200,Math.round(volYr/(50*incSupply)*100)||0));el.value=curActPct;}
+  return (+el.value)/100;}
 function payoffModel(buyUSD,months,act){
   const pUsd=(AN&&AN.pUsd)||(price0*ethUsd)||5.85e-6;
   const dAnnual=decayR?(1-Math.pow(1-decayR,31536000)):0.5;
   const feeB=(burnBps||150)/1e4,feeR=(reflBps||100)/1e4,feeRec=(recentBps||50)/1e4,feeT=(treBps||100)/1e4;
   const feeTot=feeB+feeR+feeRec+feeT,inc=incSupply||3.17e6,pool=poolMMg||3.35e5,vol=volYr||0,mir=mirrorX||1;
+  // "act" is trading activity as a fraction of BREAK-EVEN volume (50 × circulating supply / yr — the point where
+  // reflection alone offsets decay). act=1.0 → break-even. Auto-seeded to the market's real current level.
+  const beVol=50*inc, effVol=act*beVol;
   const years=months/12,entryTax=buyUSD*feeTot,afterFee=buyUSD-entryTax,mm0=afterFee/pUsd;
   const decayFrac=1-Math.pow(1-dAnnual,years);
-  const reflFrac=inc>0?(vol*act)*feeR/inc*years:0;
+  const reflFrac=inc>0?effVol*feeR/inc*years:0;
   const burnMM=Math.min(inc*decayFrac*mir,pool*0.5)*act, priceMult=pool>burnMM?pool/(pool-burnMM):1;
   const mmAfter=mm0*(1-decayFrac)+mm0*reflFrac, netVal=mmAfter*pUsd*priceMult, netPnl=netVal-buyUSD;
   const burn1=Math.min(inc*dAnnual*mir,pool*0.5)*act, pm1=pool>burn1?pool/(pool-burn1):1;
@@ -1517,7 +1732,7 @@ function payoffModel(buyUSD,months,act){
   const yrLbl=months===12?"1 year":months<12?months+" mo":(months/12).toFixed(months%12?1:0)+" yr";
   return {pUsd,feeTot,mir,years,yrLbl,entryTax,mm0,decayFrac,priceMult,netVal,netPnl,up:netPnl>=0,
     decayLoss:mm0*decayFrac*pUsd,reflGain:mm0*reflFrac*pUsd,pumpGain:mmAfter*pUsd*(priceMult-1),
-    decayMM:mm0*decayFrac,reflAnnualPct:inc>0?(vol*act)*feeR/inc*100:0,pumpAnnualPct:(pm1-1)*100,
+    decayMM:mm0*decayFrac,reflAnnualPct:inc>0?effVol*feeR/inc*100:0,pumpAnnualPct:(pm1-1)*100,
     dTre:decTreBps/1e4,dRew:decRewBps/1e4,dBurn:(1e4-decTreBps-decRewBps)/1e4, // live decay split
     pool,phRatio:inc>0?pool/inc:0,pumpCovers:mm0*decayFrac*pUsd>0?(mmAfter*pUsd*(priceMult-1))/(mm0*decayFrac*pUsd)*100:0, // pump's % offset of decay
     liq:(AN&&AN.liq)||0,s1:scen(100),s2:scen(1000)};
@@ -1540,8 +1755,9 @@ function _hero(id,sub,buyUSD,m){ // "$X → $Y  ▲/▼ ±$Z (±%)"
 // How-it-works calculator (full: flow diagram, destinations, two-buyer, seed chips)
 function calcEconomy(){
   if(!$("calcBuy"))return;
-  const buyUSD=+$("calcBuy").value,months=+$("calcYears").value,act=+$("calcAct").value/100,m=payoffModel(buyUSD,months,act);
-  $("calcBuyV").textContent="$"+buyUSD.toLocaleString("en-US");$("calcYearsV").textContent=m.yrLbl;$("calcActV").textContent=Math.round(act*100)+"%";
+  const buyUSD=+$("calcBuy").value,months=+$("calcYears").value,act=autoAct("calcAct"),m=payoffModel(buyUSD,months,act);
+  $("calcBuyV").textContent="$"+buyUSD.toLocaleString("en-US");$("calcYearsV").textContent=m.yrLbl;
+  $("calcActV").innerHTML=Math.round(act*100)+"%"+(_actUserSet?"":" <small style='color:var(--green2)'>· live</small>");
   _setf("calcBuy",10,10000,buyUSD);_setf("calcYears",1,24,months);_setf("calcAct",0,200,act*100);
   _hero("calcHero","calcHeroSub",buyUSD,m);$("calcBrk").innerHTML=payoffBrk(m);
   // pump-vs-decay coverage gauge (bar maxes at 200%; 100% = break-even, marked at center)
@@ -1561,11 +1777,12 @@ function calcEconomy(){
 // Compact calculator inside the Your-Position panel (tab)
 function posCalc(){
   if(!$("pcBuy"))return;
-  const buyUSD=+$("pcBuy").value,months=+$("pcYears").value,act=+$("pcAct").value/100,m=payoffModel(buyUSD,months,act);
-  $("pcBuyV").textContent="$"+buyUSD.toLocaleString("en-US");$("pcYearsV").textContent=m.yrLbl;$("pcActV").textContent=Math.round(act*100)+"%";
+  const buyUSD=+$("pcBuy").value,months=+$("pcYears").value,act=autoAct("pcAct"),m=payoffModel(buyUSD,months,act);
+  $("pcBuyV").textContent="$"+buyUSD.toLocaleString("en-US");$("pcYearsV").textContent=m.yrLbl;
+  $("pcActV").innerHTML=Math.round(act*100)+"%"+(_actUserSet?"":" <small style='color:var(--green2)'>· live</small>");
   _setf("pcBuy",10,10000,buyUSD);_setf("pcYears",1,24,months);_setf("pcAct",0,200,act*100);
   _hero("pcHero","pcSub",buyUSD,m);$("pcBrk").innerHTML=payoffBrk(m);
-  $("pcNote").innerHTML="Live rates · pump capped at 50% of the $"+fmt(m.liq,0)+" pool. Full breakdown + flows in <b>How it works → Calculator</b>. Slide <b>Activity</b> to 0 → decay wins, you lose.";
+  $("pcNote").innerHTML=(_actUserSet?"":"<b style='color:var(--green2)'>Auto-set to the market's live activity</b> ("+curActPct+"% of break-even). ")+"Pump capped at 50% of the $"+fmt(m.liq,0)+" pool. Slide <b>Activity</b> to 0 → decay wins, you lose.";
 }
 function posTab(which){
   const mn=$("pos-main"),cx=$("pos-calc"),tp=$("postab-pos"),tc=$("postab-calc");
@@ -1701,10 +1918,14 @@ function fmtDebt(v){if(!v)return "0";if(Math.abs(v)>=1)return v.toLocaleString("
 // On-chain pumpDebt is lazy (auto-pump drains it on every transfer). Between real
 // pumps, decay keeps accruing "pending" burn that ANY pump() call realizes. We show
 // that pending amount growing from the last realized burn — press Pump to cash it in.
+let _debtShown=null;
 function tickDebt(){
   if(!decayR||!incSupply)return;
   const dt=(Date.now()-lastSettleWall)/1000;
-  const pending=debtBase+incSupply*(1-Math.pow(1-decayR,dt))*mirrorX;
+  const target=debtBase+incSupply*(1-Math.pow(1-decayR,dt))*mirrorX;
+  if(_debtShown==null||_debtShown>target*20)_debtShown=target;      // init / recover from stale
+  _debtShown+=(target-_debtShown)*0.10;                             // slide toward target — a pump() drop glides down instead of snapping
+  const pending=_debtShown;
   const set=id=>{const el=$(id);if(el)el.textContent=fmtDebt(pending);};
   set("pm_debt");set("d_pumpdebt");
   const burnNow=Math.min(pending,poolMMg*0.20),impact=poolMMg>0?burnNow/(poolMMg-burnNow)*100:0;
@@ -1794,7 +2015,8 @@ async function getHolders(){
       if(balN>0)rows.push({a:c.a,tag:c.tag,tc:c.tc,ex,bal:balN});
     });
     rows.sort((x,y)=>y.bal-x.bal);
-    holderRows=rows.slice(0,10).map(r=>({...r,t0:Date.now()}));
+    const prevShown={};holderRows.forEach(r=>{if(r.shown!=null)prevShown[r.a]=r.shown;}); // carry the on-screen value across refreshes so the row slides, never snaps
+    holderRows=rows.slice(0,10).map(r=>({...r,t0:Date.now(),shown:prevShown[r.a]!=null?prevShown[r.a]:r.bal}));
     renderHolders();
   }catch(e){if(!document.querySelector("#holderList .hrow"))$("holderList").innerHTML='<div class="muted">loading holders…</div>';}
 }
@@ -1807,7 +2029,7 @@ function renderHolders(){
   if(!holderRows.length){$("holderList").innerHTML='<div class="muted">no holders yet</div>';return;}
   $("holderList").innerHTML=holderRows.map((r,i)=>{
     const ind=r.ex?'<span class="st">═ stable</span>':'<span class="dn">↓ live</span>';
-    return `<div class="hrow" title="Click to watch this wallet" onclick="watchHolder('${r.a}')"><span class="rk">${i+1}</span><span class="ad">${short(r.a)}</span>${r.tag?`<span class="tg ${r.tc}">${r.tag}</span>`:""}<span class="bl ${r.ex?'':'dec'}" id="hb_${i}">${hbal(r.bal,r.ex)}</span>${ind}</div>`;
+    return `<div class="hrow" title="Click to watch this wallet" onclick="watchHolder('${r.a}')"><span class="rk">${i+1}</span><span class="ad">${short(r.a)}</span>${r.tag?`<span class="tg ${r.tc}">${r.tag}</span>`:""}<span class="bl ${r.ex?'':'dec'}" id="hb_${i}">${hbal(r.shown!=null?r.shown:r.bal,r.ex)}</span>${ind}</div>`;
   }).join("");
   try{localStorage.setItem("mm_holders",$("holderList").innerHTML);}catch(e){} // stale-while-revalidate: show instantly next load
 }
@@ -1834,10 +2056,79 @@ function renderAnalytics(){
    +card("💰 Holder yield <span class='muted'>value/yr</span>",row("Reflection","+"+reflAPR.toFixed(0)+"%","var(--green2)")+row("Pump lift","+"+pumpYr.toFixed(0)+"%","var(--green2)")+row("Decay","−"+(dFrac*100).toFixed(0)+"%","var(--down)")+row("Net · ex-swap",(netEx>=0?"+":"−")+Math.abs(netEx).toFixed(0)+"%",netEx>=0?"var(--green2)":"var(--down)")+row("Net · all-in",(netAll>=0?"+":"−")+Math.abs(netAll).toFixed(0)+"%",netAll>=0?"var(--green2)":"var(--down)"),"#00C805")
    +card("📈 Valuation",row("Price",ethUsd?usd(a.pUsd):gwei(a.price).toFixed(4)+" gwei")+row("Market cap",val(a.mcap))+row("FDV · 1B cap",ethUsd?usdBig(CFG.cap*a.pUsd):fmt(CFG.cap*a.price,3)+" ETH")+row("Liquidity",val(a.liq))+row("Treasury",fmt(a.tre,0)+" MM")+row("Reward pot",fmt(a.pot,2)+" MM"),"#ffa24d");
 }
+// ===== Analytics full-page dashboard =====
+let _anFound=0,_anOwner=0,_anRange=0,_anRaf=0;
+function openAnalytics(){const w=$("analytics");if(!w)return;w.classList.add("on");document.body.style.overflow="hidden";
+  $("an_chartseg").innerHTML=[["50",50],["200",200],["All",0]].map(([l,n])=>`<button class="an-segbtn ${_anRange==n?'on':''}" onclick="_anRange=${n};renderAnalyticsPage()">${l}</button>`).join("");
+  if(!AN.sup&&typeof refresh==="function")refresh(); // populate the snapshot if the page is opened before first data
+  renderAnalyticsPage();setTimeout(renderAnalyticsPage,900);
+  cancelAnimationFrame(_anRaf);const loop=()=>{if(!w.classList.contains("on"))return;drawAnCanvas();_anRaf=requestAnimationFrame(loop);};loop();}
+function closeAnalytics(){const w=$("analytics");if(w)w.classList.remove("on");document.body.style.overflow="";cancelAnimationFrame(_anRaf);}
+async function renderAnalyticsPage(){
+  const w=$("analytics");if(!w||!w.classList.contains("on"))return;const a=AN;if(!a.sup)return;
+  try{const [fb,ob]=await mmMulti([["balanceOf",CFG.foundation],["balanceOf",CFG.owner||"0x85228f9817798E97c599ec4B2BEd0F1104b51273"]]);_anFound=Number(E.formatUnits(fb,18));_anOwner=Number(E.formatUnits(ob,18));}catch(e){}
+  const dFrac=1-Math.pow(1-decayR,31536000),pumpYr=a.pool>0?(a.inc*dFrac*mirrorX)/a.pool*100:0,reflAPR=a.inc>0?(volYr*(reflBps/10000)/a.inc)*100:0;
+  const netAll=pumpYr+reflAPR-dFrac*100,val=v=>ethUsd?usdBig(v):fmt(v,3)+" ETH";
+  const chg=priceHist.length>1?(priceHist[priceHist.length-1]/priceHist[0]-1)*100:0;
+  // hero KPIs
+  const kpi=(l,v,s,cls,kc)=>`<div class="an-kpi" style="--kc:${kc}"><div class="l">${l}</div><div class="v">${v}</div><div class="s ${cls||''}">${s||''}</div></div>`;
+  $("an_hero").innerHTML=
+    kpi("Price",ethUsd?"$"+a.pUsd.toExponential(2):gwei(a.price).toFixed(3)+"g",(chg>=0?"▲ +":"▼ ")+chg.toFixed(2)+"% · "+gwei(a.price).toFixed(2)+"g",chg>=0?"up":"down","#38ff7e")
+   +kpi("Market cap",val(a.mcap),"FDV "+(ethUsd?usdBig(CFG.cap*a.pUsd):fmt(CFG.cap*a.price,2)+" ETH"),"","#00C805")
+   +kpi("Liquidity",val(a.liq),(CFG.pools.length)+" pools · "+compactNum(a.allPool)+" MM","","#ffffff")
+   +kpi("Circulating",compactNum(a.inc)+" MM",(a.inc/CFG.cap*100).toFixed(3)+"% of cap · decays","down","#37e0c8")
+   +kpi("Holders",(holderRows.length||"—"),"tracked on-chain","","#ffa24d");
+  // supply distribution ring
+  const segs=[["Foundation",Math.max(0,_anFound-CFG.presaleSupplyMM),"#ffa24d"],["Presale pool",Math.min(_anFound,CFG.presaleSupplyMM),"#ff7a18"],
+    ["Owner",_anOwner,"#c8792a"],["LP pools",a.allPool,"#37e0c8"],["Treasury",a.tre,"#4d9bff"],["Circulating",a.inc,"#38ff7e"],["Burned",a.burned,"#4a4a4a"]]
+    .map(([l,v,c])=>({l,v:Math.max(0,v),c})).filter(s=>s.v>0);
+  const tot=segs.reduce((s,x)=>s+x.v,0)||1;let acc=0,stops=[];
+  segs.forEach(s=>{const p0=acc/tot*100,p1=(acc+s.v)/tot*100;stops.push(`${s.c} ${p0.toFixed(2)}% ${p1.toFixed(2)}%`);acc+=s.v;});
+  const ring=$("an_ring");if(ring){ring.style.background=`conic-gradient(${stops.join(",")})`;ring.setAttribute("data-c",compactNum(a.sup)+"\nMM live");}
+  $("an_splitleg").innerHTML=segs.map(s=>`<div class="r"><i style="background:${s.c}"></i>${s.l}<b>${(s.v/tot*100).toFixed(1)}%</b></div>`).join("");
+  // metric cards (reuse ancard styling)
+  const card=(t,rows,accent)=>`<div class="ancard" style="border-left-color:${accent}"><div class="ant">${t}</div>${rows}</div>`;
+  const row=(l,v,c)=>`<div class="anr"><span>${l}</span><b${c?` style="color:${c}"`:""}>${v}</b></div>`;
+  const bar=(pct,col)=>`<div class="anbar"><div style="width:${Math.max(0,Math.min(100,pct)).toFixed(1)}%;background:${col}"></div></div>`;
+  $("an_grid").innerHTML=
+    card("🔥 Deflation",row("Burned to date",fmt(a.burned,0)+" MM")+row("of 1B cap",(a.burned/CFG.cap*100).toFixed(3)+"%")+bar(a.burned/CFG.cap*100*20,"var(--orange)")+row("Total supply",fmt(a.sup,0)+" MM"),"#ff7a18")
+   +card("⌁ Decay engine",row("Rate","~"+(dFrac*100).toFixed(0)+"%/yr")+row("Decaying float",fmt(a.inc,0)+" MM")+row("Erodes / year",fmt(a.inc*dFrac,0)+" MM")+row("Excluded (stable)",fmt(a.sup-a.inc,0)+" MM"),"#ff5a2c")
+   +card("⚙ Pump engine",row("Capacity","~"+pumpYr.toFixed(0)+"%/yr",pumpYr>=0?"var(--green2)":"")+row("Pumped to date",fmt(pumpCumMM||0,2)+" MM")+row("Mirror",mirrorX.toFixed(2)+"×")+bar(a.inc/Math.max(1,a.allPool)*50,"var(--green)")+row("Decay : pool",(a.allPool>0?(a.inc/a.allPool).toFixed(2):"—")),"#00C805")
+   +card("❖ Reflection",row("Index",a.idx.toFixed(6))+row("Volume run-rate",compactNum(volYr)+" MM/yr")+row("Holder APR","+"+reflAPR.toFixed(0)+"%","var(--green2)"),"#38ff7e")
+   +card("💰 Holder yield <span class='muted'>value/yr</span>",row("Reflection","+"+reflAPR.toFixed(0)+"%","var(--green2)")+row("Pump lift","+"+pumpYr.toFixed(0)+"%","var(--green2)")+row("Decay","−"+(dFrac*100).toFixed(0)+"%","var(--down)")+row("Net · all-in",(netAll>=0?"+":"−")+Math.abs(netAll).toFixed(0)+"%",netAll>=0?"var(--green2)":"var(--down)"),"#00C805")
+   +card("💧 Liquidity",row("Total value",val(a.liq))+row("Pools",CFG.pools.length)+row("All-pool MM",fmt(a.allPool,0))+row("Treasury (MM)",fmt(a.tre,0))+row("Reward pot",fmt(a.pot,2)),"#37e0c8");
+}
+// small multi-metric area chart for the analytics page (price + circulating + liquidity, each self-normalised)
+function drawAnCanvas(){const c=$("an_canvas");if(!c||!c.offsetParent)return;const ctx=c.getContext("2d");
+  const dpr=devicePixelRatio||1,W=c.clientWidth,H=c.clientHeight;if(!W||!H)return;c.width=W*dpr;c.height=H*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,W,H);
+  const metrics=[["Price",SERIES.price.data,"#38ff7e",ethUsd?usd((SERIES.price.data.slice(-1)[0]||0)*ethUsd):null],
+    ["Circ. supply",SERIES.supply.data,"#37e0c8",compactNum(SERIES.supply.data.slice(-1)[0]||0)],
+    ["Liquidity",SERIES.pool.data,"#ffffff",null]];
+  const slc=a=>_anRange>0?a.slice(-_anRange):a;const PADT=12,PADB=16,PADX=6;
+  ctx.strokeStyle="rgba(255,255,255,.05)";ctx.lineWidth=1;for(let g=0;g<=4;g++){const y=PADT+g*(H-PADT-PADB)/4;ctx.beginPath();ctx.moveTo(PADX,y);ctx.lineTo(W-PADX,y);ctx.stroke();}
+  const maxLen=Math.max(...metrics.map(m=>slc(m[1]).length),2);
+  const X=i=>PADX+(maxLen<2?0:i/(maxLen-1))*(W-2*PADX);
+  metrics.forEach((m,mi)=>{const d=slc(m[1]).filter(v=>isFinite(v));if(d.length<2)return;
+    const lo=Math.min(...d),hi=Math.max(...d),rng=hi-lo||1,off=slc(m[1]).length-d.length;
+    const Y=v=>{const t=(v-lo)/rng;return H-PADB-t*(H-PADT-PADB)*0.92;};
+    const pts=d.map((v,i)=>[X(off+i),Y(v)]);
+    ctx.beginPath();ctx.moveTo(pts[0][0],pts[0][1]);for(let i=1;i<pts.length;i++){const xc=(pts[i-1][0]+pts[i][0])/2,yc=(pts[i-1][1]+pts[i][1])/2;ctx.quadraticCurveTo(pts[i-1][0],pts[i-1][1],xc,yc);}ctx.lineTo(pts[pts.length-1][0],pts[pts.length-1][1]);
+    ctx.lineTo(pts[pts.length-1][0],H-PADB);ctx.lineTo(pts[0][0],H-PADB);ctx.closePath();
+    const gr=ctx.createLinearGradient(0,PADT,0,H-PADB);gr.addColorStop(0,m[2]+"22");gr.addColorStop(1,m[2]+"00");ctx.fillStyle=gr;ctx.fill();
+    ctx.beginPath();ctx.moveTo(pts[0][0],pts[0][1]);for(let i=1;i<pts.length;i++){const xc=(pts[i-1][0]+pts[i][0])/2,yc=(pts[i-1][1]+pts[i][1])/2;ctx.quadraticCurveTo(pts[i-1][0],pts[i-1][1],xc,yc);}ctx.lineTo(pts[pts.length-1][0],pts[pts.length-1][1]);
+    ctx.strokeStyle=m[2];ctx.lineWidth=mi===0?2.2:1.5;ctx.shadowColor=m[2];ctx.shadowBlur=mi===0?8:4;ctx.stroke();ctx.shadowBlur=0;
+    const lp=pts[pts.length-1];ctx.fillStyle=m[2];ctx.beginPath();ctx.arc(lp[0],lp[1],mi===0?3:2.2,0,7);ctx.fill();});
+  $("an_leg").innerHTML=metrics.map(m=>`<span><i style="background:${m[2]}"></i>${m[0]}${m[3]?" <b>"+m[3]+"</b>":""}</span>`).join("");
+}
 // Between chain refreshes, non-excluded holders visibly bleed at the real decay rate.
 function tickHolders(){
-  if(!holderRows.length||!decayR)return;const now=Date.now();
-  holderRows.forEach((r,i)=>{if(r.ex)return;const live=r.bal*Math.pow(1-decayR,(now-r.t0)/1000);const el=$("hb_"+i);if(el)el.textContent=hbal(live,false);});
+  if(!holderRows.length)return;const now=Date.now();
+  holderRows.forEach((r,i)=>{
+    const target=(!r.ex&&decayR)?r.bal*Math.pow(1-decayR,(now-r.t0)/1000):r.bal; // decaying rows bleed; stable rows hold
+    if(r.shown==null)r.shown=target;
+    r.shown+=(target-r.shown)*0.12;                       // smooth slide — refresh never snaps, decay glides continuously
+    const el=$("hb_"+i);if(el)el.textContent=hbal(r.shown,r.ex);
+  });
 }
 function updatePumpPanel(pDebt,poolMM,mirror,pPool){
   const debtN=Number(E.formatUnits(pDebt,18)),poolN=Number(E.formatUnits(poolMM,18));
@@ -1956,7 +2247,7 @@ function openLearn(){const w=$("learn");w.classList.add("on");w.scrollTop=0;docu
   calcEconomy(); // populate the payoff calculator immediately from current live data
   setTimeout(()=>document.querySelectorAll("#l_feebars .fill").forEach(f=>f.style.width=f.dataset.w+"%"),250);}
 function closeLearn(){$("learn").classList.remove("on");document.body.style.overflow="";}
-document.addEventListener("keydown",e=>{if(e.key==="Escape"){closeLearn();closePresale();}});
+document.addEventListener("keydown",e=>{if(e.key==="Escape"){closeLearn();closePresale();closeAnalytics();}});
 
 // ===== Presale — pro-rata ETH deposit sale =====
 const PRESALE_ABI=["function totalRaised() view returns(uint256)","function closed() view returns(bool)","function allContributions() view returns(address[],uint256[])"];
@@ -1993,19 +2284,26 @@ async function renderPresale(){
   else{ael.textContent="not deployed yet";ael.title="";}
   $("ps_depbtn").disabled=!deployed||closed;
   const card=(l,v,s)=>`<div class="c"><div class="l">${l}</div><div class="v">${v}</div>${s?`<div class="s">${s}</div>`:""}</div>`;
-  $("ps_stats").innerHTML=card("Raised",fmtEth(raised)+" ETH",ethUsd&&raised>0?usd(raised*ethUsd):"")+card("Contributors",who.length,"")+card("For sale",fmt(dist,0)+" MM","pro-rata")+card("Min deposit","0.0001 ETH","per deposit");
+  // 4th KPI = your allocation when you've contributed, else min deposit
+  const myI=account?who.findIndex(w=>w.toLowerCase()===account.toLowerCase()):-1;
+  const myEth=myI>=0?amts[myI]:0,myMm=(myI>=0&&raised>0)?myEth/raised*dist:0;
+  const card4=myI>=0?card("Your allocation",fmt(myMm,0)+" MM",fmtEth(myEth)+" ETH · "+(myEth/raised*100).toFixed(1)+"%"):card("Min deposit","0.0001 ETH","per deposit");
+  $("ps_stats").innerHTML=card("Raised",fmtEth(raised)+" ETH",ethUsd&&raised>0?usd(raised*ethUsd):"live")+card("Contributors",who.length,who.length===1?"wallet":"wallets")+card("For sale",compactNum(dist)+" MM","pro-rata")+card4;
   presaleQuote();
   const cap=CFG.cap,supply=(AN&&AN.sup)||cap,burned=Math.max(0,cap-supply),fkeep=Math.max(0,_psFoundBal-dist),circ=Math.max(0,supply-_psFoundBal);
-  $("ps_tok").innerHTML=card("Total supply",fmt(supply,0),"cap "+fmt(cap,0))+card("Presale",fmt(dist,0),"→ buyers")+card("Foundation keeps",fmt(fkeep,0),"LP + reserve")+card("Circulating now",fmt(circ,0),"holders + pools")+card("Burned to date",fmt(burned,0),(burned/cap*100).toFixed(3)+"%")+card("Decay","50%/yr","on held MM");
+  // allocation donut + bar (same 4 segments)
+  const parts=[["Presale",dist,"var(--orange)","#ff7a18"],["Foundation",fkeep,"var(--orange2)","#ffa24d"],["Circulating",circ,"var(--green2)","#38ff7e"],["Burned",burned,"#555","#555"]];
+  let acc=0,stops=[];parts.forEach(p=>{const p0=acc/cap*100,p1=Math.min(100,(acc+p[1])/cap*100);if(p[1]>0)stops.push(`${p[3]} ${p0.toFixed(2)}% ${p1.toFixed(2)}%`);acc+=p[1];});
+  const ring=$("ps_ring");if(ring){ring.style.background=`conic-gradient(${stops.join(",")})`;ring.setAttribute("data-c",compactNum(dist)+"\nfor sale");}
   const seg=(w,col,lab)=>w>0.2?`<div style="width:${w}%;background:${col}" title="${lab}"></div>`:"";
-  $("ps_bar").innerHTML=seg(dist/cap*100,"var(--orange)","Presale")+seg(fkeep/cap*100,"var(--orange2)","Foundation")+seg(circ/cap*100,"var(--green2)","Circulating")+seg(burned/cap*100,"#555","Burned");
-  const leg=(col,l,v)=>`<span style="display:flex;align-items:center;gap:5px"><span style="width:9px;height:9px;border-radius:2px;background:${col}"></span>${l} <b class="mono">${(v/cap*100).toFixed(1)}%</b></span>`;
-  $("ps_barleg").innerHTML=leg("var(--orange)","Presale",dist)+leg("var(--orange2)","Foundation",fkeep)+leg("var(--green2)","Circulating",circ)+leg("#555","Burned",burned);
-  $("ps_toknote").innerHTML="Presale MM is sold pro-rata; the foundation keeps ~<b>"+fmt(fkeep,0)+" MM</b> for the first liquidity + reserve. <b style='color:var(--orange2)'>The moment MM reaches a buyer's wallet it starts decaying ~50%/yr</b> (pools & foundation are excluded and don't decay). Burn, treasury and the pump keep running exactly as on the terminal.";
+  $("ps_bar").innerHTML=parts.map(p=>seg(p[1]/cap*100,p[2],p[0])).join("");
+  const leg=(col,l,v)=>`<span><i style="background:${col}"></i>${l}<b>${(v/cap*100).toFixed(1)}%</b></span>`;
+  $("ps_barleg").innerHTML=parts.map(p=>leg(p[2],p[0],p[1])).join("");
+  $("ps_toknote").innerHTML="Foundation keeps ~<b>"+compactNum(fkeep)+" MM</b> for LP + reserve. The moment MM reaches a wallet it decays ~50%/yr (pools & foundation excluded).";
   renderBook();
-  const adm=$("ps-admin");if(adm)adm.style.display=(isOwner||isFound)?"block":"none";
   if($("ps_ownershort"))$("ps_ownershort").textContent=short(_psOwner||"0x…");
-  const rn=$("ps_roles");if(rn)rn.innerHTML=account?("Connected: <b class='mono'>"+short(account)+"</b> — "+(isOwner?"<b style='color:var(--green2)'>owner</b> (toggle stable/decay + close)":isFound?"<b style='color:var(--green2)'>foundation</b> (Send MM)":"<b class='down'>not owner/foundation</b> — connect owner ("+short(_psOwner||"0x…")+") for toggles/close, or foundation ("+short(CFG.foundation)+") to Send.")):"Connect the owner or foundation wallet to manage.";
+  if($("ps_ownershort2"))$("ps_ownershort2").textContent=short(CFG.foundation);
+  const rn=$("ps_roles");if(rn)rn.innerHTML=account?(isOwner?"<b style='color:var(--green2)'>owner</b> · toggle/close/refund":isFound?"<b style='color:var(--green2)'>foundation</b> · Send MM":"<b class='down'>view-only</b> · connect owner/foundation to manage"):"connect owner/foundation to manage";
 }
 async function presaleClose(){
   if(!signer){await connectWallet();if(!signer)return;}
@@ -2042,10 +2340,12 @@ function renderBook(){
     let a="";
     if(admin){
       const sendBtn=done?'<span class="sent">paid ✓</span>':`<button class="sendb" onclick="presaleSend('${r.a}',${r.mm})">Send</button>`;
-      const togBtn=isOwner?`<button class="togb ${stable?'on':''}" title="${stable?'Stable now — click to start decay':'Decaying now — click to make stable'}" onclick="presaleToggleStable('${r.a}',${!stable})">${stable?'⌁ decay':'🛡 stable'}</button>`:(stable?'<span class="sent">🛡</span>':"");
-      a=`<span style="display:flex;gap:4px;justify-content:flex-end;flex-wrap:wrap">${sendBtn}${togBtn}</span>`;
+      const togBtn=isOwner?`<button class="togb ${stable?'on':''}" title="${stable?'Stable now — click to start decay':'Decaying now — click to make stable'}" onclick="presaleToggleStable('${r.a}',${!stable})">${stable?'⌁ decay':'🛡 stable'}</button>`:"";
+      const refBtn=`<button class="refb" onclick="presaleRefund('${r.a}',${r.eth})" title="Send ${fmtEth(r.eth)} ETH back to this wallet (cancel/refund)">↩ ${fmtEth(r.eth)}</button>`;
+      a=`<span style="display:flex;gap:4px;justify-content:flex-end;flex-wrap:wrap">${sendBtn}${togBtn}${refBtn}</span>`;
     } else a=(stable?'<span class="sent" title="not decaying (grace)">🛡 stable</span>':'');
-    return `<div class="rw"><span>${i+1}</span><span class="mono" title="${r.a}">${short(r.a)}${me?' <span style="color:var(--green2)">you</span>':''}</span><span class="mono">${fmtEth(r.eth)}</span><span class="col-pct mono">${(r.pct*100).toFixed(1)}%</span><span class="mono">${fmt(r.mm,0)}</span><span>${a}</span></div>`;}).join("");
+    const cpBtn=`<button class="cpb" onclick="event.stopPropagation();cp('${r.a}','Wallet')" title="Copy address">⧉</button>`;
+    return `<div class="rw"><span>${i+1}</span><span class="mono" title="${r.a}">${short(r.a)}${me?' <span style="color:var(--green2)">you</span>':''}${cpBtn}</span><span class="mono">${fmtEth(r.eth)}</span><span class="col-pct mono">${(r.pct*100).toFixed(1)}%</span><span class="mono">${fmt(r.mm,0)}</span><span>${a}</span></div>`;}).join("");
 }
 function presaleQuote(){
   const el=$("ps_amt");if(!el)return;const amt=parseFloat(el.value||"0")||0,dist=CFG.presaleSupplyMM;
@@ -2078,6 +2378,21 @@ async function presaleSend(addr,mm){
     psSent.add(addr.toLowerCase());try{localStorage.setItem("ps_sent",JSON.stringify([...psSent]));}catch(e){}
     toast("Sent ✓");renderBook();}
   catch(e){toast("Send failed: "+(e.shortMessage||e.message||e),"err");}
+}
+// Admin refund: send a contributor's deposited ETH back to their wallet from the connected admin wallet.
+// One click, exact amount. Foundation received the ETH → connect the foundation (or any funded admin) wallet.
+async function presaleRefund(addr,ethAmt){
+  if(!signer){await connectWallet();if(!signer)return;}
+  const isOwner=account&&_psOwner&&account.toLowerCase()===_psOwner;
+  const isFound=account&&account.toLowerCase()===CFG.foundation.toLowerCase();
+  if(!isOwner&&!isFound){toast("Connect the owner or foundation wallet to refund","warn");return;}
+  const amt=Number(ethAmt)||0;if(amt<=0){toast("Nothing to refund","warn");return;}
+  if(!confirm("Refund "+fmtEth(amt)+" ETH to "+short(addr)+"?\nThis sends ETH from your connected wallet ("+short(account)+") to that address. It does not change their recorded on-chain contribution.")) return;
+  try{const bal=Number(E.formatEther(await ro.getBalance(account)));
+    if(bal<amt){toast("Your wallet has "+fmtEth(bal)+" ETH — need "+fmtEth(amt)+"","warn");return;}
+    const tx=await signer.sendTransaction({to:addr,value:E.parseEther(String(amt))});toast("Refunding "+fmtEth(amt)+" ETH…");await tx.wait();
+    toast("↩ Refunded "+fmtEth(amt)+" ETH to "+short(addr)+" ✓");}
+  catch(e){toast("Refund failed: "+(e.shortMessage||e.message||e),"err");}
 }
 // ===== ecosystem flow overlay: animated data lines between panels =====
 function edgePt(el,term,side){const r=el.getBoundingClientRect(),t=term.getBoundingClientRect();
@@ -2124,11 +2439,11 @@ function sliceN(a){return chartRange>0?a.slice(-chartRange):a;}
 function compactNum(v){const a=Math.abs(v);if(a>=1e9)return (v/1e9).toFixed(2)+"B";if(a>=1e6)return (v/1e6).toFixed(2)+"M";if(a>=1e3)return (v/1e3).toFixed(1)+"k";if(a>=1)return v.toFixed(2);if(a>0)return v.toPrecision(2);return "0";}
 function usdAxis(u){if(u>=1)return "$"+u.toFixed(2);if(u>=0.01)return "$"+u.toFixed(4);if(u<=0)return "$0";return "$"+u.toFixed(9).replace(/0+$/,"");}
 function axisFmt(k,v){return k==="price"?(ethUsd?usdAxis(v*ethUsd):gwei(v).toFixed(2)+"g"):k==="index"?v.toFixed(4):compactNum(v);}
-let _chart=null,_hoverI=null,_reveal=1,_revRaf=0,_flowPhase=0,_flowLast=0;
+let _chart=null,_hoverI=null,_hoverPy=null,_reveal=1,_revRaf=0,_flowPhase=0,_flowLast=0;
 // gentle flowing-neon animation for the legend connectors (throttled, only when chart visible)
 function flowTick(t){requestAnimationFrame(flowTick);
   if(document.hidden)return;const c=$("c_price");if(!c||!c.offsetParent)return;
-  if(t-_flowLast<90)return;_flowLast=t;_flowPhase=(_flowPhase+3)%100000;if(_reveal>=1)drawChart();}
+  if(t-_flowLast<45)return;_flowLast=t;_flowPhase=(_flowPhase+3)%100000;if(_reveal>=1)drawChart();}
 requestAnimationFrame(flowTick);
 function smoothLine(ctx,p){if(!p.length)return;ctx.moveTo(p[0][0],p[0][1]);
   if(p.length<3){for(let i=1;i<p.length;i++)ctx.lineTo(p[i][0],p[i][1]);return;}
@@ -2138,110 +2453,70 @@ function revealChart(){const ld=$("chartload");if(ld&&!ld.classList.contains("go
   _reveal=0;const s=performance.now();cancelAnimationFrame(_revRaf);
   const step=t=>{_reveal=Math.min(1,(t-s)/560);_reveal=1-Math.pow(1-_reveal,3);drawChart();if(_reveal<1)_revRaf=requestAnimationFrame(step);else _reveal=1;};
   _revRaf=requestAnimationFrame(step);}
+function roundRect(ctx,x,y,w,h,r){r=Math.min(r,w/2,h/2);ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();}
 function drawChart(){
   const c=$("c_price"),ctx=c.getContext("2d");const dpr=devicePixelRatio||1,W=c.clientWidth,H=c.clientHeight;if(!W||!H)return;
   c.width=W*dpr;c.height=H*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,W,H);
-  const all=Object.entries(SERIES).filter(([k,s])=>s.on&&s.data.length>1);
-  const lines=all.filter(([k])=>k!=="vol"),volOn=SERIES.vol.on&&SERIES.vol.data.length>1;
-  const GUT=Math.min(120,Math.max(84,W*0.17)); // left gutter holds the stacked legend
-  const PADT=14,PADR=20,PADL=GUT,volH=volOn?Math.round(H*0.18):0,plotB=H-16-volH;
-  const plotL=PADL,plotW=W-PADR-plotL,centerY=(PADT+plotB)/2;
+  const lines=Object.entries(SERIES).filter(([k,s])=>k!=="vol"&&s.on&&s.data.length>1);
+  const volOn=SERIES.vol.on&&SERIES.vol.data.length>1;
+  const PADT=18,PADR=16,PADL=14,PADBx=18,volH=volOn?Math.round(H*0.16):0;
+  const plotB=H-PADBx-volH,plotT=PADT,plotL=PADL,plotW=W-PADR-plotL,plotH=plotB-plotT;
   ctx.strokeStyle="rgba(255,255,255,.045)";ctx.lineWidth=1;
-  for(let g=0;g<=4;g++){const y=PADT+g*(plotB-PADT)/4;ctx.beginPath();ctx.moveTo(plotL,y);ctx.lineTo(W-PADR,y);ctx.stroke();}
-  if(!lines.length&&!volOn){ctx.fillStyle="#5f6b64";ctx.font="12px 'IBM Plex Mono',monospace";ctx.textAlign="center";ctx.fillText("loading history…",W/2,H/2);return;}
-  const maxLen=Math.max(...all.map(([k,s])=>sliceN(s.data).length));
+  for(let g=0;g<=4;g++){const y=plotT+g*plotH/4;ctx.beginPath();ctx.moveTo(plotL,y);ctx.lineTo(W-PADR,y);ctx.stroke();}
+  if(!lines.length&&!volOn){ctx.fillStyle="#5f6b64";ctx.font="12px 'IBM Plex Mono',monospace";ctx.textAlign="center";ctx.fillText("loading history…",W/2,H/2);_chart={W,PADR,PADL,maxLen:2,X:()=>plotL};return;}
+  const allForLen=lines.concat(volOn?[["vol",SERIES.vol]]:[]);
+  const maxLen=Math.max(...allForLen.map(([k,s])=>sliceN(s.data).length),2);
   const X=i=>maxLen<2?(W-PADR-2):plotL+i/(maxLen-1)*(plotW-2);
-  // center baseline — every series starts here (indexed to its first value); up = gain, down = loss
-  ctx.strokeStyle="rgba(120,255,180,.14)";ctx.setLineDash([2,4]);ctx.lineWidth=1;
-  ctx.beginPath();ctx.moveTo(plotL,centerY);ctx.lineTo(W-PADR,centerY);ctx.stroke();ctx.setLineDash([]);
-  ctx.fillStyle="#5c6b62";ctx.font="8px 'IBM Plex Mono'";ctx.textAlign="left";ctx.fillText("start ×1",plotL+2,centerY-3);
-  // volume bars (bottom band)
-  if(volOn){const d=sliceN(SERIES.vol.data),mx=Math.max(...d,1e-9),off=maxLen-d.length,bw=Math.max(1,plotW/maxLen*0.6);
-    d.forEach((v,i)=>{const x=X(off+i),bh=(v/mx)*(volH-4);if(bh>0.3){ctx.fillStyle=v>0?"rgba(0,200,5,.4)":"rgba(154,168,161,.25)";ctx.fillRect(x-bw/2,H-14-bh,bw,bh);}});
-    ctx.fillStyle="#5f6b64";ctx.font="9px 'IBM Plex Mono'";ctx.textAlign="left";ctx.fillText("volume",plotL+2,H-volH-4);}
-  // LINE SERIES — each INDEXED to its own first value, plotted on a CENTERED baseline:
-  // start = center line, gains rise, losses fall. Heterogeneous units (price 8e-9,
-  // LP 273k, burn 94k) become directly comparable — highest line = biggest mover.
+  const flow=_flowPhase||0, LOGon=chartLog, tf=v=>LOGon?Math.log(v>0?v:1e-12):v;
+  if(volOn){const d=sliceN(SERIES.vol.data),mx=Math.max(...d,1e-9),off=maxLen-d.length,bw=Math.max(1.5,plotW/maxLen*0.6),lim=Math.ceil(maxLen*_reveal);
+    d.forEach((v,i)=>{const gi=off+i;if(gi>=lim)return;const x=X(gi),bh=(v/mx)*(volH-6)*_reveal;if(bh>0.3){const gr=ctx.createLinearGradient(0,H-14-bh,0,H-14);gr.addColorStop(0,"rgba(0,200,5,.55)");gr.addColorStop(1,"rgba(0,200,5,.05)");ctx.fillStyle=v>0?gr:"rgba(154,168,161,.16)";ctx.fillRect(x-bw/2,H-14-bh,bw,bh);}});
+    ctx.fillStyle="#5f6b64";ctx.font="9px 'IBM Plex Mono'";ctx.textAlign="left";ctx.fillText("volume",plotL+2,H-volH-3);}
+  const based=lines.map(([k,s])=>{const raw=sliceN(s.data);let lp2=0;const d=raw.map(v=>{if(v>0)lp2=v;return v>0?v:(lp2||0);});
+    let lo=Infinity,hi=-Infinity;d.forEach(v=>{const t=tf(v);if(t<lo)lo=t;if(t>hi)hi=t;});
+    return {k,s,d,lo,hi,off:maxLen-d.length};});
+  const PADf=0.08;
+  const Yof=o=>v=>{if(o.hi<=o.lo)return plotT+plotH*0.5;const t=(tf(v)-o.lo)/(o.hi-o.lo);return plotB-(PADf+t*(1-2*PADf))*plotH;};
   const meta=[];
-  const based=lines.map(([k,s])=>{
-    const raw=sliceN(s.data);let lp2=0;
-    const d=raw.map(v=>{if(v>0)lp2=v;return v>0?v:(lp2||0);}); // forward-fill leading zeros (cumulative series start clean)
-    const base=d.find(v=>v>0)||1;
-    return {k,s,d,base,off:maxLen-d.length,mf:Math.log((d[d.length-1]||base)/base)};
-  });
-  // scale from the 2nd-biggest mover so a single runaway (cumulative burn) doesn't flatten the rest
-  const absSorted=based.map(o=>Math.abs(o.mf)).sort((a,b)=>b-a);
-  const scale=Math.max((absSorted[1]!==undefined?absSorted[1]:absSorted[0])||0.05,0.05)*1.15;
-  const halfH=(plotB-PADT)/2*0.94;
-  const MY=m=>centerY-Math.tanh(m/scale)*halfH; // centered, soft-saturating so outliers ease to the edge
-  const Yof=(d,base)=>v=>MY(Math.log((v>0?v:base*1e-9)/base));
-  // faint up/down guide labels
-  ctx.fillStyle="#4a544e";ctx.font="8px 'IBM Plex Mono'";ctx.textAlign="right";
-  ctx.fillText("▲ +"+ (Math.exp(scale)>=10?Math.exp(scale).toFixed(0):Math.exp(scale).toFixed(1))+"×",W-PADR-2,PADT+8);
-  ctx.fillText("▼ −"+((1-Math.exp(-scale))*100).toFixed(0)+"%",W-PADR-2,plotB-3);
-  // CANDLE-COLUMN mode — bold translucent columns from the centre baseline to each series' value,
-  // in its own colour, BEHIND the lines. Bucketed to ≤44 columns so the candles stay big & readable.
-  if(chartBars){
-    const COLS=Math.min(maxLen,44),bw=Math.max(4,plotW/COLS*0.72),lim=Math.ceil(maxLen*_reveal);
-    for(let ci=0;ci<COLS;ci++){
-      const gi=COLS<2?maxLen-1:Math.round(ci/(COLS-1)*(maxLen-1));if(gi>=lim)break;
-      const gx=X(gi);
-      based.forEach(o=>{
-        const {k,s,d,off}=o,Y=Yof(d,o.base),hero=k==="price",li=gi-off;if(li<0||li>=d.length)return;
-        const y=Y(d[li]),top=y<centerY,y0=Math.min(y,centerY),y1=Math.max(y,centerY),h=Math.max(1.5,y1-y0);
-        const gr=ctx.createLinearGradient(0,top?y0:y1,0,top?y1:y0);
-        gr.addColorStop(0,s.color+(hero?'66':'42'));gr.addColorStop(1,s.color+'0d');
-        ctx.fillStyle=gr;ctx.fillRect(gx-bw/2,y0,bw,h);
-      });
-    }
-  }
-  based.forEach(o=>{
-    const {k,s,d,base,off}=o;const hero=k==="price";const Y=Yof(d,base);
-    meta.push({k,s,d,off,Y,base});
-    const pts=d.map((v,i)=>[X(off+i),Y(v)]);
-    const rc=Math.max(2,Math.ceil(pts.length*_reveal)),rp=pts.slice(0,rc);
+  // normal price candlesticks behind the lines (bucketed OHLC, classic green/red bodies + wicks)
+  if(chartBars){const po=based.find(o=>o.k==="price");
+    if(po){const Yp=Yof(po),d=po.d,off=po.off,n=d.length,lim=Math.ceil(n*_reveal);
+      const COLS=Math.max(6,Math.min(48,n,Math.floor(plotW/12))),perCol=n/COLS,bw=Math.max(3,Math.min(15,plotW/COLS*0.62));
+      for(let ci=0;ci<COLS;ci++){
+        let s0=Math.floor(ci*perCol),s1=Math.min(n-1,Math.floor((ci+1)*perCol)-1);if(s1<s0)s1=s0;if(s0>=lim)break;const e=Math.min(s1,lim-1);
+        const op=d[s0],cl=d[e];let hi=-Infinity,lo=Infinity;for(let j=s0;j<=e;j++){if(d[j]>hi)hi=d[j];if(d[j]<lo)lo=d[j];}
+        const cx=X(off+Math.round((s0+s1)/2)),up=cl>=op,col=up?"#00c805":"#ff5a2c";
+        const yH=Yp(hi),yL=Yp(lo),yO=Yp(op),yC=Yp(cl);
+        ctx.strokeStyle=col;ctx.globalAlpha=.45;ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(cx,yH);ctx.lineTo(cx,yL);ctx.stroke();
+        const bt=Math.min(yO,yC),bh=Math.max(1.4,Math.abs(yC-yO));
+        ctx.globalAlpha=1;ctx.fillStyle=up?"rgba(0,200,5,.16)":"rgba(255,90,44,.14)";ctx.fillRect(cx-bw/2,bt,bw,bh);
+        ctx.strokeStyle=col;ctx.globalAlpha=.5;ctx.strokeRect(cx-bw/2,bt,bw,bh);ctx.globalAlpha=1;
+      }
+    }}
+  based.forEach((o,oi)=>{const {k,s,d}=o,hero=k==="price",Y=Yof(o);meta.push({k,s,d,off:o.off,Y});
+    const pts=d.map((v,i)=>[X(o.off+i),Y(v)]);const rc=Math.max(2,Math.ceil(pts.length*_reveal)),rp=pts.slice(0,rc);
     ctx.lineJoin="round";ctx.lineCap="round";
-    if(hero){ctx.beginPath();smoothLine(ctx,rp);ctx.lineTo(rp[rp.length-1][0],centerY);ctx.lineTo(rp[0][0],centerY);ctx.closePath();
-      const gr=ctx.createLinearGradient(0,PADT,0,plotB);gr.addColorStop(0,s.color+"24");gr.addColorStop(.5,s.color+"08");gr.addColorStop(1,s.color+"00");ctx.fillStyle=gr;ctx.fill();}
-    ctx.beginPath();smoothLine(ctx,rp);
-    ctx.strokeStyle=s.color;ctx.lineWidth=hero?2.3:1.6;ctx.globalAlpha=hero?1:.86;
-    ctx.shadowColor=s.color;ctx.shadowBlur=hero?9:5;ctx.stroke();ctx.shadowBlur=0;ctx.globalAlpha=1;
-    const lp=rp[rp.length-1];ctx.fillStyle=s.color;ctx.shadowColor=s.color;ctx.shadowBlur=6;ctx.beginPath();ctx.arc(lp[0],lp[1],hero?3.4:2.6,0,7);ctx.fill();ctx.shadowBlur=0;
+    if(hero){ctx.beginPath();smoothLine(ctx,rp);ctx.lineTo(rp[rp.length-1][0],plotB);ctx.lineTo(rp[0][0],plotB);ctx.closePath();
+      const gr=ctx.createLinearGradient(0,plotT,0,plotB);gr.addColorStop(0,s.color+"22");gr.addColorStop(.6,s.color+"07");gr.addColorStop(1,s.color+"00");ctx.fillStyle=gr;ctx.fill();}
+    ctx.beginPath();smoothLine(ctx,rp);ctx.strokeStyle=s.color;ctx.lineWidth=hero?2.4:1.7;ctx.globalAlpha=hero?1:.8;
+    ctx.shadowColor=s.color;ctx.shadowBlur=hero?10:6;ctx.stroke();ctx.shadowBlur=0;ctx.globalAlpha=1;
+    ctx.save();ctx.beginPath();smoothLine(ctx,rp);ctx.strokeStyle="#ffffff";ctx.globalAlpha=hero?.85:.55;ctx.lineWidth=hero?2.1:1.4;
+    ctx.setLineDash([2,54]);ctx.lineDashOffset=-((flow*1.7+oi*19)%56);ctx.shadowColor=s.color;ctx.shadowBlur=13;ctx.stroke();ctx.restore();ctx.shadowBlur=0;ctx.globalAlpha=1;
+    const lp=rp[rp.length-1];ctx.fillStyle=s.color;ctx.shadowColor=s.color;ctx.shadowBlur=8;ctx.beginPath();ctx.arc(lp[0],lp[1],hero?3.6:2.7,0,7);ctx.fill();ctx.shadowBlur=0;
   });
-  // ===== LEFT stacked legend, each card wired to its line with a flowing neon connector =====
-  {const rows=based.slice();const volRow=volOn?SERIES.vol:null;
-   const N=rows.length+(volRow?1:0);
-   const top=PADT+4,bot=plotB-4,rh=(bot-top)/Math.max(N,1);
-   const hi=_hoverI==null?null:Math.max(0,Math.min(maxLen-1,_hoverI));
-   const attachX=plotL+plotW*0.17,flow=(_flowPhase||0);
-   rows.forEach((o,ri)=>{
-     const {k,s,d,base,off}=o;const Y=Yof(d,base);const cy=top+rh*(ri+0.5);
-     // value + %chg (at hover point if hovering, else latest)
-     let val;if(hi!=null){const idx=hi-off;val=(idx>=0&&idx<d.length)?d[idx]:d[d.length-1];}else val=d[d.length-1];
-     const first=d.find(x=>x>0)||d[0]||1,chg=(val/first-1)*100,up=chg>=0;
-     const chgTxt=Math.abs(chg)>=1000?("×"+compactNum(val/first)):((up?"▲":"▼")+Math.abs(chg).toFixed(1)+"%");
-     // neon connector: card → a point on its own line (17% in, where lines have separated)
-     const ai=Math.max(0,Math.round((attachX-plotL)/(plotW||1)*(maxLen-1))),lidx=ai-off;
-     const ay=(lidx>=0&&lidx<d.length)?Y(d[lidx]):centerY;
-     const x0=GUT-8,cx=(x0+attachX)/2;
-     ctx.save();ctx.strokeStyle=s.color;ctx.shadowColor=s.color;ctx.shadowBlur=7;ctx.globalAlpha=.5;ctx.lineWidth=1.4;
-     ctx.setLineDash([5,6]);ctx.lineDashOffset=-flow*(ri%2?1:1.4);
-     ctx.beginPath();ctx.moveTo(x0,cy);ctx.bezierCurveTo(cx,cy,cx,ay,attachX,ay);ctx.stroke();
-     ctx.setLineDash([]);ctx.globalAlpha=1;ctx.fillStyle=s.color;ctx.beginPath();ctx.arc(attachX,ay,2.4,0,7);ctx.fill();ctx.restore();
-     // card
-     ctx.textAlign="left";
-     ctx.fillStyle=s.color;ctx.shadowColor=s.color;ctx.shadowBlur=6;ctx.beginPath();ctx.arc(6,cy,3,0,7);ctx.fill();ctx.shadowBlur=0;
-     ctx.font="bold 9.5px 'IBM Plex Mono'";ctx.fillStyle=s.color;ctx.fillText(s.ab||s.label,14,cy-3);
-     ctx.font="10px 'IBM Plex Mono'";ctx.fillStyle="#d7ded9";ctx.fillText(s.fmtV(val),14,cy+8);
-     ctx.font="8px 'IBM Plex Mono'";ctx.fillStyle=up?"#39d353":"#ff5a4d";ctx.textAlign="right";
-     ctx.fillText(chgTxt,GUT-4,cy-3);
-   });
-   if(volRow){const cy=top+rh*(rows.length+0.5);const vd=sliceN(volRow.data);let val=hi!=null?(vd[hi-(maxLen-vd.length)]??vd[vd.length-1]):vd[vd.length-1];
-     ctx.textAlign="left";ctx.fillStyle=volRow.color;ctx.beginPath();ctx.arc(6,cy,3,0,7);ctx.fill();
-     ctx.font="bold 9.5px 'IBM Plex Mono'";ctx.fillStyle=volRow.color;ctx.fillText(volRow.ab||volRow.label,14,cy-3);
-     ctx.font="10px 'IBM Plex Mono'";ctx.fillStyle="#d7ded9";ctx.fillText(volRow.fmtV(val||0),14,cy+8);}
-  }
-  // x-axis time labels (relative), with dark backing chips for legibility
+  {const hi=_hoverI==null?null:Math.max(0,Math.min(maxLen-1,_hoverI));
+   const labels=based.map(o=>{const Y=Yof(o);let val;if(hi!=null){const idx=hi-o.off;val=(idx>=0&&idx<o.d.length)?o.d[idx]:o.d[o.d.length-1];}else val=o.d[o.d.length-1];
+     return {o,y:Y(val),val};});
+   labels.sort((a,b)=>a.y-b.y);const minGap=21;
+   for(let i=1;i<labels.length;i++){if(labels[i].y-labels[i-1].y<minGap)labels[i].y=labels[i-1].y+minGap;}
+   const maxY=plotB-2;if(labels.length){const overflow=labels[labels.length-1].y-maxY;if(overflow>0)labels.forEach(l=>l.y-=overflow);}
+   ctx.textAlign="left";
+   labels.forEach(l=>{const name=l.o.s.label,val=l.o.s.fmtV(l.val);ctx.font="bold 9px 'IBM Plex Mono'";const tw=ctx.measureText(name).width;ctx.font="9.5px 'IBM Plex Mono'";const vw=ctx.measureText(val).width;
+     const bw2=Math.max(tw,vw)+16,bx=W-PADR-bw2,by=Math.max(plotT+9,Math.min(maxY-9,l.y));
+     ctx.fillStyle="rgba(3,6,4,.62)";roundRect(ctx,bx-2,by-10,bw2+2,21,5);ctx.fill();
+     ctx.fillStyle=l.o.s.color;ctx.beginPath();ctx.arc(bx+4,by,2.6,0,7);ctx.fill();
+     ctx.fillStyle=l.o.s.color;ctx.font="bold 9px 'IBM Plex Mono'";ctx.fillText(name,bx+11,by-2);
+     ctx.fillStyle="#e6efe9";ctx.font="9.5px 'IBM Plex Mono'";ctx.fillText(val,bx+11,by+8);});}
+  ctx.fillStyle="#3f4a44";ctx.font="8px 'IBM Plex Mono'";ctx.textAlign="left";ctx.fillText((LOGon?"log · ":"")+"normalized · each line spans its own range",plotL+2,plotT-6);
   if(TS.length>1){const ts=sliceN(TS),now=Math.floor(Date.now()/1000),off=maxLen-ts.length;
     ctx.font="8.5px 'IBM Plex Mono'";
     [0,0.34,0.67,1].forEach((p,pi,arr)=>{const i=Math.round(p*(ts.length-1));if(i<0||i>=ts.length)return;
@@ -2249,10 +2524,20 @@ function drawChart(){
       let x=X(off+i);x=Math.max(PADL+tw/2+2,Math.min(W-PADR-tw/2-2,x));
       ctx.fillStyle="rgba(3,5,4,.75)";ctx.fillRect(x-tw/2-3,H-11,tw+6,11);
       ctx.fillStyle="#7c8a83";ctx.textAlign="center";ctx.fillText(lbl,x,H-2.5);});}
-  // crosshair
   if(_hoverI!=null&&meta.length){const hi=Math.max(0,Math.min(maxLen-1,_hoverI)),hx=X(hi);
-    ctx.strokeStyle="rgba(255,255,255,.25)";ctx.setLineDash([3,4]);ctx.beginPath();ctx.moveTo(hx,PADT);ctx.lineTo(hx,plotB);ctx.stroke();ctx.setLineDash([]);
-    meta.forEach(m=>{const idx=hi-m.off;if(idx>=0&&idx<m.d.length){ctx.fillStyle=m.s.color;ctx.beginPath();ctx.arc(hx,m.Y(m.d[idx]),3.2,0,7);ctx.fill();}});}
+    ctx.strokeStyle="rgba(255,255,255,.22)";ctx.setLineDash([3,4]);ctx.beginPath();ctx.moveTo(hx,plotT);ctx.lineTo(hx,plotB);ctx.stroke();ctx.setLineDash([]);
+    const rows=[];meta.forEach(m=>{const idx=hi-m.off;if(idx>=0&&idx<m.d.length){const v=m.d[idx],y=m.Y(v);ctx.fillStyle=m.s.color;ctx.shadowColor=m.s.color;ctx.shadowBlur=9;ctx.beginPath();ctx.arc(hx,y,4,0,7);ctx.fill();ctx.shadowBlur=0;rows.push({c:m.s.color,n:m.s.label,v:m.s.fmtV(v)});}});
+    if(volOn){const vd=sliceN(SERIES.vol.data),vi=hi-(maxLen-vd.length);if(vi>=0&&vi<vd.length)rows.push({c:SERIES.vol.color,n:"Volume",v:SERIES.vol.fmtV(vd[vi]||0)});}
+    ctx.font="11px 'IBM Plex Mono'";let tw=0;rows.forEach(r=>{tw=Math.max(tw,ctx.measureText(r.n).width+ctx.measureText(r.v).width);});
+    let timeLbl="";if(TS.length>1){const ts=sliceN(TS),ti=hi-(maxLen-ts.length);if(ti>=0&&ti<ts.length){timeLbl=ago(Math.floor(Date.now()/1000)-ts[ti]);if(ti===ts.length-1)timeLbl="now";}}
+    const rh=17,bw2=tw+42,bh=rows.length*rh+(timeLbl?18:6)+6;
+    let bx=hx+16;if(bx+bw2>W-6)bx=hx-16-bw2;bx=Math.max(6,bx);
+    let by=(_hoverPy!=null?_hoverPy-bh/2:plotT+12);by=Math.max(plotT+2,Math.min(plotB-bh-2,by));
+    ctx.fillStyle="rgba(6,10,8,.94)";ctx.strokeStyle="rgba(0,200,5,.28)";ctx.lineWidth=1;roundRect(ctx,bx,by,bw2,bh,9);ctx.fill();ctx.stroke();
+    let yy=by+7;if(timeLbl){ctx.fillStyle="#7c8a83";ctx.font="9px 'IBM Plex Mono'";ctx.textAlign="left";ctx.fillText("⌁ "+timeLbl,bx+12,yy+7);yy+=16;}
+    rows.forEach(r=>{ctx.fillStyle=r.c;ctx.shadowColor=r.c;ctx.shadowBlur=6;ctx.beginPath();ctx.arc(bx+13,yy+8,3,0,7);ctx.fill();ctx.shadowBlur=0;
+      ctx.fillStyle="#bfd3c8";ctx.font="10.5px 'IBM Plex Mono'";ctx.textAlign="left";ctx.fillText(r.n,bx+22,yy+11);
+      ctx.fillStyle="#ffffff";ctx.font="bold 11px 'IBM Plex Mono'";ctx.textAlign="right";ctx.fillText(r.v,bx+bw2-11,yy+11);yy+=rh;});}
   _chart={W,PADR,PADL,maxLen,X};
 }
 function drawPrice(){drawChart();}
@@ -2260,8 +2545,26 @@ window.addEventListener("resize",()=>{clearTimeout(_flowT);_flowT=setTimeout(bui
 (function(){const c=$("c_price");if(!c)return;let raf=0;
   const draw=()=>{if(!raf)raf=requestAnimationFrame(()=>{raf=0;drawChart();});};
   c.addEventListener("mousemove",e=>{if(!_chart)return;const r=c.getBoundingClientRect(),x=e.clientX-r.left;
+    _hoverPy=e.clientY-r.top;
     _hoverI=Math.round((x-_chart.PADL)/(_chart.W-_chart.PADR-_chart.PADL-2)*(_chart.maxLen-1));draw();}); // rAF-throttled: 1 redraw/frame
-  c.addEventListener("mouseleave",()=>{_hoverI=null;draw();});})();
+  c.addEventListener("mouseleave",()=>{_hoverI=null;_hoverPy=null;draw();});})();
+// ===== PWA: installable app + install prompt/notification =====
+let _deferredPrompt=null;
+function isStandalone(){try{return window.matchMedia("(display-mode: standalone)").matches||navigator.standalone===true;}catch(e){return false;}}
+function maybeShowPwa(){
+  if(isStandalone())return;
+  try{if(localStorage.getItem("mm_pwa_dismiss"))return;}catch(e){}
+  const b=$("pwaBanner");if(!b)return;
+  const iOS=/iphone|ipad|ipod/i.test(navigator.userAgent);
+  if(!_deferredPrompt&&!iOS)return; // wait for the browser's install signal (or iOS which has none)
+  if(iOS&&!_deferredPrompt){$("pwaHint").innerHTML="Tap <b>Share</b> then <b>Add to Home Screen</b>.";$("pwaInstall").style.display="none";}
+  b.classList.add("show");
+}
+window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();_deferredPrompt=e;maybeShowPwa();});
+window.addEventListener("appinstalled",()=>{dismissPwa(true);toast("Installed ✓ — open Market Maker from your home screen");});
+async function pwaInstall(){if(!_deferredPrompt){dismissPwa(true);return;}const e=_deferredPrompt;_deferredPrompt=null;try{e.prompt();const r=await e.userChoice;if(r&&r.outcome==="accepted")toast("Installing…");}catch(_){}dismissPwa(false);}
+function dismissPwa(){const b=$("pwaBanner");if(b)b.classList.remove("show");try{localStorage.setItem("mm_pwa_dismiss","1");}catch(e){}}
+if("serviceWorker" in navigator){window.addEventListener("load",()=>{navigator.serviceWorker.register("sw.js").catch(()=>{});setTimeout(maybeShowPwa,3500);});}
 boot();
 </script>
 
