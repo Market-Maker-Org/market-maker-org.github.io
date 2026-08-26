@@ -835,10 +835,8 @@
     </div>
     <div class="win" style="margin-top:9px">
       <button class="wbtn primary" id="btnPump" onclick="pubPump()" title="Permissionless — anyone can trigger">⚙ Pump</button>
-      <button class="wbtn" id="btnBuy" onclick="pubBuyback()" title="Permissionless — anyone can trigger">↻ Buyback</button>
     </div>
     <div class="pmreward" id="pm_reward"></div>
-    <div class="bbstat" id="bb_status"></div>
     <div class="poolstrip" id="poolList"></div>
     <div class="muted" style="margin-top:auto;padding-top:6px" id="trigNote">Permissionless — anyone can trigger. Each pump burns the pool MM owed by real holder decay, then re-syncs the pair → MM/ETH rises.</div>
   </div>
@@ -1608,15 +1606,8 @@ async function fetchSlow(){
     const yr=(1-Math.pow(1-decayR,31536000))*100;
     $("d_decay").innerHTML=yr.toFixed(1)+" <small style='color:var(--faint)'>%/yr</small>";
     $("d_fee").textContent=((burnBps+reflBps+recentBps+treBps)/100).toFixed(1)+"%";
-    const bp=$("btnPump"),bb=$("btnBuy");if(bp){bp.disabled=mirrorX===0;bb.disabled=!bbOn;}
+    const bp=$("btnPump");if(bp)bp.disabled=mirrorX===0;
     const set=(id,v)=>{const el=$(id);if(el)el.textContent=v;};set("pm_mirror",mirrorX.toFixed(2)+"×");set("fw_dr",yr.toFixed(1)+"%/yr");
-    // buyback status: why open/closed
-    const eth=Number(E.formatUnits(ethBal,18)),th=Number(E.formatUnits(bbThresh,18)),nR=Number(bbRouters);
-    const ready=bbOn&&nR>0&&eth>=th;
-    const bs=$("bb_status");if(bs){
-      const reasons=[];if(!bbOn)reasons.push("disabled");if(nR===0)reasons.push("no router");if(eth<th)reasons.push("needs ETH");
-      bs.innerHTML=`↻ Buyback ${ready?'<b class="up">ARMED</b>':'<span class="off">off · '+reasons.join(" · ")+'</span>'} — treasury ETH <b>${eth.toFixed(4)}</b> / ${th.toFixed(3)} · ${nR} router${nR!==1?'s':''}`;
-    }
   }catch(e){}
 }
 async function refresh(){
