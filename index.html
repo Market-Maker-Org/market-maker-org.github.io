@@ -2462,9 +2462,7 @@ function drawChart(){
   const volOn=SERIES.vol.on&&SERIES.vol.data.length>1;
   const PADT=18,PADR=16,GUT=Math.min(124,Math.max(88,W*0.15)),PADL=GUT,PADBx=18,volH=volOn?Math.round(H*0.16):0;
   const plotB=H-PADBx-volH,plotT=PADT,plotL=PADL,plotW=W-PADR-plotL,plotH=plotB-plotT;
-  ctx.strokeStyle="rgba(255,255,255,.045)";ctx.lineWidth=1;
-  for(let g=0;g<=4;g++){const y=plotT+g*plotH/4;ctx.beginPath();ctx.moveTo(plotL,y);ctx.lineTo(W-PADR,y);ctx.stroke();}
-  if(!lines.length&&!volOn){ctx.fillStyle="#5f6b64";ctx.font="12px 'IBM Plex Mono',monospace";ctx.textAlign="center";ctx.fillText("loading history…",W/2,H/2);_chart={W,PADR,PADL,maxLen:2,X:()=>plotL};return;}
+  if(!lines.length&&!volOn){ctx.strokeStyle="rgba(255,255,255,.045)";ctx.lineWidth=1;for(let g=0;g<=4;g++){const y=plotT+g*plotH/4;ctx.beginPath();ctx.moveTo(plotL,y);ctx.lineTo(W-PADR,y);ctx.stroke();}ctx.fillStyle="#5f6b64";ctx.font="12px 'IBM Plex Mono',monospace";ctx.textAlign="center";ctx.fillText("loading history…",W/2,H/2);_chart={W,PADR,PADL,maxLen:2,X:()=>plotL};return;}
   const allForLen=lines.concat(volOn?[["vol",SERIES.vol]]:[]);
   const maxLen=Math.max(...allForLen.map(([k,s])=>sliceN(s.data).length),2);
   const X=i=>maxLen<2?(W-PADR-2):plotL+i/(maxLen-1)*(plotW-2);
@@ -2475,22 +2473,28 @@ function drawChart(){
   const based=lines.map(([k,s])=>{const raw=sliceN(s.data);let lp2=0;const d=raw.map(v=>{if(v>0)lp2=v;return v>0?v:(lp2||0);});
     let lo=Infinity,hi=-Infinity;d.forEach(v=>{const t=tf(v);if(t<lo)lo=t;if(t>hi)hi=t;});
     return {k,s,d,lo,hi,off:maxLen-d.length};});
-  const PADf=0.08;
-  const Yof=o=>v=>{if(o.hi<=o.lo)return plotT+plotH*0.5;const t=(tf(v)-o.lo)/(o.hi-o.lo);return plotB-(PADf+t*(1-2*PADf))*plotH;};
+  // EACH SERIES GETS ITS OWN HORIZONTAL LANE (shared time axis) → distinct shapes, no overlap/convergence
+  const NL=based.length,laneH=plotH/NL,LPAD=Math.min(13,laneH*0.17);
+  based.forEach((o,i)=>{o.lt=plotT+i*laneH+LPAD;o.lb=plotT+(i+1)*laneH-LPAD;o.lcy=plotT+(i+0.5)*laneH;});
+  const Yof=o=>v=>{if(o.hi<=o.lo)return (o.lt+o.lb)/2;const t=(tf(v)-o.lo)/(o.hi-o.lo);return o.lb-t*(o.lb-o.lt);};
+  based.forEach((o,i)=>{const ly=plotT+i*laneH; // lane bg + separators + faint mid guide
+    ctx.fillStyle=o.s.color+"06";ctx.fillRect(plotL,ly+1,plotW,laneH-2);
+    if(i>0){ctx.strokeStyle="rgba(255,255,255,.07)";ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(plotL,ly);ctx.lineTo(W-PADR,ly);ctx.stroke();}
+    ctx.strokeStyle="rgba(255,255,255,.04)";ctx.setLineDash([1,5]);ctx.beginPath();ctx.moveTo(plotL,o.lcy);ctx.lineTo(W-PADR,o.lcy);ctx.stroke();ctx.setLineDash([]);});
   const meta=[];
   // candle-columns behind the lines — per series, translucent, from baseline up to value (static, no animation)
   if(chartBars){const COLS=Math.min(maxLen,46),bw=Math.max(3,plotW/COLS*0.6),lim=Math.ceil(maxLen*_reveal);
     for(let ci=0;ci<COLS;ci++){const gi=COLS<2?maxLen-1:Math.round(ci/(COLS-1)*(maxLen-1));if(gi>=lim)break;const gx=X(gi);
       based.forEach(o=>{const Y=Yof(o),hero=o.k==="price",li=gi-o.off;if(li<0||li>=o.d.length)return;
-        const y=Y(o.d[li]),h=Math.max(1.5,plotB-y);
-        const gr=ctx.createLinearGradient(0,y,0,plotB);gr.addColorStop(0,o.s.color+(hero?'2a':'1c'));gr.addColorStop(1,o.s.color+'04');
+        const y=Y(o.d[li]),h=Math.max(1.5,o.lb-y);
+        const gr=ctx.createLinearGradient(0,y,0,o.lb);gr.addColorStop(0,o.s.color+(hero?'2a':'1c'));gr.addColorStop(1,o.s.color+'04');
         ctx.fillStyle=gr;ctx.fillRect(gx-bw/2,y,bw,h);
       });}}
   based.forEach((o,oi)=>{const {k,s,d}=o,hero=k==="price",Y=Yof(o);meta.push({k,s,d,off:o.off,Y});
     const pts=d.map((v,i)=>[X(o.off+i),Y(v)]);const rc=Math.max(2,Math.ceil(pts.length*_reveal)),rp=pts.slice(0,rc);
     ctx.lineJoin="round";ctx.lineCap="round";
-    if(hero){ctx.beginPath();smoothLine(ctx,rp);ctx.lineTo(rp[rp.length-1][0],plotB);ctx.lineTo(rp[0][0],plotB);ctx.closePath();
-      const gr=ctx.createLinearGradient(0,plotT,0,plotB);gr.addColorStop(0,s.color+"22");gr.addColorStop(.6,s.color+"07");gr.addColorStop(1,s.color+"00");ctx.fillStyle=gr;ctx.fill();}
+    {ctx.beginPath();smoothLine(ctx,rp);ctx.lineTo(rp[rp.length-1][0],o.lb);ctx.lineTo(rp[0][0],o.lb);ctx.closePath();
+      const gr=ctx.createLinearGradient(0,o.lt,0,o.lb);gr.addColorStop(0,s.color+(hero?"22":"16"));gr.addColorStop(1,s.color+"00");ctx.fillStyle=gr;ctx.fill();}
     ctx.beginPath();smoothLine(ctx,rp);ctx.strokeStyle=s.color;ctx.lineWidth=hero?2.4:1.7;ctx.globalAlpha=hero?1:.8;
     ctx.shadowColor=s.color;ctx.shadowBlur=hero?10:6;ctx.stroke();ctx.shadowBlur=0;ctx.globalAlpha=1;
     // 2–3 long light streaks gliding along the line like fluid (no dots)
@@ -2498,11 +2502,10 @@ function drawChart(){
     ctx.setLineDash([22,168]);ctx.lineDashOffset=-((flow*1.5+oi*57)%190);ctx.shadowColor=s.color;ctx.shadowBlur=14;ctx.stroke();ctx.restore();ctx.shadowBlur=0;ctx.globalAlpha=1;
   });
   // ===== LEFT stacked legend cards, each wired to its own line with a flowing neon connector =====
-  {const rows=based.slice();const volRow=volOn?SERIES.vol:null;const N=rows.length+(volRow?1:0);
-   const top=plotT+4,bot=plotB-4,rh=(bot-top)/Math.max(N,1);
+  {const rows=based.slice();const volRow=volOn?SERIES.vol:null;
    const hi=_hoverI==null?null:Math.max(0,Math.min(maxLen-1,_hoverI));
-   const attachX=plotL+plotW*0.17,flow=(_flowPhase||0),midY=plotT+plotH/2;
-   rows.forEach((o,ri)=>{const {k,s,d,off}=o;const Y=Yof(o);const cy=top+rh*(ri+0.5);
+   const attachX=plotL+plotW*0.14,flow=(_flowPhase||0),midY=plotT+plotH/2;
+   rows.forEach((o,ri)=>{const {k,s,d,off}=o;const Y=Yof(o);const cy=o.lcy;
      let val;if(hi!=null){const idx=hi-off;val=(idx>=0&&idx<d.length)?d[idx]:d[d.length-1];}else val=d[d.length-1];
      const first=d.find(x=>x>0)||d[0]||1,chg=(val/first-1)*100,up=chg>=0;
      const chgTxt=Math.abs(chg)>=1000?("×"+compactNum(val/first)):((up?"▲":"▼")+Math.abs(chg).toFixed(1)+"%");
@@ -2521,11 +2524,11 @@ function drawChart(){
      ctx.font="10.5px 'IBM Plex Mono'";ctx.fillStyle="#d7ded9";ctx.fillText(s.fmtV(val),14,cy+9);
      ctx.font="8px 'IBM Plex Mono'";ctx.fillStyle=up?"#39d353":"#ff5a4d";ctx.textAlign="right";ctx.fillText(chgTxt,GUT-4,cy-3);
    });
-   if(volRow){const cy=top+rh*(rows.length+0.5);const vd=sliceN(volRow.data);let val=hi!=null?(vd[hi-(maxLen-vd.length)]??vd[vd.length-1]):vd[vd.length-1];
+   if(volRow){const cy=H-14-volH/2;const vd=sliceN(volRow.data);let val=hi!=null?(vd[hi-(maxLen-vd.length)]??vd[vd.length-1]):vd[vd.length-1];
      ctx.textAlign="left";ctx.fillStyle=volRow.color;ctx.beginPath();ctx.arc(6,cy,3,0,7);ctx.fill();
      ctx.font="bold 10px 'IBM Plex Mono'";ctx.fillStyle=volRow.color;ctx.fillText(volRow.ab||volRow.label,14,cy-3);
      ctx.font="10.5px 'IBM Plex Mono'";ctx.fillStyle="#d7ded9";ctx.fillText(volRow.fmtV(val||0),14,cy+9);}}
-  ctx.fillStyle="#3f4a44";ctx.font="8px 'IBM Plex Mono'";ctx.textAlign="left";ctx.fillText((LOGon?"log · ":"")+"normalized · each line spans its own range",plotL+2,plotT-6);
+  ctx.fillStyle="#3f4a44";ctx.font="8px 'IBM Plex Mono'";ctx.textAlign="left";ctx.fillText((LOGon?"log · ":"")+"each series in its own lane · shared time axis",plotL+2,plotT-6);
   if(TS.length>1){const ts=sliceN(TS),now=Math.floor(Date.now()/1000),off=maxLen-ts.length;
     ctx.font="8.5px 'IBM Plex Mono'";
     [0,0.34,0.67,1].forEach((p,pi,arr)=>{const i=Math.round(p*(ts.length-1));if(i<0||i>=ts.length)return;
