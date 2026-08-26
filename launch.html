@@ -1,0 +1,388 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<title>Market Maker Launchpad</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="mm.png">
+<meta name="theme-color" content="#000000">
+<meta name="description" content="Launch MM-quoted tokens on a bonding curve. Buy/sell before bond; auto-graduates to a Uniswap V2 pool with LP burned.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800;900&family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<script src="ethers.umd.min.js"></script>
+<script src="artifacts.js"></script>
+<script src="launch-artifacts.js"></script>
+<style>
+  :root{
+    --bg:#000;--panel:#080808;--panel2:#101010;--ink:#f4f7f5;--soft:#9aa39e;--faint:#616763;
+    --line:#1b1b1b;--line2:#2a2a2a;--green:#00C805;--green2:#38ff7e;--greenDim:#0a2e14;
+    --orange:#ff7a18;--orange2:#ffa24d;--up:#00C805;--down:#ff5a2c;
+    --mono:"IBM Plex Mono",ui-monospace,monospace;--sans:"IBM Plex Sans",system-ui,sans-serif;--disp:"Archivo",sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{min-height:100%}
+  body{margin:0;color:var(--ink);font-family:var(--sans);font-size:13.5px;line-height:1.5;-webkit-font-smoothing:antialiased;
+    background:radial-gradient(130% 90% at 88% -12%,#0c0c0c 0%,transparent 55%),radial-gradient(90% 60% at -5% 0%,#0a0a0a,transparent 55%),
+    linear-gradient(rgba(255,255,255,.018) 1px,transparent 1px) 0 0/40px 40px,linear-gradient(90deg,rgba(255,255,255,.018) 1px,transparent 1px) 0 0/40px 40px,var(--bg)}
+  .mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+  a{color:var(--green2);text-decoration:none}
+  /* header */
+  header{display:flex;align-items:center;gap:14px;height:52px;padding:0 18px;border-bottom:1px solid var(--line);
+    background:rgba(0,0,0,.6);backdrop-filter:blur(8px);position:sticky;top:0;z-index:20}
+  .brand{font-family:var(--disp);font-weight:900;font-size:17px;letter-spacing:-.02em;display:flex;align-items:center;gap:9px}
+  .brand b{color:var(--green)}
+  .logo{width:24px;height:24px;border-radius:6px;border:1px solid var(--green);display:grid;place-items:center;color:var(--green);font-weight:900}
+  .spacer{flex:1}
+  .chip{font-family:var(--mono);font-size:11px;color:var(--soft);border:1px solid var(--line2);border-radius:100px;padding:5px 10px;display:flex;gap:6px;align-items:center}
+  .chip .d{width:7px;height:7px;border-radius:50%;background:var(--orange)}
+  .chip.ok .d{background:var(--green);box-shadow:0 0 8px var(--green)}
+  .hbtn{background:var(--panel2);border:1px solid var(--line2);color:var(--ink);font-family:var(--disp);font-weight:700;font-size:12px;padding:7px 12px;border-radius:8px;cursor:pointer}
+  .hbtn.green{background:var(--green);color:#00220a;border:0}
+  .hbtn:hover{border-color:var(--green)}
+  .navlink{font-family:var(--mono);font-size:11px;color:var(--soft);padding:5px 8px;border-radius:7px}
+  .navlink:hover{color:var(--ink);background:var(--panel2)}
+  /* layout */
+  .wrap{max-width:1080px;margin:0 auto;padding:22px 18px 80px}
+  .tabs{display:flex;gap:8px;margin:6px 0 20px}
+  .tab{font-family:var(--disp);font-weight:700;font-size:13px;color:var(--soft);background:var(--panel);border:1px solid var(--line);
+    padding:9px 16px;border-radius:10px;cursor:pointer}
+  .tab.on{color:var(--green);border-color:var(--green);background:var(--greenDim)}
+  h1{font-family:var(--disp);font-weight:900;font-size:26px;letter-spacing:-.02em;margin:0 0 4px}
+  .lede{color:var(--soft);margin:0 0 18px;max-width:64ch}
+  .banner{background:linear-gradient(90deg,rgba(255,122,24,.12),transparent);border:1px solid var(--orange);border-radius:12px;
+    padding:12px 15px;margin-bottom:18px;color:var(--orange2);font-family:var(--mono);font-size:12px;display:none}
+  /* cards */
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+  .card{background:linear-gradient(180deg,var(--panel),#000);border:1px solid var(--line);border-radius:14px;padding:16px;cursor:pointer;transition:border-color .15s}
+  .card:hover{border-color:var(--green)}
+  .card .top{display:flex;align-items:center;gap:11px;margin-bottom:12px}
+  .avatar{width:40px;height:40px;border-radius:10px;background:var(--panel2);border:1px solid var(--line2);object-fit:cover;flex:0 0 auto;display:grid;place-items:center;font-family:var(--disp);font-weight:800;color:var(--soft)}
+  .nm{font-family:var(--disp);font-weight:800;font-size:15px;line-height:1.1}
+  .sym{font-family:var(--mono);font-size:11px;color:var(--soft)}
+  .badge{margin-left:auto;font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;padding:3px 8px;border-radius:100px;border:1px solid var(--line2);color:var(--soft)}
+  .badge.bond{color:var(--green2);border-color:var(--greenDim);background:var(--greenDim)}
+  .badge.grad{color:var(--orange2);border-color:var(--orange)}
+  .prog{height:8px;border-radius:5px;background:var(--panel2);overflow:hidden;margin:4px 0 6px}
+  .prog>i{display:block;height:100%;background:linear-gradient(90deg,var(--green),var(--green2));border-radius:5px;transition:width .3s}
+  .row{display:flex;justify-content:space-between;font-family:var(--mono);font-size:11.5px;color:var(--soft)}
+  .row b{color:var(--ink)}
+  /* forms + panel */
+  .panel{background:linear-gradient(180deg,var(--panel),#000);border:1px solid var(--line);border-radius:16px;padding:22px;max-width:560px}
+  label{display:block;font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--soft);margin:14px 0 5px}
+  input,select{width:100%;background:#000;border:1px solid var(--line2);color:var(--ink);font-family:var(--mono);font-size:14px;padding:11px 12px;border-radius:9px}
+  input:focus,select:focus{outline:none;border-color:var(--green)}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .hint{font-family:var(--mono);font-size:11px;color:var(--faint);margin-top:5px}
+  .big{width:100%;margin-top:20px;padding:13px;font-family:var(--disp);font-weight:800;font-size:14px;border:0;border-radius:11px;background:var(--green);color:#00220a;cursor:pointer}
+  .big:disabled{opacity:.5;cursor:not-allowed}
+  .big.sell{background:var(--orange)}
+  .segmented{display:flex;gap:0;border:1px solid var(--line2);border-radius:9px;overflow:hidden}
+  .segmented button{flex:1;background:#000;border:0;color:var(--soft);font-family:var(--disp);font-weight:700;padding:10px;cursor:pointer}
+  .segmented button.on{background:var(--green);color:#00220a}
+  .segmented button.on.sell{background:var(--orange);color:#231000}
+  .stat{display:flex;justify-content:space-between;font-family:var(--mono);font-size:12.5px;padding:7px 0;border-bottom:1px solid var(--line)}
+  .stat b{color:var(--ink)}
+  .muted{color:var(--soft)}
+  .back{font-family:var(--mono);font-size:12px;color:var(--soft);cursor:pointer;margin-bottom:14px;display:inline-block}
+  .back:hover{color:var(--ink)}
+  .empty{color:var(--faint);font-family:var(--mono);font-size:13px;text-align:center;padding:50px 0}
+  #toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--panel2);border:1px solid var(--line2);
+    color:var(--ink);font-family:var(--mono);font-size:12.5px;padding:11px 16px;border-radius:10px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:50;max-width:90vw}
+  #toast.show{opacity:1}
+  #toast.warn{border-color:var(--orange);color:var(--orange2)}
+  .hide{display:none!important}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><span class="logo">M</span>Market&nbsp;<b>Launchpad</b></div>
+  <div class="chip" id="net"><span class="d"></span><span id="nettxt">connecting…</span></div>
+  <div class="spacer"></div>
+  <a class="navlink" href="index.html">← Terminal</a>
+  <button class="hbtn green" id="connectBtn">Connect</button>
+</header>
+
+<div class="wrap">
+  <div class="banner" id="cfgBanner"></div>
+
+  <div class="tabs">
+    <div class="tab on" id="tab-explore" onclick="showTab('explore')">Explore</div>
+    <div class="tab" id="tab-create" onclick="showTab('create')">Create</div>
+  </div>
+
+  <!-- EXPLORE -->
+  <section id="view-explore">
+    <h1>Launches</h1>
+    <p class="lede">MM-quoted bonding curves. Buy in with MM before bond; at the target the curve seeds a Uniswap V2 pool at the graduation price and burns the LP — nobody owns the liquidity.</p>
+    <div class="grid" id="list"></div>
+    <div class="empty hide" id="listEmpty"></div>
+  </section>
+
+  <!-- DETAIL / TRADE -->
+  <section id="view-detail" class="hide">
+    <span class="back" onclick="showTab('explore')">← all launches</span>
+    <div class="panel" id="detailPanel"></div>
+  </section>
+
+  <!-- CREATE -->
+  <section id="view-create" class="hide">
+    <h1>Create a launch</h1>
+    <p class="lede">Fixed 1B supply. Set how much MM you want to raise and the market cap at bond; the curve is derived automatically.</p>
+    <div class="panel">
+      <div class="two">
+        <div><label>Name</label><input id="f-name" placeholder="Doge Coin" maxlength="40"></div>
+        <div><label>Symbol</label><input id="f-symbol" placeholder="DOGE" maxlength="12"></div>
+      </div>
+      <label>Logo URL (ipfs:// or https://)</label>
+      <input id="f-logo" placeholder="ipfs://…">
+      <div class="two">
+        <div><label>Raise target (MM)</label><input id="f-raise" class="mono" placeholder="1000000" inputmode="decimal"></div>
+        <div><label>Market cap @ bond (MM)</label><input id="f-mcap" class="mono" placeholder="4000000" inputmode="decimal"></div>
+      </div>
+      <div class="hint" id="f-hint">Constant-product: market cap must be &gt; 2× the raise.</div>
+      <label>Curve model</label>
+      <select id="f-type">
+        <option value="0">Constant-product (recommended — price rises with demand)</option>
+        <option value="1">Fixed price (constant; note: aggressive supply burn at bond)</option>
+      </select>
+      <button class="big" id="createBtn" onclick="doCreate()">Create launch</button>
+    </div>
+  </section>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const E=window.ethers;
+// ---- config (MM is live; set launchFactory after you deploy the launchpad) ----
+const CFG={
+  rpc:"https://rpc.mainnet.chain.robinhood.com",
+  chainIdHex:"0x1237", chainId:4663,
+  chainParams:{chainId:"0x1237",chainName:"Robinhood Chain",nativeCurrency:{name:"Ether",symbol:"ETH",decimals:18},
+    rpcUrls:["https://rpc.mainnet.chain.robinhood.com"],blockExplorerUrls:["https://robinhoodchain.blockscout.com"]},
+  explorer:"https://robinhoodchain.blockscout.com",
+  mm:"0xA6FA16a2257d5cF8755216311837955904FD8271",
+  launchFactory:"0x0000000000000000000000000000000000000000" // <-- paste deployed LaunchpadFactory here
+};
+const A=window.MM_ARTIFACTS, L=window.MM_LAUNCH_ARTIFACTS;
+const $=id=>document.getElementById(id);
+const short=a=>a.slice(0,6)+"…"+a.slice(-4);
+const factorySet=()=>/^0x[0-9a-fA-F]{40}$/.test(CFG.launchFactory)&&CFG.launchFactory!=="0x0000000000000000000000000000000000000000";
+
+let ro,signer,account,factoryRead;
+function toast(m,kind){const t=$("toast");t.textContent=m;t.className="show"+(kind?" "+kind:"");clearTimeout(t._t);t._t=setTimeout(()=>t.className="",3200);}
+function fmt(bn,dec=18,dp=4){try{const s=E.formatUnits(bn,dec);const n=Number(s);if(n>=1e6)return (n/1e6).toLocaleString(undefined,{maximumFractionDigits:2})+"M";if(n>=1)return n.toLocaleString(undefined,{maximumFractionDigits:dp});return n.toLocaleString(undefined,{maximumFractionDigits:6});}catch(e){return "0";}}
+
+async function init(){
+  ro=new E.JsonRpcProvider(CFG.rpc);
+  try{await ro.getBlockNumber();$("net").classList.add("ok");$("nettxt").textContent="Robinhood · live";}
+  catch(e){$("nettxt").textContent="RPC error";}
+  if(!factorySet()){
+    $("cfgBanner").style.display="block";
+    $("cfgBanner").textContent="⚠ Launchpad factory address not set yet. Deploy LaunchpadFactory on Robinhood Chain, then paste its address into CFG.launchFactory in launch.html.";
+  }else{
+    factoryRead=new E.Contract(CFG.launchFactory,L.factory.abi,ro);
+  }
+  loadList();
+}
+
+// ---------------- wallet ----------------
+async function connectWallet(){
+  if(!window.ethereum){toast("Install MetaMask or Rabby to connect","warn");return;}
+  try{
+    const bp=new E.BrowserProvider(window.ethereum);
+    await bp.send("eth_requestAccounts",[]);
+    signer=await bp.getSigner();account=await signer.getAddress();
+    $("connectBtn").textContent=short(account);
+    toast("Connected · "+short(account));
+  }catch(e){toast(e&&e.code===4001?"Connection rejected":"Connect failed","warn");}
+}
+async function ensureChain(){
+  if(!signer){await connectWallet();if(!signer)return false;}
+  try{if(Number((await signer.provider.getNetwork()).chainId)===CFG.chainId)return true;}catch(e){}
+  try{
+    try{await window.ethereum.request({method:"wallet_switchEthereumChain",params:[{chainId:CFG.chainIdHex}]});}
+    catch(e){const c=e&&(e.code||(e.data&&e.data.originalError&&e.data.originalError.code));
+      if(c===4902||/nrecognized|not been added|4902/i.test((e&&e.message||"")))await window.ethereum.request({method:"wallet_addEthereumChain",params:[CFG.chainParams]});else throw e;}
+    const bp=new E.BrowserProvider(window.ethereum);signer=await bp.getSigner();account=await signer.getAddress();
+    return true;
+  }catch(e){toast("Switch your wallet to Robinhood Chain (4663)","warn");return false;}
+}
+
+// ---------------- explore list ----------------
+async function loadList(){
+  const list=$("list"),empty=$("listEmpty");list.innerHTML="";
+  if(!factorySet()){empty.classList.remove("hide");empty.textContent="No launchpad deployed yet.";return;}
+  let n=0;try{n=Number(await factoryRead.launchesCount());}catch(e){empty.classList.remove("hide");empty.textContent="Could not read factory.";return;}
+  if(n===0){empty.classList.remove("hide");empty.textContent="No launches yet — be the first (Create tab).";return;}
+  empty.classList.add("hide");
+  const start=Math.max(0,n-30);
+  for(let i=n-1;i>=start;i--){
+    try{
+      const lk=await factoryRead.launches(i);
+      const meta=await readLaunch(lk.token,lk.curve,Number(lk.curveType));
+      list.appendChild(card(i,meta));
+    }catch(e){}
+  }
+}
+async function readLaunch(tokenAddr,curveAddr,curveType){
+  const tok=new E.Contract(tokenAddr,L.launchToken.abi,ro);
+  const cur=new E.Contract(curveAddr,L.curve.abi,ro);
+  const [name,symbol,logo]=await Promise.all([tok.name(),tok.symbol(),tok.logoURI().catch(()=>"")]);
+  const [netRaised,targetMM,tokensSold,curveSupply,graduated,pair]=await Promise.all([
+    cur.netRaised(),cur.targetMM(),cur.tokensSold(),cur.curveSupply(),cur.graduated(),cur.pair().catch(()=>E.ZeroAddress)]);
+  return {tokenAddr,curveAddr,curveType,name,symbol,logo,netRaised,targetMM,tokensSold,curveSupply,graduated,pair};
+}
+function pct(a,b){try{const x=Number(E.formatUnits(a,18)),y=Number(E.formatUnits(b,18));return y>0?Math.min(100,x/y*100):0;}catch(e){return 0;}}
+function avatarHTML(m){const src=resolveImg(m.logo);
+  return src?`<img class="avatar" src="${src}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'avatar',textContent:'${(m.symbol||'?')[0]}'}))">`
+            :`<div class="avatar">${(m.symbol||'?')[0]}</div>`;}
+function resolveImg(u){if(!u)return "";if(u.startsWith("ipfs://"))return "https://ipfs.io/ipfs/"+u.slice(7);return u;}
+function card(i,m){
+  const p=pct(m.netRaised,m.targetMM);
+  const d=document.createElement("div");d.className="card";d.onclick=()=>openDetail(i);
+  d.innerHTML=`<div class="top">${avatarHTML(m)}<div><div class="nm">${esc(m.name)}</div><div class="sym">$${esc(m.symbol)}</div></div>
+    <span class="badge ${m.graduated?'grad':'bond'}">${m.graduated?'Graduated':'Bonding'}</span></div>
+    <div class="prog"><i style="width:${m.graduated?100:p}%"></i></div>
+    <div class="row"><span>${m.graduated?'Bonded':'Raised'}</span><b>${fmt(m.netRaised)} / ${fmt(m.targetMM)} MM</b></div>
+    <div class="row"><span>${m.curveType===0?'Constant-product':'Fixed price'}</span><span>${p.toFixed(1)}%</span></div>`;
+  return d;
+}
+function esc(s){return (s||"").replace(/[<>&"]/g,c=>({"<":"&lt;",">":"&gt;","&":"&amp;",'"':"&quot;"}[c]));}
+
+// ---------------- detail / trade ----------------
+let cur=null; // {i, meta}
+async function openDetail(i){
+  showView('detail');
+  $("detailPanel").innerHTML='<div class="empty">loading…</div>';
+  const lk=await factoryRead.launches(i);
+  const m=await readLaunch(lk.token,lk.curve,Number(lk.curveType));
+  cur={i,m};
+  renderDetail();
+}
+function renderDetail(){
+  const m=cur.m,p=pct(m.netRaised,m.targetMM);
+  const remaining=m.curveSupply-m.tokensSold;
+  const gradLink=m.graduated&&m.pair&&m.pair!==E.ZeroAddress?`<a href="${CFG.explorer}/address/${m.pair}" target="_blank" rel="noopener">V2 pair ↗</a>`:'';
+  $("detailPanel").innerHTML=`
+    <div class="top" style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+      ${avatarHTML(m)}<div><div class="nm" style="font-size:19px">${esc(m.name)}</div><div class="sym">$${esc(m.symbol)} · ${m.curveType===0?'Constant-product':'Fixed price'}</div></div>
+      <span class="badge ${m.graduated?'grad':'bond'}" style="margin-left:auto">${m.graduated?'Graduated':'Bonding'}</span></div>
+    <div class="prog"><i style="width:${m.graduated?100:p}%"></i></div>
+    <div class="stat"><span class="muted">Raised</span><b>${fmt(m.netRaised)} / ${fmt(m.targetMM)} MM (${p.toFixed(1)}%)</b></div>
+    <div class="stat"><span class="muted">Tokens sold</span><b>${fmt(m.tokensSold)} / ${fmt(m.curveSupply)}</b></div>
+    <div class="stat"><span class="muted">Token</span><b><a href="${CFG.explorer}/address/${m.tokenAddr}" target="_blank" rel="noopener">${short(m.tokenAddr)} ↗</a></b></div>
+    ${m.graduated?`<div class="stat"><span class="muted">Liquidity</span><b>${gradLink||'burned'}</b></div>`:''}
+    ${m.graduated?'':tradeBox(m,remaining)}
+  `;
+  if(!m.graduated)wireTrade();
+}
+function tradeBox(m,remaining){
+  return `
+  <div style="margin-top:18px">
+    <div class="segmented" id="seg">
+      <button class="on" id="seg-buy" onclick="setSide('buy')">Buy</button>
+      <button id="seg-sell" onclick="setSide('sell')">Sell</button>
+    </div>
+    <label id="amtLabel">Spend MM</label>
+    <input id="amt" class="mono" inputmode="decimal" placeholder="0.0" oninput="quote()">
+    <div class="stat" style="margin-top:10px"><span class="muted" id="outLabel">You receive</span><b id="out">—</b></div>
+    <button class="big" id="tradeBtn" onclick="doTrade()">Buy</button>
+    ${remaining>0n?'':'<div class="hint">Curve inventory sold out — anyone can call graduate.</div>'}
+    <button class="hbtn" style="width:100%;margin-top:10px" onclick="doGraduate()">Graduate (if ready)</button>
+  </div>`;
+}
+let side='buy';
+function setSide(s){side=s;
+  $("seg-buy").className=s==='buy'?'on':'';$("seg-sell").className=s==='sell'?'on sell':'';
+  $("amtLabel").textContent=s==='buy'?'Spend MM':'Sell '+cur.m.symbol;
+  $("outLabel").textContent='You receive';
+  const b=$("tradeBtn");b.textContent=s==='buy'?'Buy':'Sell';b.className='big'+(s==='sell'?' sell':'');
+  $("amt").value="";$("out").textContent="—";}
+function wireTrade(){setSide('buy');}
+let quoteTimer;
+async function quote(){
+  clearTimeout(quoteTimer);
+  quoteTimer=setTimeout(async()=>{
+    const v=$("amt").value.trim();if(!v||isNaN(v)||Number(v)<=0){$("out").textContent="—";return;}
+    try{
+      const c=new E.Contract(cur.m.curveAddr,L.curve.abi,ro);
+      const amt=E.parseUnits(v,18);
+      if(side==='buy'){const o=await c.previewBuy(amt);$("out").textContent=fmt(o)+" "+cur.m.symbol;}
+      else{const o=await c.previewSell(amt);$("out").textContent=fmt(o)+" MM";}
+    }catch(e){$("out").textContent="—";}
+  },200);
+}
+async function doTrade(){
+  const v=$("amt").value.trim();if(!v||isNaN(v)||Number(v)<=0){toast("Enter an amount","warn");return;}
+  if(!await ensureChain())return;
+  const amt=E.parseUnits(v,18);
+  const deadline=Math.floor(Date.now()/1000)+300;
+  const btn=$("tradeBtn");btn.disabled=true;
+  try{
+    const c=new E.Contract(cur.m.curveAddr,L.curve.abi,signer);
+    if(side==='buy'){
+      const mm=new E.Contract(CFG.mm,A.token.abi,signer);
+      const cur_allow=await mm.allowance(account,cur.m.curveAddr);
+      if(cur_allow<amt){toast("Approve MM…");await (await mm.approve(cur.m.curveAddr,amt)).wait();}
+      const minOut=(await c.previewBuy(amt))*95n/100n; // 5% slippage
+      toast("Buying…");await (await c.buy(amt,minOut,deadline)).wait();
+      toast("Bought "+cur.m.symbol+" ✓");
+    }else{
+      const tok=new E.Contract(cur.m.tokenAddr,L.launchToken.abi,signer);
+      const al=await tok.allowance(account,cur.m.curveAddr);
+      if(al<amt){toast("Approve "+cur.m.symbol+"…");await (await tok.approve(cur.m.curveAddr,amt)).wait();}
+      const minOut=(await c.previewSell(amt))*95n/100n;
+      toast("Selling…");await (await c.sell(amt,minOut,deadline)).wait();
+      toast("Sold ✓");
+    }
+    await openDetail(cur.i);
+  }catch(e){toast(txErr(e),"warn");}
+  finally{btn.disabled=false;}
+}
+async function doGraduate(){
+  if(!await ensureChain())return;
+  try{const c=new E.Contract(cur.m.curveAddr,L.curve.abi,signer);
+    toast("Graduating…");await (await c.graduate()).wait();toast("Graduated ✓");await openDetail(cur.i);}
+  catch(e){toast(txErr(e),"warn");}
+}
+
+// ---------------- create ----------------
+async function doCreate(){
+  const name=$("f-name").value.trim(),symbol=$("f-symbol").value.trim(),logo=$("f-logo").value.trim();
+  const raise=$("f-raise").value.trim(),mcap=$("f-mcap").value.trim(),type=Number($("f-type").value);
+  if(!factorySet()){toast("Launchpad factory not deployed yet","warn");return;}
+  if(!name||!symbol){toast("Name and symbol required","warn");return;}
+  if(!raise||isNaN(raise)||Number(raise)<=0){toast("Enter a raise target","warn");return;}
+  if(!mcap||isNaN(mcap)||Number(mcap)<=0){toast("Enter a market cap","warn");return;}
+  if(type===0&&Number(mcap)<=2*Number(raise)){toast("Market cap must be > 2× the raise","warn");return;}
+  if(!await ensureChain())return;
+  const btn=$("createBtn");btn.disabled=true;
+  try{
+    const f=new E.Contract(CFG.launchFactory,L.factory.abi,signer);
+    toast("Creating launch…");
+    const tx=await f.createLaunch(name,symbol,logo,E.parseUnits(raise,18),E.parseUnits(mcap,18),type);
+    await tx.wait();
+    toast("Launch created ✓");
+    showTab('explore');await loadList();
+  }catch(e){toast(txErr(e),"warn");}
+  finally{btn.disabled=false;}
+}
+function txErr(e){const m=(e&&(e.shortMessage||e.reason||e.message)||"tx failed")+"";
+  if(/user rejected|4001/i.test(m))return "Rejected in wallet";return m.slice(0,80);}
+
+// ---------------- view switching ----------------
+function showView(v){for(const id of ['explore','detail','create'])$("view-"+id).classList.toggle("hide",id!==v);}
+function showTab(t){
+  $("tab-explore").classList.toggle("on",t==='explore');
+  $("tab-create").classList.toggle("on",t==='create');
+  showView(t);
+  if(t==='explore')loadList();
+}
+
+$("connectBtn").onclick=connectWallet;
+init();
+</script>
+</body>
+</html>
