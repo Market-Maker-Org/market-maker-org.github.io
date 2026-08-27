@@ -344,6 +344,8 @@
     background:linear-gradient(100deg,rgba(0,200,5,.08),rgba(255,122,24,.05));border:1px solid var(--greenDim);font-size:11px}
   .pmcum .lab{color:var(--soft);display:flex;align-items:center;gap:6px}
   .pmcum b{font-family:var(--mono);color:var(--ink);font-weight:700}.pmcum b.up{color:var(--green2)}
+  .pmcum #pm_cum{font-size:20px;font-weight:800;letter-spacing:-.01em;text-shadow:0 0 13px rgba(0,200,5,.38)}
+  .pmcum #pm_cumpct{font-size:14px}
   .pmreward{margin-top:6px;font-size:10.5px;color:var(--soft);text-align:center;min-height:14px}
   .pmreward b{font-family:var(--mono);color:var(--ink)}.pmreward b.up{color:var(--green2)}
   .bbstat{margin-top:5px;font-size:10px;color:var(--faint);text-align:center}
@@ -556,7 +558,9 @@
   .odom .osep{opacity:.6;margin:0 .5px;font-weight:700}
   .odom .od{display:inline-flex;align-items:flex-start}
   .odom .reel{display:inline-block;overflow:hidden;height:1em;line-height:1;width:.62em;position:relative}
-  .odom .reel .st{display:flex;flex-direction:column;will-change:transform}
+  .odom .reel .st{display:flex;flex-direction:column}
+  /* only the actively-rolling reel (last one) gets a GPU layer — avoids promoting every static reel */
+  .odom .reel:last-child .st{will-change:transform}
   .odom .reel .st b{height:1em;display:flex;align-items:center;justify-content:center;font-weight:800}
   .odom .odc{align-self:center;margin-left:7px;font-size:11px;line-height:1}
   /* per-counter sizing: integer normal, moving decimals big */
@@ -573,6 +577,8 @@
   /* top-holders balances — decaying rows roll (moving decimals a touch bigger); stable rows stay plain */
   .hrow .bl.odom{font-size:11px}.hrow .bl.odom .od{font-size:13px}
   .hrow .bl.odom .osep{margin:0}.hrow .bl.odom .reel{width:.58em}
+  /* your-position balance — big rolling decimals (decaying wallet) */
+  #p_bal.odom{font-size:20px;vertical-align:baseline}#p_bal.odom .od{font-size:29px}
   /* direction badge colour + gentle bob (global reduced-motion reset disables the animation) */
   .odom.down .odc{color:var(--green2);animation:fallcue 1.9s ease-in-out infinite}
   .odom.up .odc{color:var(--orange2);animation:risecue 1.9s ease-in-out infinite}
@@ -852,6 +858,7 @@
       <div class="bigbal"><span id="p_bal">—</span><span class="u"><img src="mm.png" class="mmtag" alt="">MM</span></div>
       <div class="tick" id="p_tick"></div>
       <div style="margin-top:5px"><span class="badge" id="p_badge">—</span> <span class="muted cpy" id="p_addr" title="Copy address" onclick="cp(watch,'Wallet')"></span> <a class="cpy" id="p_expl" title="View on explorer" style="font-size:11px">↗</a></div>
+      <button class="wbtn primary" id="p_swapcta" style="display:none;margin-top:9px" onclick="protoTab('swap')">⇄ Buy MM — Swap ETH → MM</button>
       <div class="pnl" id="pnl"></div>
       <table class="proj" id="p_proj" style="display:none"></table>
       <input class="mm" id="watch" placeholder="0x… watch another wallet" autocomplete="off" onkeydown="if(event.key==='Enter')watchAddr()">
@@ -880,11 +887,6 @@
       <div class="fwnode debt" id="fwDebt"><div class="fl">pump debt</div><div class="fv mono" id="pm_debt">—</div></div>
       <svg class="fwarrow" viewBox="0 0 40 24"><path d="M2 12 H30" stroke="var(--green)" stroke-width="2" fill="none" class="fw-dash"/><path d="M28 6 L38 12 L28 18" fill="var(--green)"/></svg>
       <div class="fwnode burn"><div class="fl">burn → price↑</div><div class="fv mono up" id="pm_impact">—</div></div>
-    </div>
-    <div class="pmgrid">
-      <div class="pmcell"><div class="l">Mirror</div><div class="v mono" id="pm_mirror">—</div></div>
-      <div class="pmcell"><div class="l">Pool MM 💧</div><div class="v mono" id="pm_pool">—</div></div>
-      <div class="pmcell"><div class="l">Next pump burns</div><div class="v mono up" id="pm_impact2">—</div></div>
     </div>
     <div class="pmcum">
       <span class="lab">⚙ Pumped to date <b id="pm_cum">—</b> <span class="muted">MM</span></span>
@@ -1729,9 +1731,10 @@ async function refresh(){
     if($("pv-analytics")&&getComputedStyle($("pv-analytics")).display!=="none")renderAnalytics();
     if(watch){const b=await mmRead.balanceOf(watch);excluded=await mmRead.isExcluded(watch);const cb=Number(E.formatUnits(b,18));
       liveBalTarget=cb;if(!liveBal||Math.abs(cb-liveBal)/Math.max(1,cb)>0.5)liveBal=cb; // ease toward chain value; snap only on first load / huge change
-      if(excluded){liveBal=cb;$("p_bal").textContent=cb.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});$("p_tick").textContent="═ stable · no decay";}
+      if(excluded){liveBal=cb;const pb=$("p_bal");if(pb._odo){pb._odo=null;pb.classList.remove("odom","down");}pb.textContent=cb.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});$("p_tick").textContent="═ stable · no decay";}
       $("p_badge").textContent=excluded?"EXCLUDED":"INCLUDED · decaying";$("p_badge").className="badge "+(excluded?"exc":"inc");
       const ex=$("p_expl");if(ex){ex.href=EXPLORER+"/address/"+watch;ex.target="_blank";}
+      const cta=$("p_swapcta");if(cta)cta.style.display=cb<=0?"":"none"; // no MM → offer a one-tap Swap into MM
       ensureEntry(watch); // fire-and-forget: real entry point, no await → never blocks refresh
       renderPnL(liveBal);}
     if(account&&$("pv-wallet")&&getComputedStyle($("pv-wallet")).display!=="none")renderWallet(); // keep wallet balances live
@@ -1751,7 +1754,10 @@ function tickLive(){if(!watch||excluded||liveBal<=0){_liveLast=0;return;}const n
   const dt=_liveLast?(now-_liveLast)/1000:0;_liveLast=now;
   if(dt>0){const dk=Math.pow(1-decayR,dt);liveBal*=dk;if(liveBalTarget)liveBalTarget*=dk; // decay both (time-based)
     if(liveBalTarget){const e=1-Math.pow(0.5,dt/0.8);liveBal+=(liveBalTarget-liveBal)*e;}} // glide toward chain value (0.8s half-life) — no hard snap
-  $("p_bal").textContent=liveBal.toLocaleString("en-US",{minimumFractionDigits:4,maximumFractionDigits:4});$("p_tick").textContent="↓ decaying live";}
+  // adaptive decimals: keep the fastest reel rolling in a smooth, readable range (big balances → fewer
+  // decimals) so a large wallet doesn't spin the last digit into an aliased blur — matches total-supply flow
+  const bd=liveBal>=1e6?2:liveBal>=1e4?3:liveBal>=1e2?4:5;
+  renderOdom($("p_bal"),liveBal,{dec:bd,dir:"down",cue:"▼"});$("p_tick").textContent="↓ decaying live";}
 // ===== smooth neon stat counters =====
 // Each stat eases from its shown value to a fresh chain target, then (if it decays) keeps bleeding down
 // continuously between refreshes — the "pump-debt-style" animated fall the Live panel asks for.
@@ -2268,15 +2274,21 @@ let pumpCumMM=0,pumpMarks=[]; // pumpMarks: {t:sec, amt:MM} for on-chart pump ma
 async function fetchPumpStats(){
   // Recent pump()s via a light RPC scan → pump-times for the ⚙ markers + sawtooth resets. The pending-debt
   // line accrues smoothly on its own between pumps, so this doesn't need exhaustive (rate-limited) history.
-  try{const cur=await ro.getBlockNumber();const c=E.AbiCoder.defaultAbiCoder();const CH=45000,N=8,nowSec=Math.floor(Date.now()/1000),bms=avgBlockMs||100;let removed=0,marks=[];
+  try{const cur=await ro.getBlockNumber();const c=E.AbiCoder.defaultAbiCoder();const CH=45000,N=8,nowSec=Math.floor(Date.now()/1000),bms=avgBlockMs||100;
+    // ALL-TIME cumulative: merge every scanned pump into a persistent map keyed by block:logIndex, so the
+    // "to date" figure survives beyond the ~360k-block scan window and never double-counts across scans.
+    const seen={};try{JSON.parse(localStorage.getItem("mm_pumps")||"[]").forEach(m=>{if(m&&m.k)seen[m.k]=m;});}catch(e){}
     for(let i=N-1;i>=0;i--){const to=cur-i*CH,from=Math.max(0,to-CH+1);if(to<=0)continue;
       try{const rl=await ro.getLogs({address:CFG.mm,topics:[PUMP_TOPIC],fromBlock:from,toBlock:to});
-        rl.forEach(l=>{const d=c.decode(["uint256","uint256","uint256"],l.data);const amt=Number(E.formatUnits(d[0],18))+Number(E.formatUnits(d[1],18));removed+=amt;marks.push({t:nowSec-(cur-Number(l.blockNumber))*bms/1000,amt});});}catch(e){}}
-    if(marks.length){pumpMarks=marks.sort((a,b)=>a.t-b.t);try{localStorage.setItem("mm_pumps",JSON.stringify(marks.slice(-3000)));}catch(e){}}
-    else{try{const cached=JSON.parse(localStorage.getItem("mm_pumps")||"[]");if(cached.length)pumpMarks=cached;}catch(e){}}
-    if(pumpCumPrev>=0&&removed>pumpCumPrev+1e-9)anchorSettle(Date.now()); // a real pump happened → reset pending
-    if(removed>0){pumpCumPrev=removed;pumpCumMM=removed;const el=$("pm_cum");if(el)el.textContent=fmt(removed,2);
-      const pct=poolMMg>0?removed/(poolMMg+removed)*100:0;const e2=$("pm_cumpct");if(e2)e2.textContent="+"+pct.toFixed(3)+"%";}
+        rl.forEach(l=>{const d=c.decode(["uint256","uint256","uint256"],l.data);const amt=Number(E.formatUnits(d[0],18))+Number(E.formatUnits(d[1],18));const bn=Number(l.blockNumber),k=bn+":"+(l.index!=null?l.index:(l.logIndex!=null?l.logIndex:0));seen[k]={k,bn,amt};});}catch(e){}}
+    // re-derive display-times from block height each scan so on-chart ⚙ markers stay aligned to "now"
+    const allMarks=Object.values(seen).map(m=>({...m,t:m.bn?nowSec-(cur-m.bn)*bms/1000:(m.t||nowSec)})).sort((a,b)=>a.t-b.t);
+    if(allMarks.length){pumpMarks=allMarks;try{localStorage.setItem("mm_pumps",JSON.stringify(allMarks.slice(-3000)));}catch(e){}}
+    pumpCumMM=allMarks.reduce((a,m)=>a+m.amt,0);
+    if(pumpCumPrev>=0&&pumpCumMM>pumpCumPrev+1e-9)anchorSettle(Date.now()); // a real pump happened → reset pending
+    pumpCumPrev=pumpCumMM;
+    {const el=$("pm_cum");if(el)el.textContent=fmt(pumpCumMM,2);
+      const pct=poolMMg>0?pumpCumMM/(poolMMg+pumpCumMM)*100:0;const e2=$("pm_cumpct");if(e2)e2.textContent="+"+pct.toFixed(3)+"%";}
     rebuildDebtSeries();if(histLoaded)drawChart(); // refresh the pending pump-debt line + markers
   }catch(e){}
 }
@@ -2547,6 +2559,7 @@ function buildFlows(){
   const F=[
     [".c-holders","l",".c-pools","r","#ff7a18","decay"],   // holder decay → pump engine
     [".c-pools","l",".c-pos","r","#00C805","pump"],         // pump → your position
+    [".c-pools","r",".c-stats","l","#00C805","pumppool"],   // pump engine → Live 'pump pool MM'
     [".c-feed","r",".c-pos","l","#38ff7e","reflect"],       // activity → your position
     [".c-stats","l",".c-chart","r","#38ff7e","data"],       // protocol → chart
   ];
