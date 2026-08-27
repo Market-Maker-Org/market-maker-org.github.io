@@ -2128,8 +2128,9 @@ async function getHolders(){
       if(LABELS[a]){tag=LABELS[a][0];tc=LABELS[a][1];infra=(a!==me);}
       if(a===me){tag=tag?tag+" · you":"you";tc="you";}
       cand.push({a,tag,tc,infra,fallback:it.value||"0"});}
-    // ONE multicall for all balances (+ isExcluded for unknown, non-infra addresses)
-    const unknown=cand.filter(c=>!c.infra&&KNOWN[c.a]===undefined).map(c=>c.a);
+    // ONE multicall for all balances (+ isExcluded for EVERY holder — incl. labeled pools/infra —
+    // so on-chain exclude/include toggles (e.g. removing an LP pool from "stable") actually show up.
+    const unknown=cand.filter(c=>KNOWN[c.a]===undefined).map(c=>c.a);
     const calls=cand.map(c=>({target:CFG.mm,allowFailure:true,callData:mif.encodeFunctionData("balanceOf",[c.a])}))
       .concat(unknown.map(a=>({target:CFG.mm,allowFailure:true,callData:mif.encodeFunctionData("isExcluded",[a])})));
     let res;try{res=await mcall(calls);}catch(e){res=null;}
@@ -2138,8 +2139,9 @@ async function getHolders(){
       let balN;
       if(res&&res[i]&&res[i].success){try{balN=Number(E.formatUnits(mif.decodeFunctionResult("balanceOf",res[i].returnData)[0],18));}catch(e){balN=Number(E.formatUnits(BigInt(c.fallback),18));}}
       else balN=Number(E.formatUnits(BigInt(c.fallback),18));
-      let ex=c.infra;
-      if(!c.infra){if(KNOWN[c.a]===undefined&&res){const ui=unknown.indexOf(c.a);if(ui>=0){const rr2=res[cand.length+ui];if(rr2&&rr2.success){try{KNOWN[c.a]=mif.decodeFunctionResult("isExcluded",rr2.returnData)[0];}catch(e){KNOWN[c.a]=false;}}}}ex=KNOWN[c.a]||false;}
+      if(KNOWN[c.a]===undefined&&res){const ui=unknown.indexOf(c.a);if(ui>=0){const rr2=res[cand.length+ui];if(rr2&&rr2.success){try{KNOWN[c.a]=mif.decodeFunctionResult("isExcluded",rr2.returnData)[0];}catch(e){}}}}
+      // chain is the source of truth; if the read was unavailable, fall back to the infra assumption (pools=stable)
+      const ex=KNOWN[c.a]!==undefined?KNOWN[c.a]:c.infra;
       if(balN>0)rows.push({a:c.a,tag:c.tag,tc:c.tc,ex,bal:balN});
     });
     rows.sort((x,y)=>y.bal-x.bal);
