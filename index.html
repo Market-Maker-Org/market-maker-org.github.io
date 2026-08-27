@@ -617,6 +617,7 @@
   .pwa-x:hover{color:var(--ink)}
   @media(max-width:520px){.pwa-banner{left:8px;right:8px;transform:translateY(150%);max-width:none;width:auto}.pwa-banner.show{transform:translateY(0)}}
   .cpy{cursor:pointer;transition:color .12s}.cpy:hover{color:var(--green2)}
+  .hrow .hcopy{font-size:11px;color:var(--faint);flex:0 0 auto;padding:0 2px}
   [title]{cursor:help}
   .hrow{cursor:pointer}
   /* ===== presale — compact single-panel dashboard ===== */
@@ -2156,7 +2157,7 @@ function renderHolders(){
   if(!holderRows.length){$("holderList").innerHTML='<div class="muted">no holders yet</div>';return;}
   $("holderList").innerHTML=holderRows.map((r,i)=>{
     const ind=r.ex?'<span class="st">═ stable</span>':'<span class="dn">↓ live</span>';
-    return `<div class="hrow" title="Click to watch this wallet" onclick="watchHolder('${r.a}')"><span class="rk">${i+1}</span><span class="ad">${short(r.a)}</span>${r.tag?`<span class="tg ${r.tc}">${r.tag}</span>`:""}<span class="bl ${r.ex?'':'dec'}" id="hb_${i}">${hbal(r.shown!=null?r.shown:r.bal,r.ex)}</span>${ind}</div>`;
+    return `<div class="hrow" title="Click to watch this wallet" onclick="watchHolder('${r.a}')"><span class="rk">${i+1}</span><span class="ad">${short(r.a)}</span><span class="cpy hcopy" title="Copy address" onclick="event.stopPropagation();cp('${r.a}','Wallet')">⧉</span>${r.tag?`<span class="tg ${r.tc}">${r.tag}</span>`:""}<span class="bl ${r.ex?'':'dec'}" id="hb_${i}">${hbal(r.shown!=null?r.shown:r.bal,r.ex)}</span>${ind}</div>`;
   }).join("");
   try{localStorage.setItem("mm_holders",$("holderList").innerHTML);}catch(e){} // stale-while-revalidate: show instantly next load
 }
@@ -2627,11 +2628,9 @@ function usdAxis(u){if(u>=1)return "$"+u.toFixed(2);if(u>=0.01)return "$"+u.toFi
 function axisFmt(k,v){return k==="price"?(ethUsd?usdAxis(v*ethUsd):gwei(v).toFixed(2)+"g"):k==="index"?v.toFixed(4):compactNum(v);}
 let _chart=null,_hoverI=null,_hoverPy=null,_reveal=1,_revRaf=0,_flowPhase=0,_flowLast=0;
 let _pumpPts=[]; // pump points on the price line (canvas px) — the Pump Engine card fires beams to these
-// gentle flowing-neon animation for the legend connectors (throttled, only when chart visible)
-function flowTick(t){requestAnimationFrame(flowTick);
-  if(document.hidden)return;const c=$("c_price");if(!c||!c.offsetParent)return;
-  if(t-_flowLast<110)return;_flowLast=t;_flowPhase=(_flowPhase+7)%100000;if(_reveal>=1)drawChart();} // ~9fps ambient redraw (was ~22fps) — much lighter, same dash speed
-requestAnimationFrame(flowTick);
+// Ambient flow animation removed — the constant redraw was the main source of chart jank.
+// Dashes/connectors now render statically; the chart only redraws on data, hover, or reveal.
+// (_flowPhase stays 0 so remaining dashed connectors sit still.)
 function smoothLine(ctx,p){if(!p.length)return;ctx.moveTo(p[0][0],p[0][1]);
   if(p.length<3){for(let i=1;i<p.length;i++)ctx.lineTo(p[i][0],p[i][1]);return;}
   for(let i=1;i<p.length-1;i++){const xc=(p[i][0]+p[i+1][0])/2,yc=(p[i][1]+p[i+1][1])/2;ctx.quadraticCurveTo(p[i][0],p[i][1],xc,yc);}
@@ -2698,9 +2697,6 @@ function drawChart(){
       const gr=ctx.createLinearGradient(0,o.lt,0,o.lb);gr.addColorStop(0,s.color+(hero?"22":"16"));gr.addColorStop(1,s.color+"00");ctx.fillStyle=gr;ctx.fill();}
     ctx.beginPath();smoothLine(ctx,rp);ctx.strokeStyle=s.color;ctx.lineWidth=hero?2.4:1.7;ctx.globalAlpha=hero?1:.8;
     ctx.shadowColor=s.color;ctx.shadowBlur=hero?10:6;ctx.stroke();ctx.shadowBlur=0;ctx.globalAlpha=1;
-    // 2–3 long light streaks gliding along the line like fluid (no dots)
-    ctx.save();ctx.beginPath();smoothLine(ctx,rp);ctx.strokeStyle="#eafff4";ctx.globalAlpha=hero?.8:.5;ctx.lineWidth=hero?2.3:1.6;ctx.lineCap="round";
-    ctx.setLineDash([22,168]);ctx.lineDashOffset=-((flow*1.5+oi*57)%190);ctx.shadowColor=s.color;ctx.shadowBlur=14;ctx.stroke();ctx.restore();ctx.shadowBlur=0;ctx.globalAlpha=1;
   });
   // ===== CAUSAL BEAMS (Lanes mode) — animated energy from a driver line to the line it moves =====
   if(LANES&&based.length>1){const byk={};based.forEach(o=>byk[o.k]=o);
