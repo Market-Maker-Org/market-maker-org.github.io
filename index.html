@@ -595,12 +595,13 @@
   @keyframes toastIn{from{opacity:0;transform:translateX(20px)}to{opacity:1}}
   @keyframes toastOut{to{opacity:0;transform:translateX(20px)}}
   /* ambient aurora — sits behind all in-flow content (negative z), pure black stays dominant */
-  #aurora{position:fixed;inset:-20%;z-index:-1;pointer-events:none;opacity:.55;
+  #aurora{position:fixed;inset:-20%;z-index:-1;pointer-events:none;opacity:.55;will-change:transform;
     background:radial-gradient(38% 42% at 18% 12%,rgba(0,200,5,.10),transparent 60%),
       radial-gradient(34% 40% at 82% 8%,rgba(255,122,24,.07),transparent 60%),
       radial-gradient(46% 50% at 70% 92%,rgba(0,200,5,.06),transparent 62%);
-    filter:blur(30px);animation:aurora 26s ease-in-out infinite alternate}
-  @keyframes aurora{0%{transform:translate3d(-2%,-1%,0) scale(1)}50%{transform:translate3d(2%,1.5%,0) scale(1.06)}100%{transform:translate3d(-1%,2%,0) scale(1.02)}}
+    filter:blur(20px);animation:aurora 26s ease-in-out infinite alternate}
+  /* translate-only (no scale) → the blurred layer is rasterized once and only composited-transformed, not re-blurred each frame */
+  @keyframes aurora{0%{transform:translate3d(-2%,-1%,0)}50%{transform:translate3d(2%,1.5%,0)}100%{transform:translate3d(-1%,2%,0)}}
   /* PWA install banner */
   .pwa-banner{position:fixed;left:50%;bottom:16px;transform:translate(-50%,150%);z-index:210;display:flex;align-items:center;gap:12px;
     max-width:min(420px,94vw);width:max-content;padding:11px 12px 11px 14px;border-radius:16px;
@@ -1813,7 +1814,7 @@ function tweenStat(id,target,fmt,dropPerSec){const el=$(id);if(!el)return;const 
   _tw[id]={from:cur,to:target,cur,t0:performance.now(),dur:cur===target?0:950,fmt,drop:dropPerSec||0,last:performance.now()};
   if(Math.abs(cur-target)/Math.max(1,Math.abs(target))>0.0002){el.classList.add("flash");setTimeout(()=>{if(el)el.classList.remove("flash");},480);}}
 let _twLast=0;
-function tickStats(t){requestAnimationFrame(tickStats);if(document.hidden)return;if(t-_twLast<33)return;_twLast=t;
+function tickStats(t){requestAnimationFrame(tickStats);if(document.hidden)return;if(t-_twLast<42)return;_twLast=t; // ~24fps bleed loop (was 30) — imperceptible on slow-moving counters, ~25% less main-thread churn
   for(const id in _tw){const s=_tw[id],el=$(id);if(!el)continue;
     if(s.t0!=null){let p=(t-s.t0)/(s.dur||1);if(s.dur<=0||p>=1){p=1;s.cur=s.to;s.t0=null;s.last=t;}
       else{const e=1-Math.pow(1-p,3);s.cur=s.from+(s.to-s.from)*e;}paintStat(id,el,s.cur,s.fmt);}
@@ -2630,9 +2631,13 @@ function usdAxis(u){if(u>=1)return "$"+u.toFixed(2);if(u>=0.01)return "$"+u.toFi
 function axisFmt(k,v){return k==="price"?(ethUsd?usdAxis(v*ethUsd):gwei(v).toFixed(2)+"g"):k==="index"?v.toFixed(4):compactNum(v);}
 let _chart=null,_hoverI=null,_hoverPy=null,_reveal=1,_revRaf=0,_flowPhase=0,_flowLast=0;
 let _pumpPts=[]; // pump points on the price line (canvas px) — the Pump Engine card fires beams to these
-// Ambient flow animation removed — the constant redraw was the main source of chart jank.
-// Dashes/connectors now render statically; the chart only redraws on data, hover, or reveal.
-// (_flowPhase stays 0 so remaining dashed connectors sit still.)
+// Gentle flowing-neon animation for the legend connectors (price/liq/circ… card → its line).
+// The heavy light-streaks that used to glide ON the lines were removed; this only advances the
+// dash phase and redraws (~1ms/frame, measured). Throttled + pauses when tab/chart is hidden.
+function flowTick(t){requestAnimationFrame(flowTick);
+  if(document.hidden)return;const c=$("c_price");if(!c||!c.offsetParent)return;
+  if(t-_flowLast<125)return;_flowLast=t;_flowPhase=(_flowPhase+8)%100000;if(_reveal>=1)drawChart();} // ~8fps ambient redraw
+requestAnimationFrame(flowTick);
 function smoothLine(ctx,p){if(!p.length)return;ctx.moveTo(p[0][0],p[0][1]);
   if(p.length<3){for(let i=1;i<p.length;i++)ctx.lineTo(p[i][0],p[i][1]);return;}
   for(let i=1;i<p.length-1;i++){const xc=(p[i][0]+p[i+1][0])/2,yc=(p[i][1]+p[i+1][1])/2;ctx.quadraticCurveTo(p[i][0],p[i][1],xc,yc);}
