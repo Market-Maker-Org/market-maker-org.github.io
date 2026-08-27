@@ -2292,7 +2292,27 @@ async function fetchPumpStats(){
     rebuildDebtSeries();if(histLoaded)drawChart(); // refresh the pending pump-debt line + markers
   }catch(e){}
 }
-async function pubPump(){if(!signer)return connectWallet();if(!await ensureChain())return;try{const mm=new E.Contract(CFG.mm,A.token.abi,signer);toast("Pump sent…");const tx=await mm.pump();await tx.wait();anchorSettle(Date.now());toast("⚙ Pump confirmed — pool burned, price re-synced");refresh();fetchPumpStats();}catch(e){toast("Pump failed: "+(e.shortMessage||e.message||e).slice(0,80),"err");}}
+// Instant, correct pumped-to-date: fold the Pump event(s) from a tx receipt straight into the persisted
+// all-time map — no waiting on the 60s RPC scan. Works for manual pump() AND swap auto-pumps.
+function recordPumpLogs(logs){
+  if(!logs||!logs.length)return false;
+  const c=E.AbiCoder.defaultAbiCoder(),seen={},mm=(CFG.mm||"").toLowerCase(),nowSec=Math.floor(Date.now()/1000);
+  try{JSON.parse(localStorage.getItem("mm_pumps")||"[]").forEach(m=>{if(m&&m.k)seen[m.k]=m;});}catch(e){}
+  let added=false;
+  logs.forEach(l=>{try{if(!l.topics||l.topics[0]!==PUMP_TOPIC)return;if(l.address&&mm&&l.address.toLowerCase()!==mm)return;
+    const d=c.decode(["uint256","uint256","uint256"],l.data),amt=Number(E.formatUnits(d[0],18))+Number(E.formatUnits(d[1],18));
+    const bn=Number(l.blockNumber),k=bn+":"+(l.index!=null?l.index:(l.logIndex!=null?l.logIndex:0));
+    if(!seen[k])added=true;seen[k]={k,bn,amt,t:nowSec};}catch(e){}});
+  if(!added)return false;
+  const allMarks=Object.values(seen).sort((a,b)=>a.t-b.t);pumpMarks=allMarks;
+  try{localStorage.setItem("mm_pumps",JSON.stringify(allMarks.slice(-3000)));}catch(e){}
+  pumpCumMM=allMarks.reduce((a,m)=>a+m.amt,0);pumpCumPrev=pumpCumMM;
+  const el=$("pm_cum");if(el)el.textContent=fmt(pumpCumMM,2);
+  const pct=poolMMg>0?pumpCumMM/(poolMMg+pumpCumMM)*100:0;const e2=$("pm_cumpct");if(e2)e2.textContent="+"+pct.toFixed(3)+"%";
+  anchorSettle(Date.now());rebuildDebtSeries();if(histLoaded)drawChart();
+  return true;
+}
+async function pubPump(){if(!signer)return connectWallet();if(!await ensureChain())return;try{const mm=new E.Contract(CFG.mm,A.token.abi,signer);toast("Pump sent…");const tx=await mm.pump();const rc=await tx.wait();recordPumpLogs(rc.logs);anchorSettle(Date.now());toast("⚙ Pump confirmed — pool burned, price re-synced");refresh();setTimeout(fetchPumpStats,1500);}catch(e){toast("Pump failed: "+(e.shortMessage||e.message||e).slice(0,80),"err");}}
 async function pubBuyback(){if(!signer)return connectWallet();if(!await ensureChain())return;try{const mm=new E.Contract(CFG.mm,A.token.abi,signer);toast("Buyback sent…");const tx=await mm.triggerBuyback();await tx.wait();toast("↻ Buyback confirmed");refresh();}catch(e){toast("Buyback failed: "+(e.shortMessage||e.message||e).slice(0,80),"err");}}
 function buildPools(){const pools=CFG.pools;
   $("poolList").innerHTML=pools.map(p=>`<a class="pchip" href="https://dexscreener.com/robinhood/${p.id}" target="_blank"><span class="nm">${p.name.replace(/ \(V2\)/,"")}</span><span class="tag">${p.tag}</span><span class="go">Swap ↗</span></a>`).join("");}
@@ -2388,7 +2408,7 @@ async function doSwap(){
     const tr=swQuote.transactionRequest;$("sw_note").textContent="⏳ swapping…";
     const gl=tr.gasLimit?(BigInt(tr.gasLimit)*13n/10n):undefined; // +30% headroom so fee-on-transfer + live decay never out-of-gas
     const tx=await _sendTx({to:tr.to,data:tr.data,value:tr.value||"0x0",...(gl?{gasLimit:gl}:{})}); // let the wallet price gas (avoids stale gasPrice/underpriced)
-    await tx.wait();
+    const rc=await tx.wait();recordPumpLogs(rc.logs); // a swap transfer auto-pumps → fold any Pump event in right away
     $("sw_note").textContent="✓ Swap complete.";$("sw_in").value="";swQuote=null;quoteSwap();updateSwapBalances();refresh();
   }catch(e){$("sw_note").textContent="Swap failed: "+((e.shortMessage||e.message||e)+"").slice(0,130);}
   btn.disabled=false;
@@ -2610,7 +2630,7 @@ let _pumpPts=[]; // pump points on the price line (canvas px) — the Pump Engin
 // gentle flowing-neon animation for the legend connectors (throttled, only when chart visible)
 function flowTick(t){requestAnimationFrame(flowTick);
   if(document.hidden)return;const c=$("c_price");if(!c||!c.offsetParent)return;
-  if(t-_flowLast<45)return;_flowLast=t;_flowPhase=(_flowPhase+3)%100000;if(_reveal>=1)drawChart();}
+  if(t-_flowLast<110)return;_flowLast=t;_flowPhase=(_flowPhase+7)%100000;if(_reveal>=1)drawChart();} // ~9fps ambient redraw (was ~22fps) — much lighter, same dash speed
 requestAnimationFrame(flowTick);
 function smoothLine(ctx,p){if(!p.length)return;ctx.moveTo(p[0][0],p[0][1]);
   if(p.length<3){for(let i=1;i<p.length;i++)ctx.lineTo(p[i][0],p[i][1]);return;}
@@ -2625,7 +2645,10 @@ function roundRect(ctx,x,y,w,h,r){r=Math.min(r,w/2,h/2);ctx.beginPath();ctx.move
 function smoothArr(a,half){if(!half||half<1||a.length<3)return a.slice();const r=new Array(a.length);for(let i=0;i<a.length;i++){let s=0,n=0;for(let j=Math.max(0,i-half);j<=Math.min(a.length-1,i+half);j++){s+=a[j];n++;}r[i]=s/n;}return r;}
 function drawChart(){
   const c=$("c_price"),ctx=c.getContext("2d");const dpr=devicePixelRatio||1,W=c.clientWidth,H=c.clientHeight;if(!W||!H)return;
-  c.width=W*dpr;c.height=H*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,W,H);
+  // realloc the backing store ONLY when the size actually changes — setting canvas.width every frame forces a
+  // costly buffer reallocation that made the ambient redraw stutter; a plain clearRect is enough per frame
+  const bw=Math.round(W*dpr),bh=Math.round(H*dpr);if(c.width!==bw||c.height!==bh){c.width=bw;c.height=bh;}
+  ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,W,H);
   const lines=Object.entries(SERIES).filter(([k,s])=>k!=="vol"&&s.on&&s.data.length>1);
   const volOn=SERIES.vol.on&&SERIES.vol.data.length>1;
   const PADT=18,PADR=16,GUT=Math.min(124,Math.max(88,W*0.15)),PADL=GUT,PADBx=18,volH=volOn?Math.round(H*0.16):0;
