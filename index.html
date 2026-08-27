@@ -65,31 +65,47 @@
   @keyframes shimmer{to{background-position:-220% center}}
   /* animated "Market Maker" brand — self-moving, flickering, fragments & reunites */
   .mmword{font-family:var(--disp);font-weight:900;font-size:18px;letter-spacing:-.02em;display:inline-flex;position:relative;white-space:pre;line-height:1}
-  .mmword .ch{display:inline-block;position:relative;color:var(--ink);will-change:transform,opacity,filter;
+  .mmword .ch{display:inline-block;position:relative;color:var(--ink);will-change:transform,opacity;
     transform:translate3d(0,0,0);animation:mmshatter var(--mmdur,7.2s) cubic-bezier(.55,.06,.3,.96) infinite both}
   .mmword .ch.g{color:var(--green);text-shadow:0 0 10px rgba(0,200,5,.55),0 0 22px rgba(0,200,5,.25)}
   .mmword .ch::after{content:attr(data-c);position:absolute;left:0;top:0;color:var(--green2);opacity:0;pointer-events:none;
     text-shadow:1.5px 0 rgba(255,60,60,.6),-1.5px 0 rgba(60,180,255,.6);animation:mmchroma var(--mmdur,7.2s) steps(1) infinite}
+  /* blur-free: pure transform+opacity, so the shatter costs no GPU filter passes */
   @keyframes mmshatter{
-    0%,55%{transform:translate3d(0,0,0) rotate(0);opacity:1;filter:none}
-    62%{transform:translate3d(var(--sx,0),var(--sy,0),0) rotate(var(--sr,0deg));opacity:.12;filter:blur(1.4px)}
+    0%,55%{transform:translate3d(0,0,0) rotate(0);opacity:1}
+    62%{transform:translate3d(var(--sx,0),var(--sy,0),0) rotate(var(--sr,0deg));opacity:.12}
     68%{opacity:.04}
-    72%{transform:translate3d(calc(var(--sx,0)*.55),calc(var(--sy,0)*.6),0) rotate(calc(var(--sr,0deg)*.5));opacity:.35;filter:blur(.6px)}
-    84%{transform:translate3d(0,0,0) rotate(0);opacity:1;filter:none}
+    72%{transform:translate3d(calc(var(--sx,0)*.55),calc(var(--sy,0)*.6),0) rotate(calc(var(--sr,0deg)*.5));opacity:.35}
+    84%{transform:translate3d(0,0,0) rotate(0);opacity:1}
     88%{opacity:.55}91%{opacity:1}94%{opacity:.7}100%{transform:none;opacity:1}}
+  @media(prefers-reduced-motion:reduce){.mmword .ch,.mmword .ch::after{animation:none;transform:none;opacity:1}}
   @keyframes mmchroma{0%,58%{opacity:0}63%{opacity:.85}70%{opacity:.5}80%{opacity:.9}86%{opacity:0}100%{opacity:0}}
   .spacer{flex:1}
   .chip{font-family:var(--mono);font-size:11px;color:var(--soft);border:1px solid var(--line2);border-radius:100px;padding:5px 10px;display:flex;gap:6px;align-items:center}
   .chip .d{width:7px;height:7px;border-radius:50%;background:var(--orange)}.chip.ok .d{background:var(--green);box-shadow:0 0 8px var(--green);animation:pulse 1.6s infinite}
   #netblk{color:var(--faint);font-size:10px;padding-left:6px;margin-left:2px;border-left:1px solid var(--line2)}
-  .hbtn{background:var(--panel2);border:1px solid var(--line2);color:var(--ink);font-family:var(--disp);font-weight:700;font-size:12px;padding:7px 12px;border-radius:8px;cursor:pointer}
-  .hbtn.green{background:var(--green);color:#00220a;border:0}
+  .hbtn{background:var(--panel2);border:1px solid var(--line2);color:var(--ink);font-family:var(--disp);font-weight:700;font-size:12px;padding:7px 12px;border-radius:8px;cursor:pointer;transition:transform .15s ease,border-color .15s ease,color .15s ease}
+  .hbtn:hover{transform:translateY(-1px);border-color:var(--faint);color:var(--green2)}
+  .hbtn:active{transform:translateY(0)}
+  .hbtn.green{position:relative;overflow:hidden;background:linear-gradient(180deg,#00e006,#00b004);color:#00220a;border:0;box-shadow:0 4px 14px -6px rgba(0,200,5,.55),0 0 0 1px rgba(0,200,5,.3) inset}
+  .hbtn.green:hover{transform:translateY(-1px);color:#00220a;box-shadow:0 7px 20px -6px rgba(0,200,5,.7),0 0 0 1px rgba(0,200,5,.45) inset}
+  /* single-pass shine on hover — transform-only, no continuous cost */
+  .hbtn.green::after{content:"";position:absolute;inset:0;background:linear-gradient(120deg,transparent 32%,rgba(255,255,255,.28) 50%,transparent 68%);transform:translateX(-130%);transition:transform .6s ease;pointer-events:none}
+  .hbtn.green:hover::after{transform:translateX(130%)}
   /* terminal grid */
   .term{display:grid;grid-template-columns:repeat(4,1fr);grid-template-rows:minmax(0,1.5fr) minmax(0,1fr);gap:10px;padding:10px;height:calc(100vh - 52px);position:relative}
   .flowlayer{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:6;overflow:visible}
-  .cell{background:linear-gradient(180deg,var(--panel),#000);border:1px solid var(--line);border-radius:14px;padding:13px;overflow:hidden;display:flex;flex-direction:column;min-height:0;
-    box-shadow:0 1px 0 rgba(255,255,255,.03) inset,0 8px 24px -18px rgba(0,0,0,.9);transition:border-color .2s}
-  .cell:hover{border-color:var(--line2)}
+  .cell{position:relative;background:linear-gradient(180deg,var(--panel),#000);border:1px solid var(--line);border-radius:14px;padding:13px;overflow:hidden;display:flex;flex-direction:column;min-height:0;
+    box-shadow:0 1px 0 rgba(255,255,255,.04) inset,0 10px 30px -20px rgba(0,0,0,.95);transition:border-color .22s ease,box-shadow .22s ease,transform .22s ease}
+  /* hairline sheen along the very top edge — makes every panel read as one premium surface */
+  .cell::after{content:"";position:absolute;top:0;left:14px;right:14px;height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.07),transparent);pointer-events:none}
+  .cell:hover{border-color:#2c3630;box-shadow:0 1px 0 rgba(255,255,255,.05) inset,0 14px 36px -18px rgba(0,0,0,.98),0 0 0 1px rgba(0,200,5,.05);transform:translateY(-1px)}
+  /* staggered entrance — premium first-paint, then reverts to base so :hover lift keeps working */
+  @keyframes cellIn{from{opacity:0;transform:translateY(11px) scale(.994)}to{opacity:1;transform:none}}
+  .cell{animation:cellIn .55s cubic-bezier(.22,.61,.36,1) backwards}
+  .c-chart{animation-delay:.02s}.c-stats{animation-delay:.09s}
+  .c-feed{animation-delay:.16s}.c-pos{animation-delay:.22s}.c-pools{animation-delay:.28s}.c-holders{animation-delay:.34s}
+  @media(prefers-reduced-motion:reduce){.cell{animation:none}}
   .cell h3{font-family:var(--disp);font-size:11px;margin:0 0 9px;letter-spacing:.13em;text-transform:uppercase;color:var(--faint);display:flex;align-items:center;gap:7px}
   .cell h3::before{content:"";width:12px;height:2px;background:var(--green);border-radius:2px}
   .cell h3:has(.h3g)::before{display:none}
@@ -121,7 +137,7 @@
   .srow:last-child{border-bottom:0}
   .srow .l{font-size:11px;color:var(--soft)} .srow .v{font-family:var(--mono);font-size:14px;font-weight:600;transition:color .4s} .srow .v.flash{color:var(--green2)}
   /* Live panel — bigger neon counters that animate down */
-  #pv-proto .srow{padding:8px 6px}
+  #pv-proto .srow{padding:5px 6px}
   #pv-proto .srow .v{font-size:15.5px;font-weight:700;letter-spacing:-.01em;color:#eafff1;text-shadow:0 0 10px rgba(56,255,126,.14)}
   #pv-proto .srow:nth-child(-n+2) .v{font-size:17px}
   #pv-proto #d_supply,#pv-proto #d_circ{color:var(--green2);text-shadow:0 0 12px rgba(56,255,126,.4),0 0 24px rgba(56,255,126,.15)}
@@ -333,7 +349,10 @@
   .bbstat{margin-top:5px;font-size:10px;color:var(--faint);text-align:center}
   .bbstat b{font-family:var(--mono);color:var(--soft)}.bbstat b.up{color:var(--green2)}
   .bbstat .off{color:var(--orange2)}
-  .wbtn.primary{background:linear-gradient(180deg,var(--green),#00a504);color:#00220a;border:0;font-family:var(--disp);font-weight:800}
+  .wbtn.primary{position:relative;overflow:hidden;background:linear-gradient(180deg,#00e006,#00a504);color:#00220a;border:0;font-family:var(--disp);font-weight:800;box-shadow:0 4px 14px -7px rgba(0,200,5,.55)}
+  .wbtn.primary:hover{transform:translateY(-1px);box-shadow:0 7px 20px -7px rgba(0,200,5,.72)}
+  .wbtn.primary::after{content:"";position:absolute;inset:0;background:linear-gradient(120deg,transparent 32%,rgba(255,255,255,.3) 50%,transparent 68%);transform:translateX(-130%);transition:transform .6s ease;pointer-events:none}
+  .wbtn.primary:hover::after{transform:translateX(130%)}
   .wbtn.primary.armed{animation:armpulse 1.5s ease-in-out infinite}
   @keyframes armpulse{0%,100%{box-shadow:0 0 0 0 rgba(0,200,5,.5)}50%{box-shadow:0 0 0 5px rgba(0,200,5,0)}}
   .wbtn.primary:disabled{opacity:.4;cursor:not-allowed}
@@ -449,6 +468,11 @@
     .pmcum{flex-direction:column;gap:4px;align-items:flex-start}
     .feed,.slist,.poolstrip{max-height:260px}
     #pv-proto .srow .v,#pv-proto .srow:nth-child(-n+2) .v{font-size:13.5px}
+    /* mobile: stack the three live counters (caption on top, big rolling number below, full width) */
+    #pv-proto .srow:has(#d_circ),#pv-proto .srow:has(#d_supply),#pv-proto .srow:has(#d_pumpdebt){flex-direction:column;align-items:flex-start;gap:2px}
+    #pv-proto #d_circ{font-size:15px}#pv-proto #d_circ .od{font-size:32px}
+    #pv-proto #d_supply{font-size:14px}#pv-proto #d_supply .od{font-size:26px}
+    #pv-proto #d_pumpdebt{font-size:14px}#pv-proto #d_pumpdebt .od{font-size:26px}
     #holderList,#poolList{max-height:280px}
     .modal{padding:0}.modal-in{border-radius:0;max-height:100vh;padding:16px}
     .lnav{overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch}.lnb{flex:0 0 auto}
@@ -521,6 +545,39 @@
   .hbtn.green:hover::after{animation:sheen .7s ease}
   @keyframes sheen{to{transform:translateX(120%)}}
   .srow .v{letter-spacing:-.01em}
+  /* ===== live rolling-odometer counters — the moving digits roll & are shown big ===== */
+  /* captions above the three live rows so the number dominates */
+  #pv-proto .srow:has(#d_circ) .l,#pv-proto .srow:has(#d_supply) .l,#pv-proto .srow:has(#d_pumpdebt) .l{
+    font-size:10px;text-transform:uppercase;letter-spacing:.06em;opacity:.72;font-weight:600}
+  #pv-proto .srow:has(#d_circ),#pv-proto .srow:has(#d_supply),#pv-proto .srow:has(#d_pumpdebt){padding-top:6px;padding-bottom:6px}
+  /* odometer scaffold */
+  .odom{display:inline-flex;align-items:baseline;font-family:var(--mono);font-variant-numeric:tabular-nums;line-height:1;letter-spacing:-.01em}
+  .odom .oi{font-weight:600}
+  .odom .osep{opacity:.6;margin:0 .5px;font-weight:700}
+  .odom .od{display:inline-flex;align-items:flex-start}
+  .odom .reel{display:inline-block;overflow:hidden;height:1em;line-height:1;width:.62em;position:relative}
+  .odom .reel .st{display:flex;flex-direction:column;will-change:transform}
+  .odom .reel .st b{height:1em;display:flex;align-items:center;justify-content:center;font-weight:800}
+  .odom .odc{align-self:center;margin-left:7px;font-size:11px;line-height:1}
+  /* per-counter sizing: integer normal, moving decimals big */
+  #pv-proto #d_circ{font-size:16px}#pv-proto #d_circ .od{font-size:25px}
+  #pv-proto #d_supply{font-size:15px}#pv-proto #d_supply .od{font-size:22px}
+  #pv-proto #d_pumpdebt{font-size:15px;color:var(--orange2);text-shadow:0 0 12px rgba(255,122,24,.3)}#pv-proto #d_pumpdebt .od{font-size:22px}
+  /* sign & suffix pieces (e.g. "+" and "%") */
+  .odom .osg{font-weight:700;margin-right:1px}
+  .odom .osf{margin-left:2px;opacity:.75;font-size:.82em;align-self:flex-end}
+  /* pump-engine live figures — same rolling treatment, sized to fit their small nodes */
+  #pm_debt{font-size:12px}#pm_debt .od{font-size:15px;color:var(--orange2)}
+  #pm_impact,#pm_impact2{font-size:10px}#pm_impact .od,#pm_impact2 .od{font-size:12.5px}
+  #pm_impact .osf,#pm_impact2 .osf{font-size:.9em}
+  /* top-holders balances — decaying rows roll (moving decimals a touch bigger); stable rows stay plain */
+  .hrow .bl.odom{font-size:11px}.hrow .bl.odom .od{font-size:13px}
+  .hrow .bl.odom .osep{margin:0}.hrow .bl.odom .reel{width:.58em}
+  /* direction badge colour + gentle bob (global reduced-motion reset disables the animation) */
+  .odom.down .odc{color:var(--green2);animation:fallcue 1.9s ease-in-out infinite}
+  .odom.up .odc{color:var(--orange2);animation:risecue 1.9s ease-in-out infinite}
+  @keyframes fallcue{0%,100%{transform:translateY(-2px);opacity:.5}55%{transform:translateY(2px);opacity:1}}
+  @keyframes risecue{0%,100%{transform:translateY(2px);opacity:.5}55%{transform:translateY(-2px);opacity:1}}
   .livedot{box-shadow:0 0 10px var(--green)}
   .ptab.on{box-shadow:0 0 0 1px rgba(0,200,5,.12),0 6px 16px -10px rgba(0,200,5,.4)}
   /* toasts */
@@ -562,7 +619,7 @@
   .ps-hero .c{padding:11px 13px}.ps-hero .c .v{font-size:20px;text-shadow:0 0 14px rgba(255,122,24,.18)}
   #ps_timer:empty{display:none}
   .ps-two{display:grid;grid-template-columns:1fr 1.15fr;gap:11px}
-  .ps-panel{background:linear-gradient(180deg,var(--panel2),#050505);border:1px solid var(--line);border-radius:15px;padding:14px;display:flex;flex-direction:column;min-height:0}
+  .ps-panel{background:linear-gradient(180deg,var(--panel),#000);border:1px solid var(--line);border-radius:15px;padding:14px;display:flex;flex-direction:column;min-height:0;box-shadow:0 1px 0 rgba(255,255,255,.04) inset,0 10px 30px -20px rgba(0,0,0,.95)}
   .ps-hd{font-family:var(--disp);font-weight:800;font-size:12.5px;letter-spacing:.02em;display:flex;align-items:center;gap:7px;margin-bottom:11px}
   .ps-inp{display:flex;align-items:center;gap:8px;background:#060908;border:1px solid var(--line2);border-radius:12px;padding:10px 12px}
   .ps-inp input{flex:1;background:transparent;border:0;outline:none;color:var(--ink);font-family:var(--mono);font-size:24px;font-weight:700;width:100%;min-width:0}
@@ -617,7 +674,7 @@
   .an-kpi .s.up{color:var(--green2)}.an-kpi .s.down{color:var(--down)}
   @keyframes anrise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
   .an-two{display:grid;grid-template-columns:1.55fr 1fr;gap:12px;margin-bottom:12px}
-  .an-chartcard,.an-splitcard{background:linear-gradient(180deg,var(--panel2),#050505);border:1px solid var(--line);border-radius:16px;padding:14px}
+  .an-chartcard,.an-splitcard{background:linear-gradient(180deg,var(--panel),#000);border:1px solid var(--line);border-radius:16px;padding:14px;box-shadow:0 1px 0 rgba(255,255,255,.04) inset,0 10px 30px -20px rgba(0,0,0,.95)}
   .an-cardhd{display:flex;justify-content:space-between;align-items:center;font-family:var(--disp);font-weight:800;font-size:12.5px;letter-spacing:.02em;margin-bottom:10px}
   .an-canvaswrap{position:relative;height:280px}
   #an_canvas{width:100%;height:100%;display:block}
@@ -1231,10 +1288,10 @@ const SERIES={
   index :{label:"Reflection",ab:"REFL",color:"#e05cff",on:false,data:[],fmtV:v=>v.toFixed(5)},                               // magenta (off by default)
   debt  :{label:"Pump debt",ab:"DEBT",color:"#c98bff",on:true, data:[],fmtV:v=>compactNum(v)+" MM"},                         // violet · cumulative pumped-to-date (monotonic)
   vol   :{label:"Volume",  ab:"VOL", color:"#7a8a83",on:true, data:[],fmtV:v=>compactNum(v)+" MM"}};                         // grey
-let chartRange=0; // last N points; 0 = all (full history)
+let chartRange=50; // last N points; 0 = all (full history). Default 50 (recent) — user can pick 200/All.
 let chartLog=true; // logarithmic Y (per-series normalized)
 let chartBars=true; // draw each series as bold candle-columns (behind the lines) as well — on by default
-let chartLanes=true; // each series in its own horizontal lane (Lanes) vs all overlaid on one band (Overlay)
+let chartLanes=false; // each series in its own horizontal lane (Lanes) vs all overlaid on one band (Overlay). Default overlay — user can turn Lanes on.
 let volYr=0,incSupply=0,reflBps=0,burnBps=0,recentBps=0,treBps=0,mirrorX=1,poolMMg=0,debtBase=0,debtBaseT=0,allPool0=0,refreshFails=0;
 let circReal=0,excludedFloat=0; // circulating supply (total − foundation − LP pools) + the offset used for historical backfill
 let decTreBps=2000,decRewBps=3000; // decay split (bps): treasury / reward; burn = 10000 − these. Read live from chain.
@@ -1267,13 +1324,13 @@ function showSkeletons(){
   const pr=$("d_price");if(pr)pr.innerHTML='<span class="sk" style="width:200px;height:32px"></span>';
   const fe=$("feed");if(fe)fe.innerHTML='<div class="ev" style="pointer-events:none"><span class="sk" style="width:100%;height:15px"></span></div>'.repeat(4);
   const hl=$("holderList");if(hl)hl.innerHTML='<div class="hrow" style="pointer-events:none"><span class="sk" style="width:100%;height:15px"></span></div>'.repeat(6);}
-function savePrefs(){try{localStorage.setItem("mm_prefs",JSON.stringify({v:4,barsV:1,watch,range:chartRange,log:chartLog,bars:chartBars,lanes:chartLanes,slip:swSlip,series:Object.fromEntries(Object.entries(SERIES).map(([k,s])=>[k,s.on]))}));}catch(e){}}
+function savePrefs(){try{localStorage.setItem("mm_prefs",JSON.stringify({v:5,barsV:1,watch,range:chartRange,log:chartLog,bars:chartBars,lanes:chartLanes,slip:swSlip,series:Object.fromEntries(Object.entries(SERIES).map(([k,s])=>[k,s.on]))}));}catch(e){}}
 function loadPrefs(){try{const p=JSON.parse(localStorage.getItem("mm_prefs")||"{}");
   if(p.watch&&/^0x[a-fA-F0-9]{40}$/.test(p.watch))watch=p.watch;
-  if(typeof p.range==="number")chartRange=p.range;
+  if(typeof p.range==="number"&&(p.v||0)>=5)chartRange=p.range; // ignore stale pre-v5 range so the new 50 default wins
   if(typeof p.log==="boolean")chartLog=p.log;
   if(typeof p.bars==="boolean"&&p.barsV===1)chartBars=p.bars; // honor an explicit choice made after bars became default-on; ignore stale pre-default values
-  if(typeof p.lanes==="boolean")chartLanes=p.lanes;
+  if(typeof p.lanes==="boolean"&&(p.v||0)>=5)chartLanes=p.lanes; // ignore stale pre-v5 lanes so the new overlay default wins
   if(typeof p.slip==="number")swSlip=p.slip;
   // v3 migration: default-on set is now price+Liquidity+Deflation+Volume; Supply & Reflection
   // default OFF. Don't let an old stored state override the new defaults for those two keys.
@@ -1334,6 +1391,16 @@ async function boot(){
   restoreCache(); // paint last-seen feed/holders/chart instantly (refreshed by the live fetches)
   if(!watch&&CFG.defaultWatch)watch=CFG.defaultWatch;
   if(watch)$("p_addr").textContent=short(watch);
+  // eager silent reconnect: if the wallet is already authorized, show the USER's own wallet from the first
+  // paint (no popup) instead of a stale saved/default one, and reflect the connected state immediately.
+  if(window.ethereum){try{const accs=await window.ethereum.request({method:"eth_accounts"}).catch(()=>[]);
+    if(accs&&accs[0]){watch=accs[0];$("p_addr").textContent=short(watch);
+      walletEip=window.ethereum;const bp=new E.BrowserProvider(walletEip);finishConnect(await bp.getSigner(),null,true);}
+  }catch(e){}
+    // follow wallet account switches live
+    if(window.ethereum.on)window.ethereum.on("accountsChanged",a=>{
+      if(a&&a[0]){walletEip=window.ethereum;new E.BrowserProvider(walletEip).getSigner().then(s=>finishConnect(s,null,true)).catch(()=>{});}
+      else if(window.mmOnDisconnect)window.mmOnDisconnect();});}
   buildPools();buildChartTools();fetchEthUsd();
   await fetchSlow();          // prime rarely-changing config first
   await refresh();            // then live state
@@ -1406,9 +1473,9 @@ async function openSocial(){
   else toast("Login options unavailable — install MetaMask/Rabby instead","warn");
 }
 let walProfile=null;
-async function finishConnect(sgnr,profile){
+async function finishConnect(sgnr,profile,silent){
   try{signer=sgnr;account=await signer.getAddress();walProfile=profile||walProfile||null;window.mmConnected=true;
-    toast("Wallet connected · "+short(account));
+    if(!silent)toast("Wallet connected · "+short(account));
     const chip=$("acct");chip.style.display="";chip.style.cursor="pointer";chip.onclick=()=>protoTab('wallet');
     $("connectBtn").textContent="Wallet ▾";$("connectBtn").onclick=()=>protoTab('wallet');
     let cid=0;try{cid=Number((await signer.provider.getNetwork()).chainId);}catch(e){}
@@ -1689,6 +1756,51 @@ function tickLive(){if(!watch||excluded||liveBal<=0){_liveLast=0;return;}const n
 // Each stat eases from its shown value to a fresh chain target, then (if it decays) keeps bleeding down
 // continuously between refreshes — the "pump-debt-style" animated fall the Live panel asks for.
 const _tw={};
+// ===== rolling odometer for the live counters — moving digits shown big & rolling =====
+// The decimal reels are positioned from the CONTINUOUS value (offset = value×10^k), so the
+// least-significant digit rolls smoothly and wraps seamlessly (each frame recomputes a 2-cell window).
+const ODO={
+  d_supply:{dec:2,dir:"down",cue:"▼"},d_circ:{dec:2,dir:"down",cue:"▼"},d_pumpdebt:{dec:4,dir:"up",cue:"▲"},
+  pm_debt:{dec:4,dir:"up"},pm_impact:{dec:6,dir:"up",sign:"+",suffix:"%"},pm_impact2:{dec:6,dir:"up",sign:"+",suffix:"%"}
+};
+function renderOdom(el,value,cfg){
+  value=Math.max(0,value||0);
+  const key=cfg.dec+"|"+(cfg.sign||"")+"|"+(cfg.suffix||"");
+  let o=el._odo;
+  if(!o||o.key!==key){
+    el.classList.add("odom");if(cfg.dir)el.classList.add(cfg.dir);el.textContent="";
+    if(cfg.sign){const sg=document.createElement("span");sg.className="osg";sg.textContent=cfg.sign;el.appendChild(sg);}
+    const oi=document.createElement("span");oi.className="oi";
+    const sep=document.createElement("span");sep.className="osep";sep.textContent=".";
+    const od=document.createElement("span");od.className="od";const reels=[];
+    for(let i=0;i<cfg.dec;i++){
+      const r=document.createElement("span");r.className="reel";
+      const st=document.createElement("span");st.className="st";
+      const a=document.createElement("b"),b=document.createElement("b");
+      st.appendChild(a);st.appendChild(b);r.appendChild(st);od.appendChild(r);
+      reels.push({st,a,b,pa:-1,pb:-1});
+    }
+    el.appendChild(oi);el.appendChild(sep);el.appendChild(od);
+    if(cfg.suffix){const sf=document.createElement("span");sf.className="osf";sf.textContent=cfg.suffix;el.appendChild(sf);}
+    if(cfg.cue){const cue=document.createElement("span");cue.className="odc";cue.textContent=cfg.cue;el.appendChild(cue);}
+    o=el._odo={oi,od,reels,dec:cfg.dec,pint:"",key};
+  }
+  const intStr=Math.floor(value).toLocaleString("en-US");
+  if(o.pint!==intStr){o.oi.textContent=intStr;o.pint=intStr;}
+  for(let k=1;k<=cfg.dec;k++){
+    const oo=value*Math.pow(10,k),d=Math.floor(oo),f=oo-d;
+    const dig=((d%10)+10)%10,R=o.reels[k-1];
+    if(k===cfg.dec){                                   // fastest place → continuous smooth roll
+      const nx=(dig+1)%10;
+      if(R.pa!==dig){R.a.textContent=dig;R.pa=dig;}
+      if(R.pb!==nx){R.b.textContent=nx;R.pb=nx;}
+      R.st.style.transform="translateY(-"+f.toFixed(3)+"em)";
+    }else if(R.pa!==dig){                              // slower places → crisp, readable digit; updates only on change
+      R.a.textContent=dig;R.b.textContent=dig;R.pa=R.pb=dig;R.st.style.transform="translateY(0)";
+    }
+  }
+}
+function paintStat(id,el,val,fmt){const c=ODO[id];if(c)renderOdom(el,val,c);else el.textContent=fmt(val);}
 function tweenStat(id,target,fmt,dropPerSec){const el=$(id);if(!el)return;const s=_tw[id];
   const cur=(s&&isFinite(s.cur))?s.cur:target;
   _tw[id]={from:cur,to:target,cur,t0:performance.now(),dur:cur===target?0:950,fmt,drop:dropPerSec||0,last:performance.now()};
@@ -1697,8 +1809,8 @@ let _twLast=0;
 function tickStats(t){requestAnimationFrame(tickStats);if(document.hidden)return;if(t-_twLast<33)return;_twLast=t;
   for(const id in _tw){const s=_tw[id],el=$(id);if(!el)continue;
     if(s.t0!=null){let p=(t-s.t0)/(s.dur||1);if(s.dur<=0||p>=1){p=1;s.cur=s.to;s.t0=null;s.last=t;}
-      else{const e=1-Math.pow(1-p,3);s.cur=s.from+(s.to-s.from)*e;}el.textContent=s.fmt(s.cur);}
-    else if(s.drop>0){const dt=(t-s.last)/1000;s.last=t;s.cur=Math.max(0,s.cur-s.drop*dt);el.textContent=s.fmt(s.cur);}}
+      else{const e=1-Math.pow(1-p,3);s.cur=s.from+(s.to-s.from)*e;}paintStat(id,el,s.cur,s.fmt);}
+    else if(s.drop>0){const dt=(t-s.last)/1000;s.last=t;s.cur=Math.max(0,s.cur-s.drop*dt);paintStat(id,el,s.cur,s.fmt);}}
   tickLive();tickHolders();tickDebt();}                    // drive the position/holder/debt bleeds at 30fps too
 requestAnimationFrame(tickStats);
 function projFor(bal){const r=[["1h",3600],["1d",86400],["1w",604800],["1mo",2592000],["1y",31536000]];
@@ -1935,12 +2047,12 @@ function tickDebt(){
   if(_debtShown==null||_debtShown>target*20)_debtShown=target;      // init / recover from stale
   _debtShown+=(target-_debtShown)*0.06;                             // glide toward target — a pump() drop slides down instead of snapping
   const pending=_debtShown;
-  const set=id=>{const el=$(id);if(el)el.textContent=fmtDebt(pending);};
+  const set=id=>{const el=$(id);if(!el)return;const c=ODO[id];if(c)renderOdom(el,pending,c);else el.textContent=fmtDebt(pending);};
   set("pm_debt");set("d_pumpdebt");
   const burnNow=Math.min(pending,poolMMg*0.20),impact=poolMMg>0?burnNow/(poolMMg-burnNow)*100:0;
   const bounty=burnNow*0.005;
   const imp=(impact>=1e-6?"+"+impact.toFixed(6):"~0")+"%";
-  const a=$("pm_impact"),b=$("pm_impact2");if(a)a.textContent=imp;if(b)b.textContent=imp;
+  const a=$("pm_impact"),b=$("pm_impact2");if(a)renderOdom(a,impact,ODO.pm_impact);if(b)renderOdom(b,impact,ODO.pm_impact2);
   // if a pump would burn a visible amount, arm the button + show the reward
   const armed=burnNow>=0.001;
   const st=$("pm_state");if(st){st.textContent=armed?"ARMED · press Pump to realize":"accruing…";st.className="pm-state "+(armed?"on":"off");}
@@ -2136,7 +2248,9 @@ function tickHolders(){
     const target=(!r.ex&&decayR)?r.bal*Math.pow(1-decayR,(now-r.t0)/1000):r.bal; // decaying rows bleed; stable rows hold
     if(r.shown==null)r.shown=target;
     r.shown+=(target-r.shown)*0.07;                       // smooth glide — refresh never snaps, decay slides continuously
-    const el=$("hb_"+i);if(el)el.textContent=hbal(r.shown,r.ex);
+    const el=$("hb_"+i);if(!el)return;
+    if(r.ex){if(el._odo){el._odo=null;el.classList.remove("odom","down");}el.textContent=hbal(r.shown,r.ex);} // stable → plain integer
+    else{const dec=r.shown>=1e5?3:r.shown>=1e3?4:6;renderOdom(el,r.shown,{dec,dir:"down"});} // decaying → rolling, big moving digits
   });
 }
 function updatePumpPanel(pDebt,poolMM,mirror,pPool){
