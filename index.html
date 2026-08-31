@@ -1671,7 +1671,6 @@ async function buildHistory(attempt=0){
 async function fetchSlow(){
   try{
     const [dR,dTre,dRew,fb,fr,frc,ft,mirror,bbOn,pPool,bbThresh,bbRouters]=await mmMulti([["decayRatePerSecond"],["decayTreasuryBps"],["decayRewardBps"],["burnFeeBps"],["reflectFeeBps"],["recentFeeBps"],["treasuryFeeBps"],["pumpMirrorBps"],["buybackEnabled"],["pumpPool"],["buybackThreshold"],["buybackRoutersLength"]]);
-    const ethBal=await rr(()=>ro.getBalance(CFG.mm));
     decayR=Number(dR)/1e18;burnBps=Number(fb);reflBps=Number(fr);recentBps=Number(frc);treBps=Number(ft);mirrorX=Number(mirror)/10000;gMirrorBps=Number(mirror);gBbOn=bbOn;gPPool=pPool;
     decTreBps=Number(dTre);decRewBps=Number(dRew);paintDecaySplit(); // live decay split → keep every "where decay goes" display in sync
     const yr=(1-Math.pow(1-decayR,31536000))*100;
@@ -1683,8 +1682,22 @@ async function fetchSlow(){
 }
 async function refresh(){
   try{
-    const [sup,tre,pot,idx,exc,poolMM,pDebt,pThrob,pPack]=await mmMulti([["totalSupply"],["treasuryBalance"],["holderRewardPot"],
-      ["currentIndex"],["excludedSupply"],["balanceOf",CFG.ethPair],["pumpDebt"],["balanceOf",CFG.pools[1].id],["balanceOf",CFG.pools[2].id]]);
+    // ONE round-trip for the whole live tick: 9 MM reads + pair reserves (price) + the watched
+    // wallet's balance/exclusion, all in a single aggregate3 (was 4 separate sequential RPC calls).
+    const mmT=CFG.mm;
+    const ent=[
+      {t:mmT,iface:RD,fn:"totalSupply",allow:false},{t:mmT,iface:RD,fn:"treasuryBalance",allow:false},
+      {t:mmT,iface:RD,fn:"holderRewardPot",allow:false},{t:mmT,iface:RD,fn:"currentIndex",allow:false},
+      {t:mmT,iface:RD,fn:"excludedSupply",allow:false},{t:mmT,iface:RD,fn:"balanceOf",args:[CFG.ethPair],allow:false},
+      {t:mmT,iface:RD,fn:"pumpDebt",allow:false},{t:mmT,iface:RD,fn:"balanceOf",args:[CFG.pools[1].id],allow:false},
+      {t:mmT,iface:RD,fn:"balanceOf",args:[CFG.pools[2].id],allow:false},
+      {t:CFG.ethPair,iface:PAIRI,fn:"getReserves",allow:true},
+      {t:MULTICALL,iface:MC3,fn:"getBlockNumber",allow:true}];
+    const wi=watch?ent.length:-1;
+    if(watch){ent.push({t:mmT,iface:mif,fn:"balanceOf",args:[watch]},{t:mmT,iface:mif,fn:"isExcluded",args:[watch]});}
+    const R=await batchCall(ent);
+    const [sup,tre,pot,idx,exc,poolMM,pDebt,pThrob,pPack]=R;
+    const _reserves=R[9],_blockNo=R[10];
     updatePumpPanel(pDebt,poolMM,gMirrorBps,gPPool);
     const yr=(1-Math.pow(1-decayR,31536000))*100;
     const nSup=Number(E.formatUnits(sup,18)),nExc=Number(E.formatUnits(exc,18)),nTre=Number(E.formatUnits(tre,18)),nPot=Number(E.formatUnits(pot,18)),nPool=Number(E.formatUnits(poolMM,18));
@@ -1710,7 +1723,8 @@ async function refresh(){
     incSupply=supN0-excN0;
     const ratio=allPoolN>0?incSupply/allPoolN:0,pumpYr=ratio*(1-Math.pow(1-decayR,31536000))*mirrorX*100;
     $("d_ratio").innerHTML=ratio.toFixed(2)+" <small style='color:var(--faint)'>→ "+pumpYr.toFixed(0)+"%/yr</small>";
-    const price=await getPrice(); // ETH per MM
+    // price computed from reserves already in the batch above — no extra RPC round-trip
+    let price=null;if(_reserves){const _w=Number(E.formatUnits(_reserves[0],18)),_m=Number(E.formatUnits(_reserves[1],18));price=_m>0?_w/_m:null;}
     if(price){if(!price0)price0=price;
       const pe=$("d_price");if(priceHist.length)pe.classList.toggle("up",price>=priceHist[priceHist.length-1]),pe.classList.toggle("down",price<priceHist[priceHist.length-1]);
       const pUsd=ethUsd?price*ethUsd:0;const supN=Number(E.formatUnits(sup,18)),pmN=Number(E.formatUnits(poolMM,18));
@@ -1731,7 +1745,7 @@ async function refresh(){
       if(histLoaded&&pushLive({price,pool:liqEth,supply:circReal||supN,burn:CFG.cap-supN,index:idxN,debt:pendDebt}))drawChart();
     }
     if($("pv-analytics")&&getComputedStyle($("pv-analytics")).display!=="none")renderAnalytics();
-    if(watch){const b=await mmRead.balanceOf(watch);excluded=await mmRead.isExcluded(watch);const cb=Number(E.formatUnits(b,18));
+    if(watch){const b=R[wi]!=null?R[wi]:0n;excluded=!!R[wi+1];const cb=Number(E.formatUnits(b,18));
       liveBalTarget=cb;if(!liveBal||Math.abs(cb-liveBal)/Math.max(1,cb)>0.5)liveBal=cb; // ease toward chain value; snap only on first load / huge change
       if(excluded){liveBal=cb;const pb=$("p_bal");if(pb._odo){pb._odo=null;pb.classList.remove("odom","down");}pb.textContent=cb.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});$("p_tick").textContent="═ stable · no decay";}
       $("p_badge").textContent=excluded?"EXCLUDED":"INCLUDED · decaying";$("p_badge").className="badge "+(excluded?"exc":"inc");
@@ -1748,7 +1762,7 @@ async function refresh(){
     if($("analytics")&&$("analytics").classList.contains("on"))renderAnalyticsPage(); // keep the analytics dashboard live while open
     if(!document.hidden)buildFlows(); // refresh inter-panel flows + pump-engine → chart beams
     refreshFails=0;$("net").classList.add("ok");$("nettxt").textContent="Robinhood · live";
-    ro.getBlockNumber().then(b=>{const el=$("netblk");if(el)el.textContent="#"+b.toLocaleString("en-US");}).catch(()=>{});
+    if(_blockNo!=null){const el=$("netblk");if(el)el.textContent="#"+Number(_blockNo).toLocaleString("en-US");}
   }catch(e){refreshFails++;if(refreshFails>=2){$("net").classList.remove("ok");$("nettxt").textContent="reconnecting…";}}
 }
 let _liveLast=0;
@@ -2108,6 +2122,18 @@ async function mmMulti(spec){ // spec: [[method,...args],...] on CFG.mm; last op
   const calls=spec.map(([m,...args])=>({target:CFG.mm,allowFailure:false,callData:RD.encodeFunctionData(m,args)}));
   const res=await mcall(calls);
   return spec.map((s,i)=>RD.decodeFunctionResult(s[0],res[i].returnData)[0]);
+}
+// Generalized ONE-round-trip batch: mixed targets/interfaces in a single aggregate3.
+// entries: [{t:target, iface, fn, args?, allow?}] → decoded values (null on a failed allow:true call).
+const PAIRI=new E.Interface(PAIR_ABI);
+const MC3=new E.Interface(["function getBlockNumber() view returns(uint256)"]); // multicall3 self-call
+async function batchCall(entries){
+  const calls=entries.map(e=>({target:e.t,allowFailure:e.allow!==false,callData:e.iface.encodeFunctionData(e.fn,e.args||[])}));
+  const res=await mcall(calls);
+  return entries.map((e,i)=>{
+    const r=res[i];if(!r||!r.success)return null;
+    try{const d=e.iface.decodeFunctionResult(e.fn,r.returnData);return d.length===1?d[0]:d;}catch(_){return null;}
+  });
 }
 async function getHolders(){
   try{
