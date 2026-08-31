@@ -205,6 +205,7 @@
   .lkey .k .t{font-family:var(--disp);font-weight:700;font-size:12.5px;display:flex;align-items:center;gap:7px}
   .lkey .k .d{color:var(--faint);font-size:11px;margin-top:3px}
   .flow{stroke-dasharray:5 7;animation:dash 1s linear infinite}
+  .flowln{animation:flowdash 1.3s linear infinite}@keyframes flowdash{to{stroke-dashoffset:-12}}
   .pdot{animation:none}
   .glowpulse{animation:gp 2.2s ease-in-out infinite}@keyframes gp{50%{opacity:.4}}
   /* ---- payoff calculator ---- */
@@ -1416,6 +1417,7 @@ async function boot(){
   // pause network polling while the tab is hidden (saves RPC + battery); UI ticks keep running cheaply
   const vis=fn=>()=>{if(!document.hidden)fn();};
   setInterval(vis(refresh),5000);setInterval(vis(fetchSlow),30000);setInterval(vis(fetchEthUsd),90000);setInterval(vis(getHolders),45000);setInterval(vis(fetchPumpStats),60000);
+  setInterval(vis(buildFlows),20000); // relaid-out flows/beams on a slow cadence (moved out of the 5s refresh)
   // position/holder/debt bleeds are driven by the tickStats rAF loop (~30fps, pauses when hidden) — no interval needed
   document.addEventListener("visibilitychange",()=>{if(!document.hidden){refresh();fetchSlow();}});
 }
@@ -1760,7 +1762,10 @@ async function refresh(){
     if($("pos-calc")&&$("pos-calc").style.display!=="none")posCalc();  // same for the compact one in Your Position
     if($("presale")&&$("presale").classList.contains("on")&&feedTick%2===0)renderPresale(); // keep the presale book live while open
     if($("analytics")&&$("analytics").classList.contains("on"))renderAnalyticsPage(); // keep the analytics dashboard live while open
-    if(!document.hidden)buildFlows(); // refresh inter-panel flows + pump-engine → chart beams
+    // buildFlows() was called here every 5s — but the flow lines only move when the LAYOUT changes
+    // (resize) or a new pump appears, and each rebuild forces reflow (getBoundingClientRect ×N) plus a
+    // full SVG re-parse. It now runs on resize + a slow 20s safety interval + right after a pump, so it
+    // no longer sits in the hot 5s path. Beams still track pump points via that slow refresh.
     refreshFails=0;$("net").classList.add("ok");$("nettxt").textContent="Robinhood · live";
     if(_blockNo!=null){const el=$("netblk");if(el)el.textContent="#"+Number(_blockNo).toLocaleString("en-US");}
   }catch(e){refreshFails++;if(refreshFails>=2){$("net").classList.remove("ok");$("nettxt").textContent="reconnecting…";}}
@@ -2342,7 +2347,7 @@ function recordPumpLogs(logs){
   anchorSettle(Date.now());rebuildDebtSeries();if(histLoaded)drawChart();
   return true;
 }
-async function pubPump(){if(!signer)return connectWallet();if(!await ensureChain())return;try{const mm=new E.Contract(CFG.mm,A.token.abi,signer);toast("Pump sent…");const tx=await mm.pump();const rc=await tx.wait();recordPumpLogs(rc.logs);anchorSettle(Date.now());toast("⚙ Pump confirmed — pool burned, price re-synced");refresh();setTimeout(fetchPumpStats,1500);}catch(e){toast("Pump failed: "+(e.shortMessage||e.message||e).slice(0,80),"err");}}
+async function pubPump(){if(!signer)return connectWallet();if(!await ensureChain())return;try{const mm=new E.Contract(CFG.mm,A.token.abi,signer);toast("Pump sent…");const tx=await mm.pump();const rc=await tx.wait();recordPumpLogs(rc.logs);anchorSettle(Date.now());toast("⚙ Pump confirmed — pool burned, price re-synced");refresh();setTimeout(fetchPumpStats,1500);setTimeout(buildFlows,1800);}catch(e){toast("Pump failed: "+(e.shortMessage||e.message||e).slice(0,80),"err");}}
 async function pubBuyback(){if(!signer)return connectWallet();if(!await ensureChain())return;try{const mm=new E.Contract(CFG.mm,A.token.abi,signer);toast("Buyback sent…");const tx=await mm.triggerBuyback();await tx.wait();toast("↻ Buyback confirmed");refresh();}catch(e){toast("Buyback failed: "+(e.shortMessage||e.message||e).slice(0,80),"err");}}
 function buildPools(){const pools=CFG.pools;
   $("poolList").innerHTML=pools.map(p=>`<a class="pchip" href="https://dexscreener.com/robinhood/${p.id}" target="_blank"><span class="nm">${p.name.replace(/ \(V2\)/,"")}</span><span class="tag">${p.tag}</span><span class="go">Swap ↗</span></a>`).join("");}
@@ -2616,8 +2621,10 @@ function buildFlows(){
   let h="";
   F.forEach((f,i)=>{const A=q(f[0]),B=q(f[2]);if(!A||!B)return;const a=edgePt(A,term,f[1]),b=edgePt(B,term,f[3]);
     const mx=(a[0]+b[0])/2,d=`M${a[0]},${a[1]} C${mx},${a[1]} ${mx},${b[1]} ${b[0]},${b[1]}`;
-    h+=`<path d="${d}" fill="none" stroke="${f[4]}" stroke-width="1" opacity=".16" stroke-dasharray="3 9"><animate attributeName="stroke-dashoffset" values="0;-24" dur="1.3s" repeatCount="indefinite"/></path>`;
-    h+=`<circle r="2.4" fill="${f[4]}" opacity=".85"><animateMotion dur="${2.4+i*0.5}s" repeatCount="indefinite" path="${d}" rotate="auto"/></circle>`;
+    // dashed line only — the traveling animateMotion dots were removed: on desktop Chrome that
+    // per-frame path-motion SMIL was the single biggest source of jank (measured). The dashed
+    // stroke-dashoffset flow keeps the same "moving" feel at a fraction of the main-thread cost.
+    h+=`<path class="flowln" d="${d}" fill="none" stroke="${f[4]}" stroke-width="1" opacity=".16" stroke-dasharray="3 9"/>`;
   });
   // PUMP BEAMS — fired FROM the Pump Engine card (.c-pools) to each green pump point on the price line.
   const canvas=$("c_price"),card=q(".c-pools");
@@ -2662,7 +2669,7 @@ let _pumpPts=[]; // pump points on the price line (canvas px) — the Pump Engin
 // dash phase and redraws (~1ms/frame, measured). Throttled + pauses when tab/chart is hidden.
 function flowTick(t){requestAnimationFrame(flowTick);
   if(document.hidden)return;const c=$("c_price");if(!c||!c.offsetParent)return;
-  if(t-_flowLast<125)return;_flowLast=t;_flowPhase=(_flowPhase+8)%100000;if(_reveal>=1)drawChart();} // ~8fps ambient redraw
+  if(t-_flowLast<160)return;_flowLast=t;_flowPhase=(_flowPhase+8)%100000;if(_reveal>=1)drawChart();} // ~6fps ambient redraw (was 8) — full-canvas repaint, lighter on large desktop displays
 requestAnimationFrame(flowTick);
 function smoothLine(ctx,p){if(!p.length)return;ctx.moveTo(p[0][0],p[0][1]);
   if(p.length<3){for(let i=1;i<p.length;i++)ctx.lineTo(p[i][0],p[i][1]);return;}
