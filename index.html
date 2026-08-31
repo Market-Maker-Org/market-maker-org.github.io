@@ -298,6 +298,7 @@
   @keyframes shpulse{0%,100%{opacity:.3}50%{opacity:.85}}
   .chartload .shlabel{position:absolute;left:0;right:0;top:50%;text-align:center;color:#5f6b64;font:12px 'IBM Plex Mono',monospace;transform:translateY(-50%);letter-spacing:.04em}
   .chartwrap{position:relative;flex:1;min-height:0;display:flex;margin-top:6px}
+  #c_flow{position:absolute;left:0;top:0;pointer-events:none;z-index:2}
   #c_price{flex:1;width:100%;min-height:0;background:transparent;border:0;margin-top:0}
   .clegend{display:none!important}
   .clegend.legacy{position:absolute;top:6px;left:6px;z-index:3;flex-direction:column;align-items:stretch;gap:3px;
@@ -742,6 +743,7 @@
     <div class="chartwrap">
       <div class="clegend" id="clegend"></div>
       <canvas id="c_price"></canvas>
+      <canvas id="c_flow"></canvas>
       <div class="chartload" id="chartload">
         <div class="shbar" style="height:30%;animation-delay:0s"></div><div class="shbar" style="height:52%;animation-delay:.1s"></div>
         <div class="shbar" style="height:44%;animation-delay:.2s"></div><div class="shbar" style="height:68%;animation-delay:.3s"></div>
@@ -2662,14 +2664,16 @@ function sliceN(a){return chartRange>0?a.slice(-chartRange):a;}
 function compactNum(v){const a=Math.abs(v);if(a>=1e9)return (v/1e9).toFixed(2)+"B";if(a>=1e6)return (v/1e6).toFixed(2)+"M";if(a>=1e3)return (v/1e3).toFixed(1)+"k";if(a>=1)return v.toFixed(2);if(a>0)return v.toPrecision(2);return "0";}
 function usdAxis(u){if(u>=1)return "$"+u.toFixed(2);if(u>=0.01)return "$"+u.toFixed(4);if(u<=0)return "$0";return "$"+u.toFixed(9).replace(/0+$/,"");}
 function axisFmt(k,v){return k==="price"?(ethUsd?usdAxis(v*ethUsd):gwei(v).toFixed(2)+"g"):k==="index"?v.toFixed(4):compactNum(v);}
-let _chart=null,_hoverI=null,_hoverPy=null,_reveal=1,_revRaf=0,_flowPhase=0,_flowLast=0;
+let _chart=null,_hoverI=null,_hoverPy=null,_reveal=1,_revRaf=0,_flowPhase=0,_flowLast=0,_flowGeom=null;
 let _pumpPts=[]; // pump points on the price line (canvas px) — the Pump Engine card fires beams to these
 // Gentle flowing-neon animation for the legend connectors (price/liq/circ… card → its line).
 // The heavy light-streaks that used to glide ON the lines were removed; this only advances the
 // dash phase and redraws (~1ms/frame, measured). Throttled + pauses when tab/chart is hidden.
 function flowTick(t){requestAnimationFrame(flowTick);
-  if(document.hidden)return;const c=$("c_price");if(!c||!c.offsetParent)return;
-  if(t-_flowLast<160)return;_flowLast=t;_flowPhase=(_flowPhase+8)%100000;if(_reveal>=1)drawChart();} // ~6fps ambient redraw (was 8) — full-canvas repaint, lighter on large desktop displays
+  if(document.hidden)return;const c=$("c_price");if(!c||!c.offsetParent)return;if(_reveal<1)return; // reveal owns the canvas
+  if(t-_flowLast<24)return;_flowLast=t; // ~40fps — smooth dash flow; cheap because it repaints only the overlay
+  _flowPhase=(t*0.05)%100000; // time-based phase → continuous, jitter-free motion (~50px/s, matches old feel)
+  drawFlow();}
 requestAnimationFrame(flowTick);
 function smoothLine(ctx,p){if(!p.length)return;ctx.moveTo(p[0][0],p[0][1]);
   if(p.length<3){for(let i=1;i<p.length;i++)ctx.lineTo(p[i][0],p[i][1]);return;}
@@ -2723,6 +2727,7 @@ function drawChart(){
     if(o.k==="debt"){ctx.setLineDash([]);ctx.fillStyle=o.s.color+"cc";ctx.font="8px 'IBM Plex Mono'";ctx.textAlign="left";ctx.fillText("⚙ pump debt · accrues → pumps",plotL+5,o.lt+8);}});}
   else{ctx.strokeStyle="rgba(255,255,255,.045)";ctx.lineWidth=1;for(let g=0;g<=4;g++){const y=plotT+g*plotH/4;ctx.beginPath();ctx.moveTo(plotL,y);ctx.lineTo(W-PADR,y);ctx.stroke();}}
   const meta=[];
+  let _fg={W,H,conns:[],beams:[]}; // geometry for the animated flow overlay (drawn on a separate cheap canvas)
   // candle-columns behind the lines — per series, translucent, from baseline up to value (static, no animation)
   if(chartBars){const COLS=Math.min(maxLen,46),bw=Math.max(3,plotW/COLS*0.6),lim=Math.ceil(maxLen*_reveal);
     for(let ci=0;ci<COLS;ci++){const gi=COLS<2?maxLen-1:Math.round(ci/(COLS-1)*(maxLen-1));if(gi>=lim)break;const gx=X(gi);
@@ -2746,13 +2751,8 @@ function drawChart(){
       const gi=Math.round((bx-plotL)/(plotW||1)*(maxLen-1)),ia=gi-a.off,ib=gi-b.off;
       if(ia<0||ia>=a.ds.length||ib<0||ib>=b.ds.length)return;
       const ay=a.Yf(a.ds[ia]),by=b.Yf(b.ds[ib]),bend=17*(fi%2?-1:1),dir=by>ay?1:-1;
-      ctx.save();ctx.strokeStyle=a.s.color;ctx.globalAlpha=.3;ctx.lineWidth=1.5;ctx.setLineDash([3,7]);ctx.lineDashOffset=-flow*1.3*dir;ctx.shadowColor=a.s.color;ctx.shadowBlur=6;
-      ctx.beginPath();ctx.moveTo(bx,ay);ctx.bezierCurveTo(bx+bend,ay,bx+bend,by,bx,by);ctx.stroke();ctx.setLineDash([]);
-      const t=((flow*0.8+fi*25)%100)/100,py=ay+(by-ay)*t,px=bx+bend*Math.sin(t*Math.PI); // particle rides a→b (causal)
-      ctx.globalAlpha=1;ctx.fillStyle="#ffffff";ctx.shadowColor=a.s.color;ctx.shadowBlur=9;ctx.beginPath();ctx.arc(px,py,2.4,0,7);ctx.fill();
-      ctx.fillStyle=a.s.color;ctx.shadowBlur=5;ctx.beginPath();ctx.moveTo(bx,by);ctx.lineTo(bx-3.2,by-5*dir);ctx.lineTo(bx+3.2,by-5*dir);ctx.closePath();ctx.fill();ctx.shadowBlur=0;
-      ctx.globalAlpha=.8;ctx.fillStyle=a.s.color;ctx.font="7.5px 'IBM Plex Mono'";ctx.textAlign="center";ctx.fillText(f[2],bx+bend*0.55,(ay+by)/2+2);
-      ctx.restore();ctx.globalAlpha=1;ctx.shadowBlur=0;});}
+      _fg.beams.push({bx,ay,by,bend,dir,fi,color:a.s.color,label:f[2]}); // draw() happens on the flow overlay
+    });}
   // ===== PUMP POINTS on the PRICE line — green ⚙ dots; the animated beams to them are fired from the
   //       Pump Engine CARD via the flow overlay (renderPumpBeams). Here we just mark the points + store them.
   {_pumpPts=[];const po=based.find(o=>o.k==="price");
@@ -2774,11 +2774,8 @@ function drawChart(){
      const ai=Math.max(0,Math.round((attachX-plotL)/(plotW||1)*(maxLen-1))),lidx=ai-off;
      const ay=(lidx>=0&&lidx<ds.length)?Y(ds[lidx]):midY;
      const x0=GUT-8,cx=(x0+attachX)/2;
-     // flowing energy connector: card → a point on its own line
-     ctx.save();ctx.strokeStyle=s.color;ctx.shadowColor=s.color;ctx.shadowBlur=7;ctx.globalAlpha=.5;ctx.lineWidth=1.4;
-     ctx.setLineDash([5,7]);ctx.lineDashOffset=-flow*(ri%2?1:1.4);
-     ctx.beginPath();ctx.moveTo(x0,cy);ctx.bezierCurveTo(cx,cy,cx,ay,attachX,ay);ctx.stroke();
-     ctx.setLineDash([]);ctx.globalAlpha=1;ctx.fillStyle=s.color;ctx.beginPath();ctx.arc(attachX,ay,2.3,0,7);ctx.fill();ctx.restore();
+     // flowing energy connector (card → a point on its own line): drawn on the flow overlay, not here
+     _fg.conns.push({x0,cy,cx,ay,attachX,color:s.color,mul:(ri%2?1:1.4)});
      // card: dot + name + value + %chg
      ctx.textAlign="left";
      ctx.fillStyle=s.color;ctx.shadowColor=s.color;ctx.shadowBlur=6;ctx.beginPath();ctx.arc(6,cy,3,0,7);ctx.fill();ctx.shadowBlur=0;
@@ -2819,8 +2816,34 @@ function drawChart(){
       ctx.fillStyle="#bfd3c8";ctx.font="10.5px 'IBM Plex Mono'";ctx.textAlign="left";ctx.fillText(r.n,bx+22,yy+11);
       ctx.fillStyle="#ffffff";ctx.font="bold 11px 'IBM Plex Mono'";ctx.textAlign="right";ctx.fillText(r.v,bx+bw2-11,yy+11);yy+=rh;});}
   _chart={W,PADR,PADL,maxLen,X};
+  const fs=syncFlowCanvas();if(fs){_fg.dpr=fs.dpr;_fg.fW=fs.W;_fg.fH=fs.H;} // size/position the overlay here (layout reads happen only on data/resize redraws, never per animation frame)
+  _flowGeom=_fg;if(_reveal>=1)drawFlow();
 }
 function drawPrice(){drawChart();}
+// ===== animated flow overlay — a SEPARATE cheap canvas stacked over the chart. Only the moving dashed
+// connectors + causal beams live here, so the ambient "flow" animates smoothly WITHOUT repainting the
+// whole (shadow-blurred, gradient-heavy) chart every frame. drawChart() only runs when DATA changes.
+function syncFlowCanvas(){const c=$("c_price"),f=$("c_flow");if(!c||!f)return null;
+  const dpr=devicePixelRatio||1,W=c.clientWidth,H=c.clientHeight;if(!W||!H)return null;
+  f.style.left=c.offsetLeft+"px";f.style.top=c.offsetTop+"px";f.style.width=W+"px";f.style.height=H+"px";
+  const bw=Math.round(W*dpr),bh=Math.round(H*dpr);if(f.width!==bw||f.height!==bh){f.width=bw;f.height=bh;}
+  return {f,dpr,W,H};}
+function drawFlow(){const g=_flowGeom;if(!g||!g.dpr)return;const f=$("c_flow");if(!f)return; // uses dims cached by drawChart → no per-frame layout reads
+  const ctx=f.getContext("2d");ctx.setTransform(g.dpr,0,0,g.dpr,0,0);ctx.clearRect(0,0,g.fW,g.fH);
+  const flow=_flowPhase||0;
+  // legend connectors: card → a point on its own line
+  g.conns.forEach(o=>{ctx.save();ctx.strokeStyle=o.color;ctx.shadowColor=o.color;ctx.shadowBlur=6;ctx.globalAlpha=.5;ctx.lineWidth=1.4;
+    ctx.setLineDash([5,7]);ctx.lineDashOffset=-flow*o.mul;
+    ctx.beginPath();ctx.moveTo(o.x0,o.cy);ctx.bezierCurveTo(o.cx,o.cy,o.cx,o.ay,o.attachX,o.ay);ctx.stroke();
+    ctx.setLineDash([]);ctx.globalAlpha=1;ctx.fillStyle=o.color;ctx.beginPath();ctx.arc(o.attachX,o.ay,2.3,0,7);ctx.fill();ctx.restore();});
+  // causal beams (Lanes mode): energy from a driver line to the line it moves, with a riding particle
+  g.beams.forEach(b=>{ctx.save();ctx.strokeStyle=b.color;ctx.globalAlpha=.3;ctx.lineWidth=1.5;ctx.setLineDash([3,7]);ctx.lineDashOffset=-flow*1.3*b.dir;ctx.shadowColor=b.color;ctx.shadowBlur=5;
+    ctx.beginPath();ctx.moveTo(b.bx,b.ay);ctx.bezierCurveTo(b.bx+b.bend,b.ay,b.bx+b.bend,b.by,b.bx,b.by);ctx.stroke();ctx.setLineDash([]);
+    const t=((flow*0.8+b.fi*25)%100)/100,py=b.ay+(b.by-b.ay)*t,px=b.bx+b.bend*Math.sin(t*Math.PI);
+    ctx.globalAlpha=1;ctx.fillStyle="#ffffff";ctx.shadowColor=b.color;ctx.shadowBlur=9;ctx.beginPath();ctx.arc(px,py,2.4,0,7);ctx.fill();
+    ctx.fillStyle=b.color;ctx.shadowBlur=5;ctx.beginPath();ctx.moveTo(b.bx,b.by);ctx.lineTo(b.bx-3.2,b.by-5*b.dir);ctx.lineTo(b.bx+3.2,b.by-5*b.dir);ctx.closePath();ctx.fill();ctx.shadowBlur=0;
+    ctx.globalAlpha=.8;ctx.fillStyle=b.color;ctx.font="7.5px 'IBM Plex Mono'";ctx.textAlign="center";ctx.fillText(b.label,b.bx+b.bend*0.55,(b.ay+b.by)/2+2);
+    ctx.restore();});}
 window.addEventListener("resize",()=>{clearTimeout(_flowT);_flowT=setTimeout(buildFlows,200);drawChart();});
 (function(){const c=$("c_price");if(!c)return;let raf=0;
   const draw=()=>{if(!raf)raf=requestAnimationFrame(()=>{raf=0;drawChart();});};
