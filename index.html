@@ -898,11 +898,11 @@
       <span class="lab">total lift <b class="up" id="pm_cumpct">—</b></span>
     </div>
     <div class="win" style="margin-top:9px">
-      <button class="wbtn primary" id="btnPump" onclick="pubPump()" title="Permissionless — anyone can trigger">⚙ Pump</button>
+      <button class="wbtn primary" id="btnPump" onclick="pubPump()" title="Permissionless — anyone can poke the auto-engine">⚙ Poke engine</button>
     </div>
     <div class="pmreward" id="pm_reward"></div>
     <div class="poolstrip" id="poolList"></div>
-    <div class="muted" style="margin-top:auto;padding-top:6px" id="trigNote">Permissionless — anyone can trigger. Each pump burns the pool MM owed by real holder decay, then re-syncs the pair → MM/ETH rises.</div>
+    <div class="muted" style="margin-top:auto;padding-top:6px" id="trigNote">Fully automatic — the engine runs on trades (and anyone can <b>poke()</b> it). Each run burns the pool MM owed by holder decay (price↑) and churns swap-fee fuel into visible volume. Gated to fire only when the work exceeds ~2× the gas.</div>
   </div>
 
   <!-- HOLDERS -->
@@ -1388,6 +1388,8 @@ function computePoolId(){return E.keccak256(E.AbiCoder.defaultAbiCoder().encode(
 function priceFromSqrt(sqrtP){if(sqrtP===0n)return null;const mmPerEth=(Number(sqrtP)/2**96)**2;return mmPerEth>0?1/mmPerEth:null;}
 
 async function boot(){
+  // token switched (MM → MARKET)? wipe stale token-specific caches so old pumps/chart/feed/holders don't leak.
+  try{if(localStorage.getItem("mm_token")!==CFG.mm){["mm_chart","mm_feed","mm_holders","mm_pumps","mm_settle"].forEach(k=>localStorage.removeItem(k));localStorage.setItem("mm_token",CFG.mm);}}catch(e){}
   ro=new E.JsonRpcProvider(CFG.rpc);mmRead=new E.Contract(CFG.mm,MKT_ABI,ro);poolMgr=new E.Contract(CFG.pm,PM_ABI,ro);poolId=computePoolId();
   try{await ro.getBlockNumber();$("net").classList.add("ok");$("nettxt").textContent="Robinhood · live";}catch(e){$("nettxt").textContent="RPC error";}
   showSkeletons(); // polished first paint while data loads
@@ -2086,7 +2088,7 @@ function tickDebt(){
   const a=$("pm_impact"),b=$("pm_impact2");if(a)renderOdom(a,impact,ODO.pm_impact);if(b)renderOdom(b,impact,ODO.pm_impact2);
   // if a pump would burn a visible amount, arm the button + show the reward
   const armed=burnNow>=0.001;
-  const st=$("pm_state");if(st){st.textContent=armed?"ARMED · press Pump to realize":"accruing…";st.className="pm-state "+(armed?"on":"off");}
+  const st=$("pm_state");if(st){st.textContent=armed?"ARMED · auto / poke to realize":"accruing…";st.className="pm-state "+(armed?"on":"off");}
   const bp=$("btnPump");if(bp&&!bp.disabled)bp.classList.toggle("armed",armed);
   const rw=$("pm_reward");if(rw)rw.innerHTML=armed
     ? `Pump now → burn <b>${fmtDebt(burnNow)}</b> MM · <b class="up">${imp}</b> · earn <b class="up">${fmtDebt(bounty)}</b> MM`
@@ -2308,7 +2310,9 @@ function updatePumpPanel(pDebt,poolMM,mirror,pPool){
   tickDebt(); // paint debt + impact + state immediately
 }
 // Cumulative pump stats — total MM ever burned from the pool + approx total price lift.
-const PUMP_TOPIC=E.id("Pump(uint256,uint256,uint256)");
+// MARKET fires EngineRun(poolBurned, fuelBurned, churnSold, churnBought) each engine run.
+// The price-lifting "pump" = poolBurned (MM burned straight out of the pool → reserveMM↓ → price↑).
+const PUMP_TOPIC=E.id("EngineRun(uint256,uint256,uint256,uint256)");
 let pumpCumMM=0,pumpMarks=[]; // pumpMarks: {t:sec, amt:MM} for on-chart pump markers
 async function fetchPumpStats(){
   // Recent pump()s via a light RPC scan → pump-times for the ⚙ markers + sawtooth resets. The pending-debt
@@ -2319,7 +2323,7 @@ async function fetchPumpStats(){
     const seen={};try{JSON.parse(localStorage.getItem("mm_pumps")||"[]").forEach(m=>{if(m&&m.k)seen[m.k]=m;});}catch(e){}
     for(let i=N-1;i>=0;i--){const to=cur-i*CH,from=Math.max(0,to-CH+1);if(to<=0)continue;
       try{const rl=await ro.getLogs({address:CFG.mm,topics:[PUMP_TOPIC],fromBlock:from,toBlock:to});
-        rl.forEach(l=>{const d=c.decode(["uint256","uint256","uint256"],l.data);const amt=Number(E.formatUnits(d[0],18))+Number(E.formatUnits(d[1],18));const bn=Number(l.blockNumber),k=bn+":"+(l.index!=null?l.index:(l.logIndex!=null?l.logIndex:0));seen[k]={k,bn,amt};});}catch(e){}}
+        rl.forEach(l=>{const d=c.decode(["uint256","uint256","uint256","uint256"],l.data);const amt=Number(E.formatUnits(d[0],18));if(amt<=0)return;const bn=Number(l.blockNumber),k=bn+":"+(l.index!=null?l.index:(l.logIndex!=null?l.logIndex:0));seen[k]={k,bn,amt};});}catch(e){}}
     // re-derive display-times from block height each scan so on-chart ⚙ markers stay aligned to "now"
     const allMarks=Object.values(seen).map(m=>({...m,t:m.bn?nowSec-(cur-m.bn)*bms/1000:(m.t||nowSec)})).sort((a,b)=>a.t-b.t);
     if(allMarks.length){pumpMarks=allMarks;try{localStorage.setItem("mm_pumps",JSON.stringify(allMarks.slice(-3000)));}catch(e){}}
@@ -2339,7 +2343,7 @@ function recordPumpLogs(logs){
   try{JSON.parse(localStorage.getItem("mm_pumps")||"[]").forEach(m=>{if(m&&m.k)seen[m.k]=m;});}catch(e){}
   let added=false;
   logs.forEach(l=>{try{if(!l.topics||l.topics[0]!==PUMP_TOPIC)return;if(l.address&&mm&&l.address.toLowerCase()!==mm)return;
-    const d=c.decode(["uint256","uint256","uint256"],l.data),amt=Number(E.formatUnits(d[0],18))+Number(E.formatUnits(d[1],18));
+    const d=c.decode(["uint256","uint256","uint256","uint256"],l.data),amt=Number(E.formatUnits(d[0],18));if(amt<=0)return;
     const bn=Number(l.blockNumber),k=bn+":"+(l.index!=null?l.index:(l.logIndex!=null?l.logIndex:0));
     if(!seen[k])added=true;seen[k]={k,bn,amt,t:nowSec};}catch(e){}});
   if(!added)return false;
@@ -2351,7 +2355,7 @@ function recordPumpLogs(logs){
   anchorSettle(Date.now());rebuildDebtSeries();if(histLoaded)drawChart();
   return true;
 }
-async function pubPump(){if(!signer)return connectWallet();if(!await ensureChain())return;try{const mm=new E.Contract(CFG.mm,A.token.abi,signer);toast("Pump sent…");const tx=await mm.pump();const rc=await tx.wait();recordPumpLogs(rc.logs);anchorSettle(Date.now());toast("⚙ Pump confirmed — pool burned, price re-synced");refresh();setTimeout(fetchPumpStats,1500);setTimeout(buildFlows,1800);}catch(e){toast("Pump failed: "+(e.shortMessage||e.message||e).slice(0,80),"err");}}
+async function pubPump(){if(!signer)return connectWallet();if(!await ensureChain())return;try{const mm=new E.Contract(CFG.mm,MKT_ABI,signer);toast("Poking engine…");const tx=await mm.poke();const rc=await tx.wait();recordPumpLogs(rc.logs);anchorSettle(Date.now());toast("⚙ Engine ran — pool burned + churn, price re-synced");refresh();setTimeout(fetchPumpStats,1500);setTimeout(buildFlows,1800);}catch(e){const m=(e.shortMessage||e.message||e)+"";toast(m.includes("not ready")?"Engine not ready yet — pump debt/fuel below the 2× gas gate. It fires as decay/volume build up.":"Poke failed: "+m.slice(0,80),m.includes("not ready")?"":"err");}}
 async function pubBuyback(){if(!signer)return connectWallet();if(!await ensureChain())return;try{const mm=new E.Contract(CFG.mm,A.token.abi,signer);toast("Buyback sent…");const tx=await mm.triggerBuyback();await tx.wait();toast("↻ Buyback confirmed");refresh();}catch(e){toast("Buyback failed: "+(e.shortMessage||e.message||e).slice(0,80),"err");}}
 function buildPools(){const pools=CFG.pools;
   $("poolList").innerHTML=pools.map(p=>`<a class="pchip" href="https://dexscreener.com/robinhood/${p.id}" target="_blank"><span class="nm">${p.name.replace(/ \(V2\)/,"")}</span><span class="tag">${p.tag}</span><span class="go">Swap ↗</span></a>`).join("");}
