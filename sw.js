@@ -1,7 +1,7 @@
 /* Market Maker terminal — service worker.
    Keeps the app installable + fast/offline for the static shell, WITHOUT ever caching
    live chain data (/rpc, /holders, /ethusd, Blockscout, LI.FI) — those are always network. */
-const VERSION = "mm-v1";
+const VERSION = "market-v2";
 const SHELL = [
   "./",
   "./index.html",

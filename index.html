@@ -770,11 +770,11 @@
       <div class="srow"><span class="l"><img src="mm.png" class="mmtag" alt="">Total supply</span><span class="v" id="d_supply">—</span></div>
       <div class="srow" title="Supply that actually decays — excludes pools, treasury, owner & hook"><span class="l">Circulating · decaying</span><span class="v" id="d_circ">—</span></div>
       <div class="srow"><span class="l">Burned 🔥</span><span class="v" id="d_burn">—</span></div>
-      <div class="srow"><span class="l"><img src="mm.png" class="mmtag" alt="">Treasury (MM)</span><span class="v" id="d_tre">—</span></div>
-      <div class="srow"><span class="l">Reward pot</span><span class="v" id="d_pot">—</span></div>
-      <div class="srow" title="Decay accrued & waiting to be burned from the pool on the next pump() — realizes price↑"><span class="l">Pump debt ⚙</span><span class="v" id="d_pumpdebt">—</span></div>
+      <div class="srow" title="MM collected from swap fees (2%/2%), waiting to be churned by the engine into visible volume"><span class="l"><img src="mm.png" class="mmtag" alt="">Churn fuel 💠</span><span class="v" id="d_tre">—</span></div>
+      <div class="srow" title="Total MARKET burned by the engine to date (pool-burn + churn buybacks)"><span class="l">Engine burned ⚙</span><span class="v" id="d_pot">—</span></div>
+      <div class="srow" title="Decay accrued & waiting to be burned from the pool by the engine — realizes price↑"><span class="l">Pump debt ⚙</span><span class="v" id="d_pumpdebt">—</span></div>
       <div class="srow"><span class="l">Decay</span><span class="v" id="d_decay">—</span></div>
-      <div class="srow" title="Global multiplier: balance = units × index. Reflection lifts it, decay lowers it"><span class="l">Reflection index</span><span class="v" id="d_idx">—</span></div>
+      <div class="srow" title="Pool MM burned per unit of holder decay (1× = 1:1). The core pump multiplier."><span class="l">Pump mirror</span><span class="v" id="d_idx">—</span></div>
       <div class="srow"><span class="l"><img src="mm.png" class="mmtag" alt="">Pump pool MM 💧</span><span class="v" id="d_pool">—</span></div>
       <div class="srow"><span class="l"><img src="mm.png" class="mmtag" alt="">All-pool MM <span id="d_allpoolD" class="pooldelta"></span></span><span class="v" id="d_allpool">—</span></div>
       <div class="srow" title="Decaying supply ÷ all-pool MM × decay% × mirror ≈ annual pump rate"><span class="l">Decay : pool → pump</span><span class="v" id="d_ratio">—</span></div>
@@ -1265,18 +1265,17 @@
 // Local dev has the server.js proxy (/rpc,/holders,/ethusd). Static hosting
 // (GitHub Pages) has no proxy → hit the public endpoints directly (CORS-enabled).
 const LOCAL=/^(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])$/.test(location.hostname);
-const CFG={rpc:(LOCAL?location.origin+"/rpc":"https://rpc.mainnet.chain.robinhood.com"),mm:"0xA6FA16a2257d5cF8755216311837955904FD8271",
-  hook:"0xbc1a927A61fe72a52E046afce0817771C3BB0044",pm:"0x8366a39CC670B4001A1121B8F6A443A643e40951",cap:1e9,
-  defaultWatch:"0x87A7A3D8f13f92795e2Ce5016B36E15893439B4F",
-  foundation:"0x91b5965e81DAC2687D0dAD000bd6ef207D2D167f", // holds the presale MM + receives ETH
-  owner:"0x85228f9817798E97c599ec4B2BEd0F1104b51273", // token owner + treasuryWallet
+const CFG={rpc:(LOCAL?location.origin+"/rpc":"https://rpc.mainnet.chain.robinhood.com"),mm:"0x3F336a8390a500f478daa2dc068E376626f58f42", // MARKET (V2, decay→pool-burn + churn)
+  hook:"0x0000000000000000000000000000000000000000",pm:"0x8366a39CC670B4001A1121B8F6A443A643e40951",cap:1e9,
+  defaultWatch:"0x85228f9817798E97c599ec4B2BEd0F1104b51273",
+  foundation:"0x85228f9817798E97c599ec4B2BEd0F1104b51273", // deployer = holds supply + owns/manages LP
+  owner:"0x85228f9817798E97c599ec4B2BEd0F1104b51273", // deployer + pairManager (only privileged role)
+  router:"0x89e5DB8B5aA49aA85AC63f691524311AEB649eba", // UniswapV2Router02
   presale:"0x85C46a570F9770Fe1a6a9d411731c02AB31BDa19", // MarketMakerPresale — live
-  presaleSupplyMM:8e8,   // 800M MM sold pro-rata in the presale; the rest stays with the foundation (LP + reserve)
+  presaleSupplyMM:8e8,   // 800M sold pro-rata in the presale; the rest stays with the foundation (LP + reserve)
   presaleEnd:"2026-09-24T00:00:00Z", // 30-day countdown target (informational; owner can close early)
-  ethPair:"0x66f6f74235f113Cf39B821C6566057FbC1271434", // V2 WETH/MM (token0=WETH, token1=MM)
-  pools:[{name:"MM / ETH (V2)",id:"0x66f6f74235f113Cf39B821C6566057FbC1271434",tag:"V2 · main"},
-         {name:"MM / THROBBIN (V2)",id:"0x3014706B83aff71A4Ef5550900A0A437f3F1e25F",tag:"V2"},
-         {name:"MM / PACK (V2)",id:"0x1b66ECa284b18D83BF7F5fFBaD3cA278E76Ca24D",tag:"V2"}]};
+  ethPair:"0xa375149cDcd6C695C7AdA55a90c70757fcF83A4a", // V2 WETH/MARKET (token0=WETH, token1=MARKET)
+  pools:[{name:"MARKET / ETH (V2)",id:"0xa375149cDcd6C695C7AdA55a90c70757fcF83A4a",tag:"V2 · main"}]};
 const A=window.MM_ARTIFACTS,E=ethers,$=id=>document.getElementById(id);
 const PM_ABI=["function extsload(bytes32) view returns (bytes32)"];
 let ro,signer,account,mmRead,poolMgr,poolId,price0=0,feedTick=0,histLoaded=false;
@@ -1389,7 +1388,7 @@ function computePoolId(){return E.keccak256(E.AbiCoder.defaultAbiCoder().encode(
 function priceFromSqrt(sqrtP){if(sqrtP===0n)return null;const mmPerEth=(Number(sqrtP)/2**96)**2;return mmPerEth>0?1/mmPerEth:null;}
 
 async function boot(){
-  ro=new E.JsonRpcProvider(CFG.rpc);mmRead=new E.Contract(CFG.mm,A.token.abi,ro);poolMgr=new E.Contract(CFG.pm,PM_ABI,ro);poolId=computePoolId();
+  ro=new E.JsonRpcProvider(CFG.rpc);mmRead=new E.Contract(CFG.mm,MKT_ABI,ro);poolMgr=new E.Contract(CFG.pm,PM_ABI,ro);poolId=computePoolId();
   try{await ro.getBlockNumber();$("net").classList.add("ok");$("nettxt").textContent="Robinhood · live";}catch(e){$("nettxt").textContent="RPC error";}
   showSkeletons(); // polished first paint while data loads
   initBrand();  // animated fragment/reunite "Market Maker" wordmark
@@ -1583,9 +1582,7 @@ async function buildHistory(attempt=0){
     // pair moves over time (it's the pump target); PACK/THROBBIN MM reserves are near-static, so
     // we snapshot their current MM once and treat them as a constant offset. TVL is stored in ETH
     // (2 × priceETH × totalMM) and rendered in $ at draw time via ethUsd — feed-independent shape.
-    let otherPoolMM=0;
-    try{const [tb,pb]=await Promise.all([mmRead.balanceOf(CFG.pools[1].id),mmRead.balanceOf(CFG.pools[2].id)]);
-      otherPoolMM=Number(E.formatUnits(tb,18))+Number(E.formatUnits(pb,18));}catch(e){}
+    let otherPoolMM=0; // MARKET has a single MARKET/ETH pool for now — no extra pools to snapshot
     const sync=[],swaps=[],decays=[];let emptyRun=0,seen=false,committed=false;
     // Rebuild the series from whatever has loaded so far and paint. Called after the FIRST chunk
     // (fast first paint — one chunk ≈ most of the token's short history) and again at the end.
@@ -1674,13 +1671,14 @@ async function buildHistory(attempt=0){
 // Rarely-changing protocol config — fetched every 30s, not every 5s (RPC-light).
 async function fetchSlow(){
   try{
-    const [dR,dTre,dRew,fb,fr,frc,ft,mirror,bbOn,pPool,bbThresh,bbRouters]=await mmMulti([["decayRatePerSecond"],["decayTreasuryBps"],["decayRewardBps"],["burnFeeBps"],["reflectFeeBps"],["recentFeeBps"],["treasuryFeeBps"],["pumpMirrorBps"],["buybackEnabled"],["pumpPool"],["buybackThreshold"],["buybackRoutersLength"]]);
-    decayR=Number(dR)/1e18;burnBps=Number(fb);reflBps=Number(fr);recentBps=Number(frc);treBps=Number(ft);mirrorX=Number(mirror)/10000;gMirrorBps=Number(mirror);gBbOn=bbOn;gPPool=pPool;
-    decTreBps=Number(dTre);decRewBps=Number(dRew);paintDecaySplit(); // live decay split → keep every "where decay goes" display in sync
+    const [dR,bBps,buyF,sellF,mirror,msw]=await mmMulti([["decayRatePerSecond"],["burnBps"],["buyFeeBps"],["sellFeeBps"],["mirrorBps"],["maxSwapBps"]]);
+    decayR=Number(dR)/1e18;mirrorX=Number(mirror)/10000;gMirrorBps=Number(mirror);gPPool=CFG.ethPair;
+    gBurnBps=Number(bBps);gBuyBps=Number(buyF);gSellBps=Number(sellF);gMaxSwapBps=Number(msw);
+    decTreBps=0;decRewBps=0;burnBps=0;reflBps=0;recentBps=0;treBps=0; // MARKET: decay→pumpDebt, no treasury/reward/reflection split
     const yr=(1-Math.pow(1-decayR,31536000))*100;
     $("d_decay").innerHTML=yr.toFixed(1)+" <small style='color:var(--faint)'>%/yr</small>";
-    $("d_fee").textContent=((burnBps+reflBps+recentBps+treBps)/100).toFixed(1)+"%";
-    const bp=$("btnPump");if(bp)bp.disabled=mirrorX===0;
+    $("d_fee").textContent=((Number(buyF)+Number(sellF))/100).toFixed(1)+"%"; // buy+sell swap fee
+    const bp=$("btnPump");if(bp)bp.disabled=false; // engine is permissionless (poke)
     const set=(id,v)=>{const el=$(id);if(el)el.textContent=v;};set("pm_mirror",mirrorX.toFixed(2)+"×");set("fw_dr",yr.toFixed(1)+"%/yr");
   }catch(e){}
 }
@@ -1690,18 +1688,22 @@ async function refresh(){
     // wallet's balance/exclusion, all in a single aggregate3 (was 4 separate sequential RPC calls).
     const mmT=CFG.mm;
     const ent=[
-      {t:mmT,iface:RD,fn:"totalSupply",allow:false},{t:mmT,iface:RD,fn:"treasuryBalance",allow:false},
-      {t:mmT,iface:RD,fn:"holderRewardPot",allow:false},{t:mmT,iface:RD,fn:"currentIndex",allow:false},
-      {t:mmT,iface:RD,fn:"excludedSupply",allow:false},{t:mmT,iface:RD,fn:"balanceOf",args:[CFG.ethPair],allow:false},
-      {t:mmT,iface:RD,fn:"pumpDebt",allow:false},{t:mmT,iface:RD,fn:"balanceOf",args:[CFG.pools[1].id],allow:false},
-      {t:mmT,iface:RD,fn:"balanceOf",args:[CFG.pools[2].id],allow:false},
+      {t:mmT,iface:RD,fn:"totalSupply",allow:false},
+      {t:mmT,iface:RD,fn:"fuelBalance",allow:false},      // -> tre (repurposed: churn fuel awaiting the engine)
+      {t:mmT,iface:RD,fn:"totalBurned",allow:false},      // -> pot (repurposed: burned to date)
+      {t:mmT,iface:RD,fn:"balanceOf",args:[CFG.owner],allow:false},   // deployer bag (excluded)
+      {t:mmT,iface:RD,fn:"balanceOf",args:[CFG.ethPair],allow:false}, // MARKET/ETH pool MM
+      {t:mmT,iface:RD,fn:"pumpDebt",allow:false},
       {t:CFG.ethPair,iface:PAIRI,fn:"getReserves",allow:true},
       {t:MULTICALL,iface:MC3,fn:"getBlockNumber",allow:true}];
     const wi=watch?ent.length:-1;
     if(watch){ent.push({t:mmT,iface:mif,fn:"balanceOf",args:[watch]},{t:mmT,iface:mif,fn:"isExcluded",args:[watch]});}
     const R=await batchCall(ent);
-    const [sup,tre,pot,idx,exc,poolMM,pDebt,pThrob,pPack]=R;
-    const _reserves=R[9],_blockNo=R[10];
+    // remap MARKET reads onto the legacy variable names so the downstream stat code is unchanged:
+    // tre=churn fuel, pot=burned, idx=n/a (no reflection), exc=excluded set (deployer+pool+contract).
+    const sup=R[0],tre=R[1]||0n,pot=R[2]||0n,ownerBal=R[3]||0n,poolMM=R[4]||0n,pDebt=R[5]||0n;
+    const idx=0n,pThrob=0n,pPack=0n,exc=ownerBal+poolMM+tre;
+    const _reserves=R[6],_blockNo=R[7];
     updatePumpPanel(pDebt,poolMM,gMirrorBps,gPPool);
     const yr=(1-Math.pow(1-decayR,31536000))*100;
     const nSup=Number(E.formatUnits(sup,18)),nExc=Number(E.formatUnits(exc,18)),nTre=Number(E.formatUnits(tre,18)),nPot=Number(E.formatUnits(pot,18)),nPool=Number(E.formatUnits(poolMM,18));
@@ -1713,7 +1715,7 @@ async function refresh(){
     if(!allPool0)allPool0=allPoolN;
     // smooth neon counters — supply & circulating bleed DOWN continuously between refreshes (like pump debt),
     // then re-sync to the exact chain value each refresh; the rest ease into their new value.
-    const burnFrac=(1e4-decTreBps-decRewBps)/1e4, f2=v=>fmt(v,2), f0=v=>fmt(v,0);
+    const burnFrac=1, f2=v=>fmt(v,2), f0=v=>fmt(v,0);
     tweenStat("d_supply",nSup,f2,circReal*decayR*burnFrac);
     tweenStat("d_circ",circReal,f2,circReal*decayR); // 2dp so the slow real decay is a visible smooth bleed
     tweenStat("d_burn",(CFG.cap-nSup),f2,0);
@@ -1721,7 +1723,7 @@ async function refresh(){
     tweenStat("d_allpool",allPoolN,f0,0);
     const dP=allPoolN-allPool0,dE=$("d_allpoolD");
     if(dE&&Math.abs(dP)>=0.5){dE.textContent=(dP<0?"▼ ":"▲ ")+fmt(Math.abs(dP),0);dE.className="pooldelta "+(dP<0?"down":"up");}
-    tweenStat("d_idx",Number(E.formatUnits(idx,18)),v=>v.toFixed(6),0);
+    {const de=$("d_idx");if(de)de.textContent=(mirrorX||1).toFixed(2)+"×";} // repurposed: pump mirror (was reflection index)
     // live values for PnL + debt ticking (fee/decay/mirror come from fetchSlow)
     const supN0=Number(E.formatUnits(sup,18)),excN0=Number(E.formatUnits(exc,18)),idxN=Number(E.formatUnits(idx,18));
     incSupply=supN0-excN0;
@@ -2104,7 +2106,7 @@ async function getFeed(){try{
   const rev=logs.slice().reverse(); // newest first
   anchorSettle(tOf(rev[0].blockNumber));
   const hk=CFG.hook.toLowerCase(),mm=CFG.mm.toLowerCase(),Z="0x0000000000000000000000000000000000000000";
-  const pools=new Set([CFG.ethPair,CFG.pools[1].id,CFG.pools[2].id,CFG.pm].map(a=>a.toLowerCase()));
+  const pools=new Set([CFG.ethPair,CFG.pm].map(a=>a.toLowerCase()));
   const evs=rev.filter(l=>{try{return BigInt(l.data)>=10n**15n;}catch(e){return false;}}).slice(0,14);
   $("feed").innerHTML=evs.map(l=>{const f=("0x"+l.topics[1].slice(26)).toLowerCase(),t=("0x"+l.topics[2].slice(26)).toLowerCase(),v=Number(E.formatUnits(BigInt(l.data),18));
     let k="transfer",cls="",lb="transfer";
@@ -2124,7 +2126,9 @@ const MC_ABI=["function aggregate3((address target,bool allowFailure,bytes callD
 let multicall;const mif=new E.Interface(["function balanceOf(address) view returns(uint256)","function isExcluded(address) view returns(bool)"]);
 async function mcall(calls){if(!multicall)multicall=new E.Contract(MULTICALL,MC_ABI,ro);return rr(()=>multicall.aggregate3(calls));}
 // batched read of many MM view calls in ONE atomic eth_call (robust vs partial batch drops)
-const RD=new E.Interface(["function totalSupply() view returns(uint256)","function treasuryBalance() view returns(uint256)","function holderRewardPot() view returns(uint256)","function currentIndex() view returns(uint256)","function excludedSupply() view returns(uint256)","function balanceOf(address) view returns(uint256)","function pumpDebt() view returns(uint256)","function decayRatePerSecond() view returns(uint256)","function decayTreasuryBps() view returns(uint256)","function decayRewardBps() view returns(uint256)","function burnFeeBps() view returns(uint256)","function reflectFeeBps() view returns(uint256)","function recentFeeBps() view returns(uint256)","function treasuryFeeBps() view returns(uint256)","function pumpMirrorBps() view returns(uint256)","function buybackEnabled() view returns(bool)","function pumpPool() view returns(address)","function buybackThreshold() view returns(uint256)","function buybackRoutersLength() view returns(uint256)"]);
+// MARKET (V2) read+write ABI — self-contained, replaces the old MM token ABI for CFG.mm.
+const MKT_ABI=["function name() view returns(string)","function symbol() view returns(string)","function decimals() view returns(uint8)","function totalSupply() view returns(uint256)","function balanceOf(address) view returns(uint256)","function allowance(address,address) view returns(uint256)","function fuelBalance() view returns(uint256)","function totalBurned() view returns(uint256)","function pumpDebt() view returns(uint256)","function decayRatePerSecond() view returns(uint256)","function burnBps() view returns(uint16)","function minBlocks() view returns(uint32)","function maxSwapBps() view returns(uint16)","function buyFeeBps() view returns(uint16)","function sellFeeBps() view returns(uint16)","function mirrorBps() view returns(uint32)","function isExcluded(address) view returns(bool)","function isPool(address) view returns(bool)","function lastRun() view returns(uint256)","function pairManager() view returns(address)","function transfer(address,uint256) returns(bool)","function approve(address,uint256) returns(bool)","function poke()","function addPair(address)"];
+const RD=new E.Interface(MKT_ABI);
 async function mmMulti(spec){ // spec: [[method,...args],...] on CFG.mm; last optional {eth:addr} handled by caller
   const calls=spec.map(([m,...args])=>({target:CFG.mm,allowFailure:false,callData:RD.encodeFunctionData(m,args)}));
   const res=await mcall(calls);
@@ -2150,12 +2154,10 @@ async function getHolders(){
     const pm=CFG.pm.toLowerCase(),hk=CFG.hook.toLowerCase(),mm=CFG.mm.toLowerCase(),sd="0x0bc6146b349446458383093e39b6c30a7c7bb571",me=(account||watch||"").toLowerCase();
     // labelled infrastructure: pools, engine wallets, foundation
     const LABELS={
-      [pm]:["V4 pool","pool"],[hk]:["hook","pool"],[mm]:["treasury","pool"],
-      [CFG.ethPair.toLowerCase()]:["MM/ETH LP","pool"],
-      [CFG.pools[1].id.toLowerCase()]:["MM/THROB LP","pool"],
-      [CFG.pools[2].id.toLowerCase()]:["MM/PACK LP","pool"],
+      [pm]:["V4 pool","pool"],[mm]:["engine","pool"],
+      [CFG.ethPair.toLowerCase()]:["MARKET/ETH LP","pool"],
       [sd]:["seeder",""],
-      ["0x91b5965e81dac2687d0dad000bd6ef207d2d167f"]:["foundation","owner"]};
+      [CFG.foundation.toLowerCase()]:["foundation","owner"]};
     const cand=[];
     for(const it of items){const a=(it.address&&it.address.hash||"").toLowerCase();if(!a)continue;
       let tag="",tc="",infra=false;
