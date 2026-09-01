@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="tr" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<title>MM V2 Deployer</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@700;800;900&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<script src="ethers.umd.min.js"></script>
+<script src="mmv2-artifact.js"></script>
+<style>
+  :root{--bg:#080c0a;--panel:#111815;--panel2:#161f1b;--ink:#e9f0ec;--soft:#a6b2ac;--faint:#69756e;--line:#232e29;
+    --accent:#2ecb93;--accent2:#63e6b3;--down:#ef6a4c;--gold:#e4b552;--mono:"IBM Plex Mono",monospace;--sans:"IBM Plex Sans",system-ui,sans-serif;--disp:"Archivo",sans-serif}
+  *{box-sizing:border-box}
+  body{margin:0;background:radial-gradient(120% 80% at 80% -10%,#0e1a15,transparent 55%),var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.55}
+  .wrap{max-width:820px;margin:0 auto;padding:26px 20px 80px}
+  h1{font-family:var(--disp);font-weight:900;font-size:30px;margin:0 0 4px;letter-spacing:-.02em}
+  h1 b{color:var(--accent)}
+  .sub{color:var(--soft);margin:0 0 20px}
+  .mono{font-family:var(--mono)}
+  .panel{background:linear-gradient(180deg,var(--panel),#0b100e);border:1px solid var(--line);border-radius:16px;padding:18px;margin-bottom:16px;box-shadow:0 10px 40px rgba(0,0,0,.4)}
+  .panel h3{font-family:var(--disp);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);margin:0 0 12px}
+  label{display:block;font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.06em;margin:10px 0 5px}
+  input{width:100%;background:#0b100e;color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:11px 12px;font-family:var(--mono);font-size:14px;outline:none}
+  input:focus{border-color:var(--accent)}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+  button{border:0;border-radius:11px;padding:13px 16px;font-family:var(--disp);font-weight:700;font-size:15px;cursor:pointer;background:var(--accent);color:#04120c;transition:.15s}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  button.ghost{background:var(--panel2);color:var(--ink);border:1px solid var(--line)}
+  .wallet{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .chip{font-family:var(--mono);font-size:12px;padding:6px 11px;border-radius:100px;background:var(--panel2);border:1px solid var(--line);color:var(--soft)}
+  .chip.ok{border-color:var(--accent);color:var(--accent2)}
+  .log{max-height:220px;overflow:auto;font-family:var(--mono);font-size:12px;color:var(--soft);display:flex;flex-direction:column;gap:3px}
+  .warn{background:linear-gradient(180deg,#1b1710,#141009);border:1px solid #3a2f15;color:#e9d19a;border-radius:11px;padding:11px 13px;font-size:12.5px;margin-bottom:16px}
+  .warn b{color:#f4c86a}
+  .ok{background:linear-gradient(180deg,#0f1a13,#0b130e);border:1px solid #1f3a2b;color:#bfe8d1;border-radius:11px;padding:11px 13px;font-size:12.5px;margin-bottom:16px}
+  a{color:var(--accent2)}
+  .result{font-family:var(--mono);font-size:13px}
+  .result div{padding:6px 0;border-bottom:1px solid var(--line);word-break:break-all}
+  .hint{color:var(--faint);font-size:11.5px;font-family:var(--mono);margin:4px 0 0}
+  code{background:#0b100e;border:1px solid var(--line);border-radius:6px;padding:1px 6px;font-family:var(--mono);font-size:12px;color:var(--accent2)}
+  ol{margin:6px 0 0;padding-left:20px;color:var(--soft)}ol li{margin:5px 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Market <b>Maker V2</b> · Deployer</h1>
+  <p class="sub">Decay-fueled auto buyback/churn motorlu, sahipsiz (minimal) elastik token. Cüzdanını bağla, parametreleri gir, tek imzayla deploy et.</p>
+
+  <div class="warn">⚠️ Gerçek zincire deploy geri alınamaz ve gerçek ETH harcar. Router öntanımlı <code>0x89e5…649eba</code> — blok gezgininde <b>UniswapV2Router02</b> olarak doğrulanmış (churn motorunun ihtiyacı olan <code>WETH()</code> + fee-on-transfer swap fonksiyonları var). Deploy'dan önce WETH satırında adresin okunduğunu gör.</div>
+
+  <div class="panel">
+    <h3>1 · Cüzdan</h3>
+    <div class="wallet">
+      <button id="connectBtn" onclick="connect()">Cüzdanı Bağla</button>
+      <span class="chip" id="acctChip">bağlı değil</span>
+      <span class="chip" id="chainChip">—</span>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h3>2 · Token &amp; Ekonomi</h3>
+    <div class="row">
+      <div><label>İsim</label><input id="f_name" value="Market Maker"></div>
+      <div><label>Sembol</label><input id="f_symbol" value="MM"></div>
+    </div>
+    <label>Toplam arz (adet — 1e18 ile ölçeklenir)</label>
+    <input id="f_supply" class="mono" value="1000000000">
+
+    <label>Uniswap V2 Router02 adresi <span class="hint">(WETH otomatik okunur)</span></label>
+    <input id="f_router" class="mono" value="0x89e5DB8B5aA49aA85AC63f691524311AEB649eba">
+    <p class="hint" id="wethHint">WETH: router'dan okunacak</p>
+
+    <div class="row3">
+      <div><label>Yıllık decay %</label><input id="f_decayPct" class="mono" value="50"></div>
+      <div><label>Burn payı % <span class="hint">(gerisi churn)</span></label><input id="f_burnPct" class="mono" value="30"></div>
+      <div><label>Churn cap % <span class="hint">(havuz rezervi)</span></label><input id="f_maxSwapPct" class="mono" value="1"></div>
+    </div>
+    <div class="row3">
+      <div><label>Buy fee % <span class="hint">(≤5)</span></label><input id="f_buyPct" class="mono" value="2"></div>
+      <div><label>Sell fee % <span class="hint">(≤5)</span></label><input id="f_sellPct" class="mono" value="2"></div>
+      <div><label>Min blok (motor)</label><input id="f_minBlocks" class="mono" value="2"></div>
+    </div>
+    <p class="hint" id="rawHint"></p>
+  </div>
+
+  <div class="panel">
+    <h3>3 · Deploy</h3>
+    <button id="deployBtn" onclick="deploy()" disabled>Deploy Et (imzalayarak)</button>
+    <div class="result" id="result" style="display:none;margin-top:12px"></div>
+  </div>
+
+  <div class="panel" style="border-color:#1c3247">
+    <h3>4 · Kurulum (deploy sonrası)</h3>
+    <div class="ok">Sıra önemli: havuzu <b>likidite eklemeden ÖNCE</b> exclude et, yoksa havuz decay yer.</div>
+    <ol>
+      <li>Router'ın factory'sinde <code>createPair(MM, WETH)</code> çağır → pair adresini al.</li>
+      <li>Aşağıdan <code>addPair(pair)</code> → havuzu decay'den muaf tut.</li>
+      <li>Vakıf cüzdanından <code>addLiquidityETH</code> ile MM/ETH likiditesini ekle (LP sende kalır, sen yönetirsin).</li>
+      <li>Ek pair'ler (MM/NVDA…): createPair → <code>addPair</code>. Motor swap'ları hep MM/WETH'ten döner.</li>
+      <li>Bittiğinde <code>renouncePairManager()</code> → token tamamen otonom, scanner tamamen temiz.</li>
+    </ol>
+    <label>Token adresi (deploy sonrası otomatik dolar)</label>
+    <input id="m_token" class="mono" placeholder="0x…">
+    <div class="row" style="margin-top:8px">
+      <div><input id="m_pair" class="mono" placeholder="0x… pair adresi"></div>
+      <div><button class="ghost" onclick="doAddPair()">addPair</button></div>
+    </div>
+    <div style="margin-top:10px"><button class="ghost" onclick="doRenounce()" style="border-color:#3a2f15;color:#e9d19a">renouncePairManager</button></div>
+    <div class="result" id="mResult" style="display:none;margin-top:12px"></div>
+  </div>
+
+  <div class="panel">
+    <h3>Günlük</h3>
+    <div class="log" id="log"></div>
+  </div>
+</div>
+
+<script>
+const E=ethers, $=id=>document.getElementById(id);
+let provider, signer, owner;
+const SECONDS_PER_YEAR=31536000;
+
+function log(m){const d=document.createElement("div");d.textContent=m;$("log").appendChild(d);$("log").scrollTop=1e9;}
+
+// annual decay % -> per-second 1e18-scaled rate: r = 1 - (1-annual)^(1/N)
+function decayPerSecond(annualPct){
+  const annual=Math.min(0.999,Math.max(0,annualPct/100));
+  const perSec=1-Math.pow(1-annual,1/SECONDS_PER_YEAR);
+  return BigInt(Math.round(perSec*1e18));
+}
+function refreshRaw(){
+  try{
+    const r=decayPerSecond(parseFloat($("f_decayPct").value||"0"));
+    $("rawHint").textContent="decayRatePerSecond = "+r.toString()+"  ·  burnBps="+Math.round(parseFloat($("f_burnPct").value||"0")*100)+"  ·  buy/sell = "+Math.round(parseFloat($("f_buyPct").value||"0")*100)+"/"+Math.round(parseFloat($("f_sellPct").value||"0")*100)+" bps";
+  }catch(e){}
+}
+["f_decayPct","f_burnPct","f_buyPct","f_sellPct"].forEach(id=>$(id).addEventListener("input",refreshRaw));
+refreshRaw();
+
+// --- robust wallet discovery: EIP-6963 (Rabby/MetaMask announce here) + legacy fallback ---
+const _wallets=[]; // {info,provider}
+window.addEventListener("eip6963:announceProvider",e=>{
+  if(!_wallets.some(w=>w.info.uuid===e.detail.info.uuid)) _wallets.push(e.detail);
+});
+try{window.dispatchEvent(new Event("eip6963:requestProvider"));}catch(e){}
+
+function pickProvider(){
+  if(_wallets.length){
+    const rabby=_wallets.find(w=>/rabby/i.test(w.info.name));
+    const mm=_wallets.find(w=>/metamask/i.test(w.info.name));
+    return (rabby||mm||_wallets[0]).provider;
+  }
+  const eth=window.ethereum;
+  if(!eth) return null;
+  if(eth.providers&&eth.providers.length) // multiple injected → prefer Rabby
+    return eth.providers.find(p=>p.isRabby)||eth.providers.find(p=>p.isMetaMask)||eth.providers[0];
+  return eth;
+}
+
+async function connect(){
+  try{
+    const inj=pickProvider();
+    if(!inj){alert("Cüzdan bulunamadı — Rabby/MetaMask kurulu ve bu siteye izinli mi? (file:// yerine http(s) üzerinden aç)");return;}
+    const found=_wallets.map(w=>w.info.name).join(", ")||"legacy window.ethereum";
+    log("cüzdan(lar): "+found);
+    provider=new E.BrowserProvider(inj);
+    await provider.send("eth_requestAccounts",[]);
+    signer=await provider.getSigner();
+    owner=await signer.getAddress();
+    const net=await provider.getNetwork();
+    $("acctChip").textContent=owner.slice(0,6)+"…"+owner.slice(-4);$("acctChip").className="chip ok";
+    $("chainChip").textContent="chainId "+net.chainId;
+    $("deployBtn").disabled=false;
+    log("bağlandı: "+owner+" · chainId "+net.chainId);
+  }catch(e){log("bağlantı hatası: "+(e.shortMessage||e.message||e));}
+}
+
+async function deploy(){
+  try{
+    if(!signer){alert("Önce cüzdanı bağla");return;}
+    const name=$("f_name").value.trim(), symbol=$("f_symbol").value.trim();
+    const supply=BigInt($("f_supply").value.trim());
+    const router=$("f_router").value.trim();
+    if(!E.isAddress(router)){alert("Geçerli V2 router adresi gir");return;}
+    const decay=decayPerSecond(parseFloat($("f_decayPct").value));
+    const burnBps=Math.round(parseFloat($("f_burnPct").value)*100);
+    const minBlocks=parseInt($("f_minBlocks").value);
+    const maxSwapBps=Math.round(parseFloat($("f_maxSwapPct").value)*100);
+    const buyBps=Math.round(parseFloat($("f_buyPct").value)*100);
+    const sellBps=Math.round(parseFloat($("f_sellPct").value)*100);
+    if(buyBps>500||sellBps>500){alert("Fee max %5");return;}
+
+    // sanity: router looks like a V2 Router02 (has WETH())
+    let weth="?";
+    try{
+      const rc=new E.Contract(router,["function WETH() view returns(address)"],provider);
+      weth=await rc.WETH();$("wethHint").textContent="WETH: "+weth;
+      log("router WETH() → "+weth);
+    }catch(e){
+      if(!confirm("Router WETH() döndürmedi — bu standart bir V2 Router02 olmayabilir ve churn motoru çalışmayabilir. Yine de deploy edilsin mi?"))return;
+    }
+
+    $("deployBtn").disabled=true;
+    log("deploy ediliyor… (constructor imzalanacak)");
+    const factory=new E.ContractFactory(window.MMV2.abi,window.MMV2.bytecode,signer);
+    const c=await factory.deploy(name,symbol,supply,router,decay,burnBps,minBlocks,maxSwapBps,buyBps,sellBps);
+    log("tx gönderildi: "+c.deploymentTransaction().hash);
+    await c.waitForDeployment();
+    const addr=await c.getAddress();
+    log("✓ deploy edildi: "+addr);
+    $("m_token").value=addr;
+    const r=$("result");r.style.display="block";
+    r.innerHTML="<div><b>Token:</b> "+addr+"</div><div><b>WETH:</b> "+weth+"</div><div><b>Router:</b> "+router+"</div><div>Şimdi 4·Kurulum adımlarını izle.</div>";
+  }catch(e){log("deploy hatası: "+(e.shortMessage||e.message||e));$("deployBtn").disabled=false;}
+}
+
+function tokenContract(){
+  const addr=$("m_token").value.trim();
+  if(!E.isAddress(addr)){alert("Geçerli token adresi gir");return null;}
+  return new E.Contract(addr,window.MMV2.abi,signer);
+}
+async function doAddPair(){
+  try{
+    const c=tokenContract();if(!c)return;
+    const pair=$("m_pair").value.trim();if(!E.isAddress(pair)){alert("Geçerli pair adresi");return;}
+    log("addPair("+pair+")…");
+    const tx=await c.addPair(pair);await tx.wait();
+    log("✓ addPair ok: "+tx.hash);
+    const r=$("mResult");r.style.display="block";r.innerHTML="<div>✓ pair eklendi: "+pair+"</div>";
+  }catch(e){log("addPair hatası: "+(e.shortMessage||e.message||e));}
+}
+async function doRenounce(){
+  try{
+    const c=tokenContract();if(!c)return;
+    if(!confirm("pairManager renounce edilecek — sonra yeni pair EKLENEMEZ. Emin misin?"))return;
+    log("renouncePairManager()…");
+    const tx=await c.renouncePairManager();await tx.wait();
+    log("✓ renounce ok: "+tx.hash);
+    const r=$("mResult");r.style.display="block";r.innerHTML="<div>✓ pairManager sıfırlandı — token tamamen otonom.</div>";
+  }catch(e){log("renounce hatası: "+(e.shortMessage||e.message||e));}
+}
+</script>
+</body>
+</html>
