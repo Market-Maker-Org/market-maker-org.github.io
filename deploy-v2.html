@@ -82,6 +82,8 @@
       <div><label>Sell fee % <span class="hint">(≤5)</span></label><input id="f_sellPct" class="mono" value="2"></div>
       <div><label>Min blok (motor)</label><input id="f_minBlocks" class="mono" value="2"></div>
     </div>
+    <label>Pump mirror × <span class="hint">(çekirdek: her birim holder decay'i havuzdan × katı yak → gerçek fiyat ↑; 1 = 1:1, max 5)</span></label>
+    <input id="f_mirror" class="mono" value="1">
     <p class="hint" id="rawHint"></p>
   </div>
 
@@ -190,7 +192,9 @@ async function deploy(){
     const maxSwapBps=Math.round(parseFloat($("f_maxSwapPct").value)*100);
     const buyBps=Math.round(parseFloat($("f_buyPct").value)*100);
     const sellBps=Math.round(parseFloat($("f_sellPct").value)*100);
+    const mirrorBps=Math.round(parseFloat($("f_mirror").value)*10000);
     if(buyBps>500||sellBps>500){alert("Fee max %5");return;}
+    if(mirrorBps>50000){alert("Mirror max 5×");return;}
 
     // sanity: router looks like a V2 Router02 (has WETH())
     let weth="?";
@@ -205,7 +209,7 @@ async function deploy(){
     $("deployBtn").disabled=true;
     log("deploy ediliyor… (constructor imzalanacak)");
     const factory=new E.ContractFactory(window.MMV2.abi,window.MMV2.bytecode,signer);
-    const c=await factory.deploy(name,symbol,supply,router,decay,burnBps,minBlocks,maxSwapBps,buyBps,sellBps);
+    const c=await factory.deploy(name,symbol,supply,router,decay,burnBps,minBlocks,maxSwapBps,buyBps,sellBps,mirrorBps);
     log("tx gönderildi: "+c.deploymentTransaction().hash);
     await c.waitForDeployment();
     const addr=await c.getAddress();
