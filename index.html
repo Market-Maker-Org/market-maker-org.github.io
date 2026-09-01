@@ -729,7 +729,7 @@
   <div class="cell c-chart">
     <div class="phead">
       <div>
-        <div class="plabel"><img src="mm.png" class="mmtag" alt="">MM / ETH · Robinhood</div>
+        <div class="plabel"><img src="mm.png" class="mmtag" alt="">MARKET / ETH · Robinhood</div>
         <div class="price" id="d_price">—<span class="u">gwei</span></div>
         <div class="psub"><span class="chg" id="d_chg">—</span> <span id="d_priceSub">—</span></div>
       </div>
@@ -822,13 +822,13 @@
         </div>
         <div class="wal-fund" id="wal_fund"></div>
         <div class="wal-bals">
-          <div class="wal-b"><div class="l"><img src="mm.png" class="mmtag" alt="">MM</div><div class="v mono" id="wal_mm">—</div><div class="wsub" id="wal_mmusd"></div></div>
+          <div class="wal-b"><div class="l"><img src="mm.png" class="mmtag" alt="">MARKET</div><div class="v mono" id="wal_mm">—</div><div class="wsub" id="wal_mmusd"></div></div>
           <div class="wal-b"><div class="l"><span class="wlogo"><svg viewBox="0 0 24 24"><rect width="24" height="24" rx="12" fill="#0a0f16"/><path d="M12 3.2 L12 9.9 L17.6 12.3 Z" fill="#8ab4ff"/><path d="M12 3.2 L6.4 12.3 L12 9.9 Z" fill="#dbe6ff"/><path d="M12 13.3 L12 20.8 L17.7 13.5 Z" fill="#8ab4ff"/><path d="M12 20.8 L12 13.3 L6.4 13.5 Z" fill="#dbe6ff"/></svg></span>ETH <span class="muted">· gas</span></div><div class="v mono" id="wal_eth">—</div><div class="wsub" id="wal_ethusd"></div></div>
         </div>
         <div class="wal-card">
           <div class="l">Withdraw / Send</div>
           <div class="waltok" id="wal_toksel">
-            <button type="button" class="wtk on" data-t="MM" onclick="setWalTok('MM')"><img src="mm.png" alt="">MM</button>
+            <button type="button" class="wtk on" data-t="MM" onclick="setWalTok('MM')"><img src="mm.png" alt="">MARKET</button>
             <button type="button" class="wtk" data-t="ETH" onclick="setWalTok('ETH')"><span class="wlogo"><svg viewBox="0 0 24 24"><rect width="24" height="24" rx="12" fill="#0a0f16"/><path d="M12 3.2 L12 9.9 L17.6 12.3 Z" fill="#8ab4ff"/><path d="M12 3.2 L6.4 12.3 L12 9.9 Z" fill="#dbe6ff"/><path d="M12 13.3 L12 20.8 L17.7 13.5 Z" fill="#8ab4ff"/><path d="M12 20.8 L12 13.3 L6.4 13.5 Z" fill="#dbe6ff"/></svg></span>ETH</button>
           </div>
           <input class="mm" id="wal_to" placeholder="0x… recipient" autocomplete="off" style="margin-top:8px">
@@ -860,10 +860,10 @@
       </span>
     </h3>
     <div id="pos-main">
-      <div class="bigbal"><span id="p_bal">—</span><span class="u"><img src="mm.png" class="mmtag" alt="">MM</span></div>
+      <div class="bigbal"><span id="p_bal">—</span><span class="u"><img src="mm.png" class="mmtag" alt="">MARKET</span></div>
       <div class="tick" id="p_tick"></div>
       <div style="margin-top:5px"><span class="badge" id="p_badge">—</span> <span class="muted cpy" id="p_addr" title="Copy address" onclick="cp(watch,'Wallet')"></span> <a class="cpy" id="p_expl" title="View on explorer" style="font-size:11px">↗</a></div>
-      <button class="wbtn primary" id="p_swapcta" style="display:none;margin-top:9px" onclick="protoTab('swap')">⇄ Buy MM — Swap ETH → MM</button>
+      <button class="wbtn primary" id="p_swapcta" style="display:none;margin-top:9px" onclick="protoTab('swap')">⇄ Buy MARKET — Swap ETH → MARKET</button>
       <div class="pnl" id="pnl"></div>
       <table class="proj" id="p_proj" style="display:none"></table>
       <input class="mm" id="watch" placeholder="0x… watch another wallet" autocomplete="off" onkeydown="if(event.key==='Enter')watchAddr()">
@@ -894,7 +894,7 @@
       <div class="fwnode burn"><div class="fl">burn → price↑</div><div class="fv mono up" id="pm_impact">—</div></div>
     </div>
     <div class="pmcum">
-      <span class="lab">⚙ Pumped to date <b id="pm_cum">—</b> <span class="muted">MM</span></span>
+      <span class="lab">⚙ Pumped to date <b id="pm_cum">—</b> <span class="muted">MARKET</span></span>
       <span class="lab">total lift <b class="up" id="pm_cumpct">—</b></span>
     </div>
     <div class="win" style="margin-top:9px">
@@ -1195,7 +1195,7 @@
         <div class="ps-pcts"><button class="pspct" onclick="presalePct(10)">10%</button><button class="pspct" onclick="presalePct(20)">20%</button><button class="pspct" onclick="presalePct(30)">30%</button><button class="pspct" onclick="presalePct(50)">50%</button><button class="pspct" onclick="presalePct(100)">Max</button></div>
         <div class="ps-quote"><span>You receive <span class="muted" style="font-size:9.5px">at current split</span></span><b id="ps_quote">—</b></div>
         <button class="swexec" id="ps_depbtn" style="background:linear-gradient(180deg,var(--orange),#d95e00);color:#1a0d00;margin-top:10px" onclick="presaleDeposit()">◎ Deposit ETH</button>
-        <div class="muted" style="font-size:10px;margin-top:8px;line-height:1.5">Pro-rata: your MM = your ETH ÷ total raised × <b>800M</b>. Foundation-run sale — you trust the team to distribute afterwards. Once in your wallet, MM decays ~50%/yr.</div>
+        <div class="muted" style="font-size:10px;margin-top:8px;line-height:1.5">Pro-rata: your MARKET = your ETH ÷ total raised × <b>800M</b>. Foundation-run sale — you trust the team to distribute afterwards. Once in your wallet, MARKET decays ~50%/yr.</div>
       </div>
       <div class="ps-panel ps-alloc">
         <div class="ps-hd">Allocation <span class="muted" style="margin-left:auto;font-size:10px;font-weight:400">live · 1B cap</span></div>
@@ -1292,8 +1292,8 @@ const SERIES={
   supply:{label:"Circ. supply",ab:"CIRC",color:"#37e0c8",on:true, data:[],fmtV:v=>compactNum(v)},                            // teal · circulating = total − foundation − LP pools
   burn  :{label:"Deflation",ab:"DEFL",color:"#ff8c1a",on:true, data:[],fmtV:v=>compactNum(v)},                               // orange
   index :{label:"Reflection",ab:"REFL",color:"#e05cff",on:false,data:[],fmtV:v=>v.toFixed(5)},                               // magenta (off by default)
-  debt  :{label:"Pump debt",ab:"DEBT",color:"#c98bff",on:true, data:[],fmtV:v=>compactNum(v)+" MM"},                         // violet · cumulative pumped-to-date (monotonic)
-  vol   :{label:"Volume",  ab:"VOL", color:"#7a8a83",on:true, data:[],fmtV:v=>compactNum(v)+" MM"}};                         // grey
+  debt  :{label:"Pump debt",ab:"DEBT",color:"#c98bff",on:true, data:[],fmtV:v=>compactNum(v)+" MKT"},                        // violet · cumulative pumped-to-date (monotonic)
+  vol   :{label:"Volume",  ab:"VOL", color:"#7a8a83",on:true, data:[],fmtV:v=>compactNum(v)+" MKT"}};                        // grey
 let chartRange=50; // last N points; 0 = all (full history). Default 50 (recent) — user can pick 200/All.
 let chartLog=true; // logarithmic Y (per-series normalized)
 let chartBars=true; // draw each series as bold candle-columns (behind the lines) as well — on by default
@@ -1739,7 +1739,7 @@ async function refresh(){
       const pUsd=ethUsd?price*ethUsd:0;const supN=Number(E.formatUnits(sup,18)),pmN=Number(E.formatUnits(poolMM,18));
       pe.innerHTML=ethUsd?usd(pUsd):(gwei(price).toFixed(4)+"<span class='u'>gwei</span>");
       const chg=(price/price0-1)*100;$("d_chg").textContent=(chg>=0?"▲ +":"▼ ")+chg.toFixed(2)+"%";$("d_chg").className="chg "+(chg>=0?"up":"down");
-      $("d_priceSub").textContent=`${gwei(price).toFixed(4)} gwei · ${price.toExponential(3)} ETH / MM`;
+      $("d_priceSub").textContent=`${gwei(price).toFixed(4)} gwei · ${price.toExponential(3)} ETH / MARKET`;
       $("d_mcap").textContent=ethUsd?usdBig(pUsd*supN):fmt(price*supN,3)+" ETH";
       // Liquidity = ALL registered AMM pools (MM/ETH + MM/PACK + MM/THROBBIN), valued in $.
       // Uses the MM/ETH price as the single MM anchor (arbitrage-equilibrium assumption) and
@@ -2504,7 +2504,7 @@ async function renderPresale(){
   const myI=account?who.findIndex(w=>w.toLowerCase()===account.toLowerCase()):-1;
   const myEth=myI>=0?amts[myI]:0,myMm=(myI>=0&&raised>0)?myEth/raised*dist:0;
   const card4=myI>=0?card("Your allocation",fmt(myMm,0)+" MM",fmtEth(myEth)+" ETH · "+(myEth/raised*100).toFixed(1)+"%"):card("Min deposit","0.0001 ETH","per deposit");
-  $("ps_stats").innerHTML=card("Raised",fmtEth(raised)+" ETH",ethUsd&&raised>0?usd(raised*ethUsd):"live")+card("Contributors",who.length,who.length===1?"wallet":"wallets")+card("For sale",compactNum(dist)+" MM","pro-rata")+card4;
+  $("ps_stats").innerHTML=card("Raised",fmtEth(raised)+" ETH",ethUsd&&raised>0?usd(raised*ethUsd):"live")+card("Contributors",who.length,who.length===1?"wallet":"wallets")+card("For sale",compactNum(dist)+" MARKET","pro-rata")+card4;
   presaleQuote();
   const cap=CFG.cap,supply=(AN&&AN.sup)||cap,burned=Math.max(0,cap-supply),fkeep=Math.max(0,_psFoundBal-dist),circ=Math.max(0,supply-_psFoundBal);
   // allocation donut + bar (same 4 segments)
@@ -2515,7 +2515,7 @@ async function renderPresale(){
   $("ps_bar").innerHTML=parts.map(p=>seg(p[1]/cap*100,p[2],p[0])).join("");
   const leg=(col,l,v)=>`<span><i style="background:${col}"></i>${l}<b>${(v/cap*100).toFixed(1)}%</b></span>`;
   $("ps_barleg").innerHTML=parts.map(p=>leg(p[2],p[0],p[1])).join("");
-  $("ps_toknote").innerHTML="Foundation keeps ~<b>"+compactNum(fkeep)+" MM</b> for LP + reserve. The moment MM reaches a wallet it decays ~50%/yr (pools & foundation excluded).";
+  $("ps_toknote").innerHTML="Foundation keeps ~<b>"+compactNum(fkeep)+" MARKET</b> for LP + reserve. The moment MARKET reaches a wallet it decays ~50%/yr (pools & foundation excluded).";
   renderBook();
   if($("ps_ownershort"))$("ps_ownershort").textContent=short(_psOwner||"0x…");
   if($("ps_ownershort2"))$("ps_ownershort2").textContent=short(CFG.foundation);
@@ -2567,7 +2567,7 @@ function presaleQuote(){
   const el=$("ps_amt");if(!el)return;const amt=parseFloat(el.value||"0")||0,dist=CFG.presaleSupplyMM;
   if(amt<=0){$("ps_quote").textContent="—";return;}
   const after=_psRaised+amt,mm=after>0?amt/after*dist:0;
-  $("ps_quote").innerHTML=fmt(mm,0)+" MM <span class='muted' style='font-size:10px'>("+(amt/after*100).toFixed(1)+"% of pool · dilutes as more join)</span>";
+  $("ps_quote").innerHTML=fmt(mm,0)+" MARKET <span class='muted' style='font-size:10px'>("+(amt/after*100).toFixed(1)+"% of pool · dilutes as more join)</span>";
 }
 async function presalePct(p){ // fill the deposit input with p% of the connected wallet's ETH balance
   if(!account){await connectWallet();if(!account)return;}
