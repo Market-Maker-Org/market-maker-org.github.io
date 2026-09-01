@@ -921,7 +921,7 @@
     <span class="chip ok"><span class="d"></span>docs</span>
   </div>
   <div class="docs-wrap">
-  <p class="muted" style="max-width:720px;font-size:13.5px;line-height:1.6">A self-balancing elastic-supply token. Idle balances <b style="color:var(--orange2)">decay</b>; that decay is burned, funds the treasury, rewards holders — and mirrors into a permissionless <b style="color:var(--green2)">pump</b> that burns pool supply to lift price. Every swap also burns, reflects, and funds treasury. This page explains the whole engine, its holder economics, and its exclusion/LP trade-offs.</p>
+  <p class="muted" style="max-width:720px;font-size:13.5px;line-height:1.6">A self-balancing elastic-supply token. Idle balances <b style="color:var(--orange2)">decay</b>; every unit of that decay mirrors 1:1 into a <b style="color:var(--green2)">pump</b> — MM burned straight out of the pool so <b>reserveMM↓ → price↑</b> (funded by the foundation's LP, never its ETH). A fixed <b>2%/2% swap fee</b> feeds an automatic <b>churn</b> engine (sell→buy→burn) that prints visible on-chart volume. No owner-mint, no blacklist, no reflection, no treasury — the foundation only holds LP. This page explains the whole engine, its holder economics, and its exclusion/LP trade-offs.</p>
   <div class="lnav">
     <button class="lnb on" onclick="learnTab('s-supply',this)">Elastic supply</button>
     <button class="lnb" onclick="learnTab('s-decay',this)">Decay engine</button>
@@ -1012,7 +1012,7 @@
   <!-- 4 · DECAY-MIRROR PUMP (the star) -->
   <div class="lsec" id="s-pump">
     <h3>Decay-mirror pump — the permissionless price engine</h3>
-    <p>The signature mechanic. Every unit of holder decay queues an equal (× mirror) burn of <b>pool</b> MM as <b>pumpDebt</b>. Calling <b style="color:var(--green2)">pump()</b> burns that owed MM straight from the V2 pair and re-syncs it: ETH stays, MM shrinks → <b>price rises</b>. It's <b>permissionless</b> — anyone can call it and earn a 0.5% bounty. On a quiet chain the debt just accrues until someone pumps; on an active chain ordinary transfers auto-pump it in slivers.</p>
+    <p>The signature mechanic. Every unit of holder decay queues an equal (× mirror) burn of <b>pool</b> MM as <b>pumpDebt</b>. The <b>automatic engine</b> burns that owed MM straight from the V2 pair and re-syncs it: ETH stays, MM shrinks → <b>price rises</b>. It runs on ordinary trades and is also <b>permissionless</b> — anyone can <b style="color:var(--green2)">poke()</b> it. Each run is capped to 1% of the pool (never over-drains) and only fires when the work exceeds ~2× the gas. On a quiet chain the debt just accrues until a trade or poke realizes it in slivers.</p>
     <div class="ldiag">
       <svg viewBox="0 0 520 190" style="width:100%">
         <!-- decay source -->
@@ -1045,12 +1045,12 @@
         </g>
       </svg>
     </div>
-    <div class="lformula">burn = min(pumpDebt, 20% of pool)<br>price × = poolMM / (poolMM − burn)   <span class="c">·</span>   caller bounty = burn × <b>0.5%</b></div>
+    <div class="lformula">burn = min(pumpDebt, 1% of pool)<br>price × = poolMM / (poolMM − burn)   <span class="c">·</span>   + swap fee → churn (visible volume)</div>
     <div class="lkey">
-      <div class="k"><div class="t">⚙ Permissionless</div><div class="d">Anyone calls pump() — no keeper, no owner. You earn 0.5% of the burn.</div></div>
-      <div class="k"><div class="t">🛑 Pool-safe</div><div class="d">Max 20% of the pool per call; debt tracks real decay, never over-drains LP.</div></div>
-      <div class="k"><div class="t">🔁 Auto on transfers</div><div class="d">Ordinary transfers auto-pump in slivers; quiet chains accrue until you pump.</div></div>
-      <div class="k"><div class="t">💧 V2 only</div><div class="d">Only the designated V2 pair is pumped; other pools stay fully decay-immune.</div></div>
+      <div class="k"><div class="t">⚙ Automatic</div><div class="d">Runs on ordinary trades — no keeper, no owner. Anyone can also poke() it.</div></div>
+      <div class="k"><div class="t">🛑 Pool-safe</div><div class="d">Max 1% of the pool per run; debt tracks real decay, never over-drains LP.</div></div>
+      <div class="k"><div class="t">🔁 Gated</div><div class="d">Fires only when the work exceeds ~2× the gas, at most once per few blocks.</div></div>
+      <div class="k"><div class="t">💧 V2 only</div><div class="d">Only the MARKET/ETH pair is pumped; other pools stay fully decay-immune.</div></div>
     </div>
   </div>
 
