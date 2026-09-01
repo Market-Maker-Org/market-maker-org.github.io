@@ -1395,6 +1395,7 @@ async function boot(){
   showSkeletons(); // polished first paint while data loads
   initBrand();  // animated fragment/reunite "Market Maker" wordmark
   loadPrefs(); // restore saved chart series/range/log, slippage, watched wallet
+  SERIES.index.on=false; // MARKET has no reflection — keep that series off regardless of stale prefs
   try{const pm=JSON.parse(localStorage.getItem("mm_pumps")||"[]");if(pm.length){pumpMarks=pm;pumpCumMM=pm.reduce((a,m)=>a+m.amt,0);}}catch(e){} // persisted pump history → debt shows instantly
   restoreCache(); // paint last-seen feed/holders/chart instantly (refreshed by the live fetches)
   if(!watch&&CFG.defaultWatch)watch=CFG.defaultWatch;
@@ -2651,7 +2652,7 @@ let _flowT;window.addEventListener("resize",()=>{clearTimeout(_flowT);_flowT=set
 
 function buildChartTools(){
   const box=$("cseries");if(!box)return;
-  const chips=Object.entries(SERIES).map(([k,s])=>
+  const chips=Object.entries(SERIES).filter(([k])=>k!=="index").map(([k,s])=> // MARKET has no reflection — hide that series chip
     `<button class="cbtn ${s.on?'on':''}" data-k="${k}" style="color:${s.color}" onclick="toggleSeries('${k}')"><span class="dot"></span>${s.label}</button>`).join("");
   const ranges=[["50",50],["200",200],["All",0]].map(([l,n])=>
     `<button class="cbtn ${chartRange==n?'on':''}" data-r="${n}" onclick="setRange(${n})">${l}</button>`).join("");
