@@ -12,16 +12,16 @@
 <meta name="apple-mobile-web-app-title" content="Market Maker">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#000000">
-<meta name="description" content="Market Maker (MM) — live on-chain terminal for the decay-mirror-pump token on Robinhood Chain. Real-time price, liquidity, supply, reflection, and a payoff calculator.">
+<meta name="description" content="MARKET — live on-chain terminal for the decay-mirror-pump token on Robinhood Chain. Real-time price, liquidity, supply, pump debt, and an auto buyback/churn engine.">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Market Maker">
 <meta property="og:title" content="Market Maker Terminal">
-<meta property="og:description" content="Live on-chain terminal for MM — price, liquidity, deflation, reflection, and a payoff calculator on Robinhood Chain.">
+<meta property="og:description" content="Live on-chain terminal for MARKET — price, liquidity, deflation, pump debt, and an auto buyback/churn engine on Robinhood Chain.">
 <meta property="og:image" content="https://market-maker-org.github.io/mm.png">
 <meta property="og:url" content="https://market-maker-org.github.io/">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Market Maker Terminal">
-<meta name="twitter:description" content="Live on-chain terminal for MM — price, liquidity, deflation, reflection, and a payoff calculator.">
+<meta name="twitter:description" content="Live on-chain terminal for MARKET — price, liquidity, deflation, pump debt, and an auto buyback/churn engine.">
 <meta name="twitter:image" content="https://market-maker-org.github.io/mm.png">
 <script type="importmap">{"imports":{"@coinbase/wallet-sdk":"https://esm.sh/@coinbase/wallet-sdk@4?bundle"}}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -2032,8 +2032,8 @@ function pnlToDate(bal){
   const row=(lbl,ic,val,extra)=>`<div class="row"><span class="l">${icon(ic)} ${lbl}</span><span class="v ${cls(val)}">${sg(val)}${dv(val)}${extra?` <span class="muted">${extra}</span>`:""}</span></div>`;
   return `<div class="row" style="border-top:1px dashed var(--line2);margin-top:4px;padding-top:6px"><span class="l" style="font-weight:600">To date <span class="muted">· since ${dstr}</span></span><span class="v muted" style="font-size:10px">${days.toFixed(days<1?1:0)}d · ${tag}</span></div>
    ${row("Pump/price","pump",priceEff,sg(priceRet)+Math.abs(priceRet*100).toFixed(1)+"%")}
-   ${row("Reflection","reflect",reflEff,"+"+fmt(reflMM,0)+" MM")}
-   ${row("Decay","decay",decayEff,"−"+fmt(decayMM,0)+" MM")}
+   ${reflBps>0?row("Reflection","reflect",reflEff,"+"+fmt(reflMM,0)+" MARKET"):""}
+   ${row("Decay","decay",decayEff,"−"+fmt(decayMM,0)+" MARKET")}
    <div class="row net"><span class="l">Net · ex-swap</span><span class="v ${cls(netEx)}">${sg(netEx)}${dv(netEx)}</span></div>
    <div class="row"><span class="l">Net · all-in ${verdict}</span><span class="v ${cls(netAll)}" style="font-size:14px">${sg(netAll)}${dv(netAll)}</span></div>`;
 }
@@ -2056,13 +2056,13 @@ function renderPnL(bal){
   const netAll=pumpPct+reflPct-decayPct;                // all-in value net
   const pill=v=>`<span class="netpill ${v>=0?'pos':'neg'}">${v>=0?'net +':'net −'}</span>`;
   const cls=v=>v>=0?'pos':'neg',sg=v=>(v>=0?'+':'−')+Math.abs(v).toFixed(0)+'%';
-  const amt=n=>fmt(Math.abs(n),0)+" MM";
+  const amt=n=>fmt(Math.abs(n),0)+" MARKET";
   const decayMM=bal*dFrac,reflMM=bal*reflPct/100,netExMM=bal*netEx/100,netAllMM=bal*netAll/100; // YOUR MM amounts — differ per wallet
   box.innerHTML=pnlToDate(bal)+`
    <div class="row" style="border-top:1px dashed var(--line2);margin-top:4px;padding-top:6px"><span class="l muted" style="font-size:9.5px">Expected · forward-looking /yr</span></div>
    <div class="row"><span class="l">${icon('decay')} Decay <span class="muted">/yr</span></span><span class="v neg">−${decayPct.toFixed(0)}% <span class="muted">·−${amt(decayMM)}</span></span></div>
    <div class="row"><span class="l">${icon('pump')} Pump lift <span class="muted">/yr</span></span><span class="v pos">+${pumpPct.toFixed(0)}%</span></div>
-   <div class="row"><span class="l">${icon('reflect')} Reflection <span class="muted">/yr</span></span><span class="v pos">+${reflPct.toFixed(0)}% <span class="muted">·+${amt(reflMM)}</span></span></div>
+   ${reflBps>0?`<div class="row"><span class="l">${icon('reflect')} Reflection <span class="muted">/yr</span></span><span class="v pos">+${reflPct.toFixed(0)}% <span class="muted">·+${amt(reflMM)}</span></span></div>`:""}
    <div class="row net"><span class="l">Net · ex-swap ${pill(netEx)}</span><span class="v ${cls(netEx)}">${sg(netEx)} <span class="muted">${netEx>=0?'+':'−'}${amt(netExMM)}</span></span></div>
    <div class="row"><span class="l">Net · all-in ${pill(netAll)}</span><span class="v ${cls(netAll)}">${sg(netAll)} <span class="muted">${netAll>=0?'+':'−'}${amt(netAllMM)}</span></span></div>
    <div class="row"><span class="l muted" style="font-size:9.5px">% is per-unit (same for every holder) — MM amounts are yours</span></div>`;
